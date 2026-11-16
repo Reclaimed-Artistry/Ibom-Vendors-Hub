@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CustomerRegisterForm, VendorRegisterForm } from "@/components/auth-forms";
+import { Lock, LogIn, ShieldCheck, Store, UserPlus } from "lucide-react";
+import { VendorRegisterForm } from "@/components/auth-forms";
 import { GoogleAuthButton } from "@/components/google-auth-button";
 import { getCurrentUser } from "@/lib/auth";
+import { getCategoriesWithCounts } from "@/lib/storefront";
+import { getSettings } from "@/lib/settings";
 import { systemDb } from "@/lib/db";
-import { getStoreCategories } from "@/lib/storefront";
-import { rootDomain } from "@/lib/domains";
 
-export const metadata = { title: "Create an account" };
-export const dynamic = "force-dynamic";
+export const metadata = { title: "Create a Storefront" };
 
 export default async function RegisterPage({
   searchParams,
@@ -16,87 +16,104 @@ export default async function RegisterPage({
   searchParams: Promise<{ role?: string; next?: string }>;
 }) {
   const params = await searchParams;
-  const isCustomer = params.role === "customer";
-  const nextQuery = params.next ? `&next=${encodeURIComponent(params.next)}` : "";
 
-  const currentUser = await getCurrentUser();
-  let initialUser: { fullName?: string; email?: string; phone?: string | null } | undefined;
-
-  if (currentUser) {
-    if (isCustomer) {
-      if (params.next && params.next.startsWith("/")) redirect(params.next);
-      redirect(currentUser.role === "vendor" ? "/vendor" : currentUser.role === "customer" ? "/account" : "/admin");
-    } else {
-      const existingStore = await systemDb.maybeOne<{ id: string }>(
-        `select id from stores where owner_id = $1 limit 1`,
-        [currentUser.id],
-      );
-      if (existingStore) {
-        redirect("/vendor");
-      }
-      if (currentUser.role === "customer" || currentUser.role === "vendor") {
-        const profileRow = await systemDb.maybeOne<{ phone: string | null }>(
-          `select phone from users where id = $1`,
-          [currentUser.id],
-        );
-        initialUser = {
-          fullName: currentUser.fullName,
-          email: currentUser.email,
-          phone: profileRow?.phone ?? "",
-        };
-      }
-    }
+  // Backward compatibility for `/register?role=customer`
+  if (params.role === "customer") {
+    const query = params.next ? `?next=${encodeURIComponent(params.next)}` : "";
+    redirect(`/register/customer${query}`);
   }
 
-  const categories = isCustomer ? [] : await getStoreCategories();
+  const currentUser = await getCurrentUser();
+
+  // Gate: Users can ONLY view or submit the storefront creation form AFTER signing in with Google or creating an account first.
+  if (!currentUser) {
+    return (
+      <div className="space-y-6">
+        <div className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-800">
+          <Lock className="size-3.5" /> Account required first
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-ink-900">
+            Sign in or create an account first
+          </h1>
+          <p className="mt-2 text-sm leading-6 text-ink-600">
+            To open a storefront on Ibom Vendors Hub, first sign in with your Google account or create your account.
+            Once you are signed in, you&apos;ll immediately get the option to create your verified Akwa Ibom storefront.
+          </p>
+        </div>
+
+        <div className="space-y-3 rounded-2xl border border-ink-200 bg-white p-5 shadow-soft">
+          <GoogleAuthButton label="Sign in with Google to continue" next="/register" divider={false} />
+
+          <Link
+            href="/register/customer?next=%2Fregister"
+            className="btn-primary flex w-full items-center justify-center gap-2"
+          >
+            <UserPlus className="size-4" /> Create an account first
+          </Link>
+
+          <Link
+            href="/login?next=%2Fregister"
+            className="btn-secondary flex w-full items-center justify-center gap-2"
+          >
+            <LogIn className="size-4" /> Sign in to existing account
+          </Link>
+        </div>
+
+        <div className="flex items-start gap-2.5 rounded-xl border border-ink-100 bg-ink-50/70 p-3.5 text-xs text-ink-600">
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand-700" />
+          <p>
+            Every vendor storefront is tied to a verified account owner, has a globally unique locked business name,
+            and receives Paystack escrow payouts directly to your Nigerian bank account.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentUser.role === "admin" || currentUser.role === "super_admin") {
+    redirect("/admin");
+  }
+
+  const existingStore = await systemDb.maybeOne<{ id: string }>(
+    `select id from stores where owner_id = $1 limit 1`,
+    [currentUser.id],
+  );
+  if (existingStore) redirect("/vendor");
+
+  const [categories, settings, userRecord] = await Promise.all([
+    getCategoriesWithCounts(),
+    getSettings(),
+    systemDb.maybeOne<{ phone: string | null }>(`select phone from users where id = $1`, [currentUser.id]),
+  ]);
+  const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? settings.main_domain ?? "ibomvendorshub.com";
 
   return (
     <div>
-      <div className="mb-6 inline-flex rounded-xl bg-ink-100 p-1 text-xs font-semibold">
-        <Link
-          href="/register"
-          className={`rounded-lg px-3.5 py-1.5 transition ${!isCustomer ? "bg-white text-ink-900 shadow-soft" : "text-ink-500"}`}
-        >
-          Akwa Ibom business
-        </Link>
-        <Link
-          href={`/register?role=customer${nextQuery}`}
-          className={`rounded-lg px-3.5 py-1.5 transition ${isCustomer ? "bg-white text-ink-900 shadow-soft" : "text-ink-500"}`}
-        >
-          Customer account
-        </Link>
+      <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+        <Store className="size-3.5" /> Account verified · Storefront setup unlocked
+      </div>
+      <h1 className="mt-3 text-2xl font-bold tracking-tight">Create your Akwa Ibom storefront</h1>
+      <p className="mt-1.5 text-sm text-ink-500">
+        Choose your unique business name, verify your Akwa Ibom address, and add the Nigerian bank account where you receive customer payouts. Includes a {settings.default_trial_days}-day free trial.
+      </p>
+
+      <div className="mt-6">
+        <VendorRegisterForm
+          categories={categories}
+          rootDomain={rootDomain}
+          initialUser={{
+            fullName: currentUser.fullName,
+            email: currentUser.email,
+            phone: userRecord?.phone,
+          }}
+        />
       </div>
 
-      {isCustomer ? (
-        <>
-          <h1 className="text-2xl font-bold tracking-tight">Create a customer account</h1>
-          <p className="mt-1.5 text-sm text-ink-500">
-            Required to check out, receive your delivery verification PIN, and review verified purchases.
-          </p>
-          <div className="mt-6 space-y-5">
-            <GoogleAuthButton label="Sign up with Google" next={params.next ?? "/account"} />
-            <CustomerRegisterForm next={params.next} />
-          </div>
-        </>
-      ) : (
-        <>
-          <h1 className="text-2xl font-bold tracking-tight">Open your Akwa Ibom storefront</h1>
-          <p className="mt-1.5 text-sm text-ink-500">
-            Get your own business address on Ibom Vendors Hub with a free 14-day trial. Exclusively for Akwa Ibom State merchants.
-          </p>
-          <div className="mt-6">
-            <VendorRegisterForm categories={categories} rootDomain={rootDomain()} initialUser={initialUser} />
-          </div>
-        </>
-      )}
-
       <p className="mt-6 text-sm text-ink-500">
-        Already have an account?{" "}
-        <Link
-          href={params.next ? `/login?next=${encodeURIComponent(params.next)}` : "/login"}
-          className="font-semibold text-brand-800 hover:text-brand-900"
-        >
-          Sign in
+        Not ready right now?{" "}
+        <Link href="/account" className="font-semibold text-brand-800 hover:text-brand-900">
+          Return to My Account
         </Link>
       </p>
     </div>

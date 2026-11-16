@@ -44,13 +44,29 @@ export const loginSchema = z.object({
   next: z.string().optional(),
 });
 
+const accountNumberSchema = z
+  .string()
+  .trim()
+  .transform((val) => val.replace(/\s+/g, ""))
+  .refine((val) => val === "" || /^\d{10}$/.test(val), "Enter a valid 10-digit Nigerian bank account number (NUBAN)");
+
+export const vendorBankAccountSchema = z.object({
+  bankName: z.string().trim().min(2, "Select or enter your bank name").max(100),
+  accountNumber: z
+    .string()
+    .trim()
+    .transform((val) => val.replace(/\s+/g, ""))
+    .refine((val) => /^\d{10}$/.test(val), "Enter a valid 10-digit Nigerian bank account number (NUBAN)"),
+  accountName: z.string().trim().min(3, "Enter the exact name on your bank account").max(140),
+});
+
 export const vendorRegisterSchema = z
   .object({
-    businessName: z.string().trim().min(2, "Business name is required").max(120),
+    businessName: z.string().trim().min(3, "Business name must be at least 3 characters").max(120),
     ownerName: z.string().trim().min(2, "Your full name is required").max(120),
-    email,
+    email: email.optional().or(z.literal("")),
     phone,
-    password,
+    password: password.optional().or(z.literal("")),
     categorySlug: z.string().min(1, "Choose a business category"),
     description: z.string().trim().min(10, "Tell customers about your business (at least 10 characters)").max(4000),
     city: z.string().trim().min(2, "Select your Local Government Area / town in Akwa Ibom").max(80),
@@ -61,6 +77,9 @@ export const vendorRegisterSchema = z
     proofOfResidenceUrl: z.string().trim().min(1, "Upload your proof of residence document").max(3_200_000),
     cacRegistered: z.enum(["yes", "no"], { message: "Indicate whether your business is registered with CAC" }),
     cacNumber: z.string().trim().max(40).optional().or(z.literal("")),
+    bankName: z.string().trim().min(2, "Select or enter the bank where you receive payouts").max(100),
+    accountNumber: accountNumberSchema.refine((val) => /^\d{10}$/.test(val), "Enter your 10-digit payout bank account number"),
+    accountName: z.string().trim().min(3, "Enter the account holder name matching your bank account").max(140),
     logoUrl: z.string().trim().max(3_200_000).optional().or(z.literal("")),
     coverUrl: z.string().trim().max(3_200_000).optional().or(z.literal("")),
     acceptTerms: z.literal("on", { message: "You must accept the terms" }),

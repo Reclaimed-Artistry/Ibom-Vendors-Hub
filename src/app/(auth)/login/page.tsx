@@ -50,10 +50,10 @@ export default async function LoginPage({
           <Alert tone="info">
             Your cart items are saved on this device. Sign in below or{" "}
             <Link
-              href={`/register?role=customer&next=${encodeURIComponent(params.next ?? "/checkout")}`}
+              href={`/register/customer?next=${encodeURIComponent(params.next ?? "/checkout")}`}
               className="font-semibold underline"
             >
-              create a customer account
+              create an account
             </Link>{" "}
             to complete your order.
           </Alert>
@@ -74,28 +74,13 @@ export default async function LoginPage({
         </div>
       ) : null}
       <p className="mt-6 text-sm text-ink-500">
-        {isCheckoutRedirect ? (
-          <>
-            Don&apos;t have an account yet?{" "}
-            <Link
-              href={`/register?role=customer&next=${encodeURIComponent(params.next ?? "/checkout")}`}
-              className="font-semibold text-brand-800 hover:text-brand-900"
-            >
-              Create a customer account
-            </Link>
-          </>
-        ) : (
-          <>
-            New to Ibom Vendors Hub?{" "}
-            <Link href="/register" className="font-semibold text-brand-800 hover:text-brand-900">
-              Open a storefront
-            </Link>{" "}
-            or{" "}
-            <Link href="/register?role=customer" className="font-semibold text-brand-800 hover:text-brand-900">
-              sign up as a customer
-            </Link>
-          </>
-        )}
+        Don&apos;t have an account yet?{" "}
+        <Link
+          href={params.next ? `/register/customer?next=${encodeURIComponent(params.next)}` : "/register/customer"}
+          className="font-semibold text-brand-800 hover:text-brand-900"
+        >
+          Create an account
+        </Link>
       </p>
     </div>
   );

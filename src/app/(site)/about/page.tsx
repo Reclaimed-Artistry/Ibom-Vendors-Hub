@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { getCurrentUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { normalisePhone } from "@/lib/utils";
 
 export const metadata = { title: "About" };
 
 export default async function AboutPage() {
-  const settings = await getSettings();
+  const [user, settings] = await Promise.all([getCurrentUser(), getSettings()]);
   return (
     <div className="container-page max-w-3xl py-12 prose-site">
       <h1 className="font-display text-3xl">A marketplace built for Akwa Ibom businesses</h1>
@@ -34,7 +35,22 @@ export default async function AboutPage() {
         <a className="underline" href={`mailto:${settings.support_email}`}>{settings.support_email}</a> ·{" "}
         <a className="underline" href={`tel:${normalisePhone(settings.support_phone)}`}>{settings.support_phone}</a>
       </p>
-      <p><Link href="/register" className="font-semibold text-brand-800 underline">Open your storefront today</Link>.</p>
+      <p>
+        {!user ? (
+          <Link href="/register/customer" className="font-semibold text-brand-800 underline">
+            Sign in or create an account today
+          </Link>
+        ) : user.role === "customer" ? (
+          <Link href="/register" className="font-semibold text-brand-800 underline">
+            Create your storefront today
+          </Link>
+        ) : (
+          <Link href={user.role === "vendor" ? "/vendor" : "/admin"} className="font-semibold text-brand-800 underline">
+            Go to your dashboard
+          </Link>
+        )}
+        .
+      </p>
     </div>
   );
 }

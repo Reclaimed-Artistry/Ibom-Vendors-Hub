@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
-import { CheckCircle2, Eye, EyeOff, FileCheck2, Loader2, MapPin, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, FileCheck2, Landmark, Loader2, Lock, MapPin, ShieldCheck } from "lucide-react";
 import {
   ActionState,
   forgotPasswordAction,
@@ -12,7 +12,7 @@ import {
   resetPasswordAction,
   verifyEmailAction,
 } from "@/app/actions/auth";
-import { AKWA_IBOM_LGAS, AKWA_IBOM_STATE, PROOF_OF_RESIDENCE_TYPES } from "@/lib/akwa-ibom";
+import { AKWA_IBOM_LGAS, AKWA_IBOM_STATE, NIGERIAN_BANKS, PROOF_OF_RESIDENCE_TYPES } from "@/lib/akwa-ibom";
 import { Alert, Field } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import type { StoreCategory } from "@/lib/types";
@@ -141,9 +141,6 @@ export function VendorRegisterForm({
   const [businessName, setBusinessName] = useState("");
   const [ownerName, setOwnerName] = useState(initialUser?.fullName ?? "");
   const [phone, setPhone] = useState(initialUser?.phone ?? "");
-  const [email, setEmail] = useState(initialUser?.email ?? "");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [categorySlug, setCategorySlug] = useState("");
   const [description, setDescription] = useState("");
   const [city, setCity] = useState("Uyo");
@@ -152,6 +149,9 @@ export function VendorRegisterForm({
   const [proofOfResidenceType, setProofOfResidenceType] = useState("utility_bill");
   const [cacRegistered, setCacRegistered] = useState<"yes" | "no">("no");
   const [cacNumber, setCacNumber] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [accountName, setAccountName] = useState(initialUser?.fullName ?? "");
   const [acceptTerms, setAcceptTerms] = useState(false);
 
   const [proofFileName, setProofFileName] = useState("");
@@ -164,8 +164,10 @@ export function VendorRegisterForm({
   const [coverUrl, setCoverUrl] = useState("");
   const [coverUploading, setCoverUploading] = useState(false);
 
+  const [checkingName, setCheckingName] = useState(false);
   const [check, setCheck] = useState<{
     available: boolean;
+    locked?: boolean;
     slug: string;
     suggestedSlug?: string;
     reason?: string;
@@ -175,8 +177,10 @@ export function VendorRegisterForm({
     const trimmed = businessName.trim();
     if (trimmed.length < 2) {
       setCheck(null);
+      setCheckingName(false);
       return;
     }
+    setCheckingName(true);
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(
@@ -187,12 +191,15 @@ export function VendorRegisterForm({
         setCheck(data);
       } catch {
         setCheck(null);
+      } finally {
+        setCheckingName(false);
       }
-    }, 260);
+    }, 240);
     return () => clearTimeout(timer);
   }, [businessName, city]);
 
   const anyUploading = proofUploading || logoUploading || coverUploading;
+  const isNameLocked = Boolean(check && !check.available);
 
   return (
     <form action={action} className="space-y-4">
@@ -201,11 +208,17 @@ export function VendorRegisterForm({
       <input type="hidden" name="proofOfResidenceUrl" value={proofOfResidenceUrl} />
       <input type="hidden" name="logoUrl" value={logoUrl} />
       <input type="hidden" name="coverUrl" value={coverUrl} />
+      <input type="hidden" name="email" value={initialUser?.email ?? ""} />
 
       {initialUser?.email ? (
-        <Alert tone="info">
-          Signed in as <strong>{initialUser.email}</strong>. Completing this form opens your Akwa Ibom storefront and sets your vendor sign-in password.
-        </Alert>
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-2.5 text-xs text-emerald-950">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="size-4 shrink-0 text-emerald-700" />
+            <span>
+              Creating storefront under verified account <strong>{initialUser.email}</strong>
+            </span>
+          </div>
+        </div>
       ) : null}
 
       <div className="flex items-start gap-2.5 rounded-xl border border-brand-200 bg-brand-50/70 px-3.5 py-2.5 text-xs text-brand-900">
@@ -213,23 +226,23 @@ export function VendorRegisterForm({
         <div>
           <p className="font-semibold">Akwa Ibom State Vendors Only</p>
           <p className="text-brand-800/90">
-            Every storefront on Ibom Vendors Hub is verified to operate within <strong>Akwa Ibom State</strong>.
+            Every storefront on Ibom Vendors Hub is verified to operate within <strong>Akwa Ibom State</strong> and has a globally unique business name.
           </p>
         </div>
       </div>
 
       <Field
-        label="Business name"
+        label="Unique business name"
         htmlFor="businessName"
-        error={state?.fieldErrors?.businessName}
+        error={isNameLocked ? (check?.reason ?? "That business name is already in use and locked.") : state?.fieldErrors?.businessName}
         hint={
-          check
-            ? check.available
-              ? `Your storefront address: ${check.slug}.${rootDomain}`
-              : check.suggestedSlug
-                ? `Storefront address assigned: ${check.suggestedSlug}.${rootDomain}`
-                : check.reason
-            : "This also sets your subdomain (e.g. mamaputkitchen." + rootDomain + ")"
+          checkingName
+            ? "Checking business name availability…"
+            : check?.available
+              ? `✓ Unique name available — storefront address: ${check.slug}.${rootDomain}`
+              : !check
+                ? `Every vendor business name is locked uniquely (e.g. mamaputkitchen.${rootDomain})`
+                : undefined
         }
         required
       >
@@ -238,10 +251,19 @@ export function VendorRegisterForm({
           name="businessName"
           value={businessName}
           onChange={(e) => setBusinessName(e.target.value)}
-          className="input"
+          className={`input ${isNameLocked ? "border-red-400 bg-red-50/30 focus:border-red-500 focus:ring-red-500/20" : ""}`}
           required
+          minLength={3}
           placeholder="e.g. Mama Put Kitchen"
         />
+        {isNameLocked ? (
+          <div className="mt-2 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-800">
+            <Lock className="mt-0.5 size-3.5 shrink-0 text-red-600" />
+            <span>
+              {check?.reason ?? "That business name is already in use and locked by another vendor. Choose a different business name."}
+            </span>
+          </div>
+        ) : null}
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -266,49 +288,6 @@ export function VendorRegisterForm({
             required
             placeholder="0803 123 4567"
           />
-        </Field>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Business email" htmlFor="email" error={state?.fieldErrors?.email} required>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="input"
-            required
-            autoComplete="email"
-          />
-        </Field>
-        <Field
-          label="Password"
-          htmlFor="password"
-          error={state?.fieldErrors?.password}
-          hint="Min 8 characters, letters & numbers"
-          required
-        >
-          <div className="relative">
-            <input
-              id="password"
-              name="password"
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input pr-10"
-              required
-              autoComplete="new-password"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-ink-400 hover:text-ink-700"
-            >
-              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            </button>
-          </div>
         </Field>
       </div>
 
@@ -562,6 +541,76 @@ export function VendorRegisterForm({
         )}
       </div>
 
+      {/* Payout Bank Account */}
+      <div className="space-y-4 rounded-2xl border border-emerald-200/80 bg-emerald-50/40 p-4">
+        <div className="flex items-start gap-2.5">
+          <Landmark className="mt-0.5 size-5 shrink-0 text-emerald-700" />
+          <div>
+            <h3 className="text-sm font-semibold text-ink-900">Payout Bank Account (Where You Receive Payments)</h3>
+            <p className="text-xs text-ink-600">
+              Customers pay securely via Paystack escrow at checkout. Once an order is delivered using the customer’s 6-digit PIN, your earnings unlock into your Available Wallet and are sent to this Nigerian bank account.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Nigerian bank" htmlFor="bankName" error={state?.fieldErrors?.bankName} required>
+            <input
+              id="bankName"
+              name="bankName"
+              list="nigerian-banks-list"
+              value={bankName}
+              onChange={(e) => setBankName(e.target.value)}
+              className="input"
+              required
+              placeholder="Select or type bank (e.g. GTBank, OPay)"
+            />
+            <datalist id="nigerian-banks-list">
+              {NIGERIAN_BANKS.map((bank) => (
+                <option key={bank} value={bank} />
+              ))}
+            </datalist>
+          </Field>
+
+          <Field
+            label="10-digit account number (NUBAN)"
+            htmlFor="accountNumber"
+            error={state?.fieldErrors?.accountNumber}
+            required
+          >
+            <input
+              id="accountNumber"
+              name="accountNumber"
+              inputMode="numeric"
+              maxLength={10}
+              value={accountNumber}
+              onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
+              className="input font-mono tracking-wider"
+              required
+              placeholder="0123456789"
+            />
+          </Field>
+        </div>
+
+        <Field
+          label="Account holder name"
+          htmlFor="accountName"
+          error={state?.fieldErrors?.accountName}
+          hint="Exact name displayed on your bank account (can be updated later in Wallet & Payouts)"
+          required
+        >
+          <input
+            id="accountName"
+            name="accountName"
+            value={accountName}
+            onChange={(e) => setAccountName(e.target.value)}
+            className="input"
+            required
+            placeholder="e.g. Mama Put Kitchen Ventures or Grace Etim"
+          />
+        </Field>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           label="Business logo"
@@ -635,6 +684,10 @@ export function VendorRegisterForm({
       {anyUploading ? (
         <button type="button" disabled className="btn-primary w-full opacity-70">
           <Loader2 className="size-4 animate-spin" /> Finishing file upload…
+        </button>
+      ) : isNameLocked ? (
+        <button type="button" disabled className="btn-primary w-full cursor-not-allowed opacity-60">
+          <Lock className="size-4" /> Business name locked — choose a unique name
         </button>
       ) : (
         <SubmitButton className="w-full" pendingLabel="Creating your storefront…">

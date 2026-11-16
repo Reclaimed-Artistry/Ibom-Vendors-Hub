@@ -209,6 +209,21 @@ export default async function AdminVendorDetailPage({ params }: { params: Promis
                     )}
                   </dd>
                 </div>
+                <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3 sm:col-span-2">
+                  <dt className="text-xs font-medium text-emerald-900">Settlement Bank Account (Vendor Payouts)</dt>
+                  <dd className="mt-1 text-sm text-ink-900">
+                    {kyc?.bank_name && kyc?.account_number ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold">
+                          {kyc.bank_name} · <span className="font-mono">{kyc.account_number}</span>
+                        </span>
+                        <span className="text-xs font-medium text-ink-600">{kyc.account_name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-ink-500">Not added yet</span>
+                    )}
+                  </dd>
+                </div>
                 <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3 sm:col-span-2">
                   <dt className="text-xs font-medium text-ink-500">Proof of Residence ({proofOfResidenceLabel(kyc?.proof_of_residence_type)})</dt>
                   <dd className="mt-1.5 flex items-center justify-between gap-2">

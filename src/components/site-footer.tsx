@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { getCurrentUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { getCategoriesWithCounts } from "@/lib/storefront";
 import { normalisePhone } from "@/lib/utils";
 
 export async function SiteFooter() {
-  const [settings, categories] = await Promise.all([getSettings(), getCategoriesWithCounts()]);
+  const [user, settings, categories] = await Promise.all([
+    getCurrentUser(),
+    getSettings(),
+    getCategoriesWithCounts(),
+  ]);
   return (
     <footer className="mt-16 border-t border-ink-100 bg-white">
       <div className="container-page grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-4">
@@ -24,7 +29,15 @@ export async function SiteFooter() {
             <li><Link className="hover:text-brand-800" href="/browse">All products</Link></li>
             <li><Link className="hover:text-brand-800" href="/stores">All vendors</Link></li>
             <li><Link className="hover:text-brand-800" href="/track">Track an order</Link></li>
-            <li><Link className="hover:text-brand-800" href="/register">Open a storefront</Link></li>
+            {!user ? (
+              <li><Link className="hover:text-brand-800" href="/register/customer">Sign in / Create account</Link></li>
+            ) : user.role === "customer" ? (
+              <li><Link className="font-medium text-brand-800 hover:text-brand-900" href="/register">Create a storefront</Link></li>
+            ) : user.role === "vendor" ? (
+              <li><Link className="hover:text-brand-800" href="/vendor">Vendor dashboard</Link></li>
+            ) : (
+              <li><Link className="hover:text-brand-800" href="/admin">Admin console</Link></li>
+            )}
           </ul>
         </div>
         <div>

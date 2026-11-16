@@ -9,6 +9,9 @@ export interface VendorProfile {
   proof_of_residence_type: string | null;
   cac_registered: boolean;
   cac_number: string | null;
+  bank_name?: string | null;
+  account_number?: string | null;
+  account_name?: string | null;
   kyc_status: "pending" | "submitted" | "verified" | "rejected";
   kyc_note: string | null;
   verified_at: string | null;
@@ -139,6 +142,7 @@ export interface Store {
   minimum_order: number;
   delivery_areas: string | null;
   prep_time_minutes: number;
+  commission_rate?: number | null;
   rating_avg: number;
   rating_count: number;
   is_featured: boolean;

@@ -798,3 +798,138 @@ export async function verifyPaystackAction(_prev: AdminState, _formData: FormDat
     : "no settled balance yet";
   return { message: `The secret key authenticates with Paystack. Account balance: ${balances}.` };
 }
+
+export async function settleVendorPayoutAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const payoutId = String(formData.get("payoutId") ?? "").trim();
+  const decision = String(formData.get("decision") ?? "").trim(); // "paid" | "failed"
+  const reference = String(formData.get("reference") ?? "").trim() || null;
+  const adminNote = String(formData.get("note") ?? "").trim() || null;
+
+  if (!payoutId || (decision !== "paid" && decision !== "failed")) {
+    return { error: "Invalid payout settlement action." };
+  }
+
+  try {
+    await withSystem(async (db) => {
+      const payout = await db.maybeOne<{
+        id: string;
+        store_id: string;
+        amount: number;
+        status: string;
+        bank_name: string | null;
+        account_number: string | null;
+        account_name: string | null;
+        owner_id: string;
+        store_name: string;
+      }>(
+        `select p.id, p.store_id, p.amount::float8 as amount, p.status,
+                p.bank_name, p.account_number, p.account_name,
+                s.owner_id, s.name as store_name
+           from vendor_payouts p
+           join stores s on s.id = p.store_id
+          where p.id = $1
+          for update of p`,
+        [payoutId],
+      );
+
+      if (!payout) throw new Error("Payout request not found.");
+      if (payout.status !== "pending" && payout.status !== "processing") {
+        throw new Error(`This payout request is already marked ${payout.status}.`);
+      }
+
+      if (decision === "paid") {
+        await db.execute(
+          `update vendor_payouts
+              set status = 'paid',
+                  reference = coalesce($2, reference),
+                  note = coalesce($3, note),
+                  processed_by = $4,
+                  processed_at = now()
+            where id = $1`,
+          [payoutId, reference, adminNote, user.id],
+        );
+
+        await db.execute(
+          `update vendor_balances
+              set lifetime_withdrawn = lifetime_withdrawn + $2,
+                  updated_at = now()
+            where store_id = $1`,
+          [payout.store_id, payout.amount],
+        );
+
+        await notify(
+          {
+            userId: payout.owner_id,
+            storeId: payout.store_id,
+            type: "payout_paid",
+            title: `Payout Sent: ₦${Number(payout.amount).toLocaleString()}`,
+            body: `₦${Number(payout.amount).toLocaleString()} has been transferred to ${payout.bank_name ?? "your bank account"} (${payout.account_number ?? ""})${reference ? ` · Ref: ${reference}` : ""}.`,
+            actionUrl: "/vendor/payouts",
+            dedupeKey: `payout-paid:${payout.id}`,
+          },
+          db,
+        );
+      } else {
+        await db.execute(
+          `update vendor_payouts
+              set status = 'failed',
+                  note = coalesce($2, note),
+                  processed_by = $3,
+                  processed_at = now()
+            where id = $1`,
+          [payoutId, adminNote ?? "Returned to available wallet balance", user.id],
+        );
+
+        await db.execute(
+          `update vendor_balances
+              set available_amount = available_amount + $2,
+                  updated_at = now()
+            where store_id = $1`,
+          [payout.store_id, payout.amount],
+        );
+
+        await notify(
+          {
+            userId: payout.owner_id,
+            storeId: payout.store_id,
+            type: "payout_returned",
+            title: `Payout Returned to Wallet: ₦${Number(payout.amount).toLocaleString()}`,
+            body: `Your payout request was returned to your available wallet balance${adminNote ? `: ${adminNote}` : "."}`,
+            actionUrl: "/vendor/payouts",
+            dedupeKey: `payout-failed:${payout.id}`,
+          },
+          db,
+        );
+      }
+
+      await logActivity(
+        {
+          actorId: user.id,
+          actorRole: "admin",
+          storeId: payout.store_id,
+          action: decision === "paid" ? "payout.paid" : "payout.returned",
+          entityType: "payout",
+          entityId: payout.id,
+          description:
+            decision === "paid"
+              ? `Marked payout of ₦${Number(payout.amount).toLocaleString()} to ${payout.store_name} as paid${reference ? ` (${reference})` : ""}`
+              : `Returned payout of ₦${Number(payout.amount).toLocaleString()} back to ${payout.store_name} available wallet`,
+        },
+        db,
+      );
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not update payout status" };
+  }
+
+  revalidatePath("/admin/payments");
+  revalidatePath("/vendor");
+  revalidatePath("/vendor/payouts");
+  return {
+    message:
+      decision === "paid"
+        ? "Payout marked as paid and vendor notified."
+        : "Payout cancelled and funds returned to vendor's available wallet.",
+  };
+}

@@ -9,17 +9,29 @@ import {
   setSessionCookie,
   vendorSuspensionMessage,
 } from "@/lib/auth";
-import { systemDb, withActor } from "@/lib/db";
+import { isUniqueViolation, systemDb, withActor, withSystem } from "@/lib/db";
 import { logActivity } from "@/lib/audit";
-import { notify } from "@/lib/notifications";
+import { notify, notifyAdmins } from "@/lib/notifications";
 import { sendEmail } from "@/lib/email";
 import { uploadImage, uploadVerificationDocument } from "@/lib/storage";
 import { AKWA_IBOM_STATE } from "@/lib/akwa-ibom";
 import { getSettings } from "@/lib/settings";
 import { updateOrderByVendor } from "@/lib/orders";
-import { deleteProductCompletely, deleteStoreCompletely, resubmitStoreForReview } from "@/lib/stores";
+import {
+  deleteProductCompletely,
+  deleteStoreCompletely,
+  normaliseBusinessName,
+  resubmitStoreForReview,
+} from "@/lib/stores";
 import { purchaseSubscription, getPlans } from "@/lib/subscriptions";
-import { productSchema, storeSettingsSchema, vendorKycSchema, quotationResponseSchema, formatIssues } from "@/lib/validation";
+import {
+  productSchema,
+  storeSettingsSchema,
+  vendorBankAccountSchema,
+  vendorKycSchema,
+  quotationResponseSchema,
+  formatIssues,
+} from "@/lib/validation";
 import { toSlug } from "@/lib/utils";
 
 export interface VendorState {
@@ -445,6 +457,18 @@ export async function saveStoreSettingsAction(_prev: VendorState, formData: Form
   });
   if (!parsed.success) return { error: "Please fix the highlighted fields", fieldErrors: formatIssues(parsed.error) };
   const data = parsed.data;
+  const cleanTitle = data.name.trim().replace(/\s+/g, " ");
+  const takenStore = await systemDb.maybeOne<{ id: string; name: string }>(
+    `select id, name from stores
+      where lower(regexp_replace(btrim(name), '\\s+', ' ', 'g')) = $1
+        and id <> $2
+      limit 1`,
+    [normaliseBusinessName(cleanTitle), ctx.store.id],
+  );
+  if (takenStore) {
+    const lockMsg = `Business name “${takenStore.name}” is already in use and locked by another vendor. Please choose a unique business name.`;
+    return { error: lockMsg, fieldErrors: { name: lockMsg } };
+  }
 
   const hours: Record<string, { open: string; close: string; closed: boolean }> = {};
   for (const day of ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]) {
@@ -473,7 +497,7 @@ export async function saveStoreSettingsAction(_prev: VendorState, formData: Form
           where id=$1`,
         [
           ctx.store.id,
-          data.name,
+          cleanTitle,
           data.tagline || null,
           data.description || null,
           data.email || null,
@@ -501,6 +525,11 @@ export async function saveStoreSettingsAction(_prev: VendorState, formData: Form
       );
     });
   } catch (error) {
+    if (isUniqueViolation(error)) {
+      const lockMsg =
+        "That business name is already in use and locked by another vendor. Please choose a unique business name.";
+      return { error: lockMsg, fieldErrors: { name: lockMsg } };
+    }
     return { error: error instanceof Error ? error.message : "Settings could not be saved" };
   }
 
@@ -838,4 +867,149 @@ export async function markNotificationsReadAction() {
   await systemDb.execute(`update notifications set read_at = now() where user_id = $1 and read_at is null`, [user.id]);
   revalidatePath("/vendor");
   revalidatePath("/account");
+}
+
+/* -------------------------------------------------------------------------- */
+/* Settlement Bank Account & Payout Withdrawals                               */
+/* -------------------------------------------------------------------------- */
+
+export async function saveVendorBankAccountAction(_prev: VendorState, formData: FormData): Promise<VendorState> {
+  const ctx = await getVendorContext();
+  const parsed = vendorBankAccountSchema.safeParse({
+    bankName: formData.get("bankName") ?? "",
+    accountNumber: formData.get("accountNumber") ?? "",
+    accountName: formData.get("accountName") ?? "",
+  });
+  if (!parsed.success) {
+    return { error: "Please fix the highlighted bank account fields", fieldErrors: formatIssues(parsed.error) };
+  }
+
+  try {
+    await systemDb.execute(
+      `insert into vendor_profiles (user_id, position, bank_name, account_number, account_name)
+       values ($1, 'Owner', $2, $3, $4)
+       on conflict (user_id) do update
+         set bank_name = excluded.bank_name,
+             account_number = excluded.account_number,
+             account_name = excluded.account_name,
+             updated_at = now()`,
+      [ctx.user.id, parsed.data.bankName, parsed.data.accountNumber, parsed.data.accountName],
+    );
+
+    await logActivity({
+      actorId: ctx.user.id,
+      actorRole: "vendor",
+      storeId: ctx.store.id,
+      action: "vendor.bank_account_updated",
+      entityType: "store",
+      entityId: ctx.store.id,
+      description: `${ctx.store.name} saved payout bank account (${parsed.data.bankName} · ${parsed.data.accountNumber})`,
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not save bank account details" };
+  }
+
+  revalidatePath("/vendor");
+  revalidatePath("/vendor/payouts");
+  revalidatePath("/vendor/store");
+  revalidatePath(`/admin/vendors/${ctx.store.id}`);
+  revalidatePath("/admin/payments");
+  return { message: "Payout bank account saved." };
+}
+
+export async function requestVendorPayoutAction(_prev: VendorState, formData: FormData): Promise<VendorState> {
+  const ctx = await getVendorContext();
+  const lockError = vendorSuspensionMessage(ctx);
+  if (lockError) return { error: lockError };
+
+  const rawAmount = Number(formData.get("amount") ?? 0);
+  const note = String(formData.get("note") ?? "").trim() || null;
+  if (!Number.isFinite(rawAmount) || rawAmount < 500) {
+    return { error: "Minimum payout withdrawal is ₦500." };
+  }
+  const amount = Math.round(rawAmount * 100) / 100;
+
+  const bank = await systemDb.maybeOne<{
+    bank_name: string | null;
+    account_number: string | null;
+    account_name: string | null;
+  }>(
+    `select bank_name, account_number, account_name from vendor_profiles where user_id = $1`,
+    [ctx.user.id],
+  );
+  if (!bank?.bank_name || !bank?.account_number || !bank?.account_name) {
+    return { error: "Save your Nigerian bank account details first before requesting a payout." };
+  }
+
+  try {
+    await withSystem(async (db) => {
+      await db.execute(
+        `insert into vendor_balances (store_id) values ($1) on conflict (store_id) do nothing`,
+        [ctx.store.id],
+      );
+      const balance = await db.one<{ available_amount: number }>(
+        `select available_amount::float8 as available_amount
+           from vendor_balances
+          where store_id = $1
+          for update`,
+        [ctx.store.id],
+      );
+      if (Number(balance.available_amount) < amount) {
+        throw new Error(
+          `Insufficient unlocked balance. Available for payout: ₦${Number(balance.available_amount).toLocaleString()}.`,
+        );
+      }
+
+      await db.execute(
+        `update vendor_balances
+            set available_amount = available_amount - $2,
+                updated_at = now()
+          where store_id = $1`,
+        [ctx.store.id, amount],
+      );
+
+      const payout = await db.one<{ id: string }>(
+        `insert into vendor_payouts
+           (store_id, amount, currency, status, bank_name, account_number, account_name, note)
+         values ($1, $2, 'NGN', 'pending', $3, $4, $5, $6)
+         returning id`,
+        [ctx.store.id, amount, bank.bank_name, bank.account_number, bank.account_name, note],
+      );
+
+      await logActivity(
+        {
+          actorId: ctx.user.id,
+          actorRole: "vendor",
+          storeId: ctx.store.id,
+          action: "vendor.payout_requested",
+          entityType: "payout",
+          entityId: payout.id,
+          description: `${ctx.store.name} requested payout of ₦${amount.toLocaleString()} to ${bank.bank_name} (${bank.account_number})`,
+        },
+        db,
+      );
+
+      await notifyAdmins(
+        {
+          storeId: ctx.store.id,
+          type: "payout_requested",
+          title: `Payout Request: ₦${amount.toLocaleString()} — ${ctx.store.name}`,
+          body: `Transfer to ${bank.bank_name} · ${bank.account_number} (${bank.account_name}). Review & settle in Admin Payments.`,
+          actionUrl: "/admin/payments",
+          dedupeKey: `payout-req:${payout.id}`,
+        },
+        db,
+      );
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not submit payout request" };
+  }
+
+  revalidatePath("/vendor");
+  revalidatePath("/vendor/payouts");
+  revalidatePath("/admin/payments");
+  revalidatePath(`/admin/vendors/${ctx.store.id}`);
+  return {
+    message: `Payout request for ₦${amount.toLocaleString()} submitted! Funds will be transferred to ${bank.bank_name} (${bank.account_number}).`,
+  };
 }

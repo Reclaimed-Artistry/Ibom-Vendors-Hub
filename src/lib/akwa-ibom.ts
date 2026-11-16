@@ -56,3 +56,42 @@ export function isAkwaIbomState(value: string | null | undefined): boolean {
 export function proofOfResidenceLabel(type: string | null | undefined): string {
   return PROOF_OF_RESIDENCE_TYPES.find((item) => item.value === type)?.label ?? "Proof of residence";
 }
+
+export const NIGERIAN_BANKS = [
+  "Access Bank",
+  "Citibank Nigeria",
+  "Ecobank Nigeria",
+  "Fidelity Bank",
+  "First Bank of Nigeria",
+  "First City Monument Bank (FCMB)",
+  "Globus Bank",
+  "Guaranty Trust Bank (GTBank)",
+  "Heritage Bank",
+  "Jaiz Bank",
+  "Keystone Bank",
+  "Kuda Bank",
+  "Lotus Bank",
+  "Moniepoint MFB",
+  "OPay Digital Services",
+  "Optimus Bank",
+  "PalmPay",
+  "Parallex Bank",
+  "Polaris Bank",
+  "PremiumTrust Bank",
+  "Providus Bank",
+  "Rubies Bank",
+  "Sparkle MFB",
+  "Stanbic IBTC Bank",
+  "Standard Chartered Bank",
+  "Sterling Bank",
+  "SunTrust Bank",
+  "TajBank",
+  "Titan Trust Bank",
+  "Union Bank of Nigeria",
+  "United Bank for Africa (UBA)",
+  "Unity Bank",
+  "VFD Microfinance Bank",
+  "Wema Bank",
+  "Zenith Bank",
+] as const;
+

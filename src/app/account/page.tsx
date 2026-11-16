@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Bell, CalendarClock, FileText, Package, Star, Wallet } from "lucide-react";
+import { ArrowRight, Bell, CalendarClock, FileText, Package, Star, Store, Wallet } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { formatMoney, formatDate, timeAgo } from "@/lib/utils";
@@ -47,8 +47,38 @@ export default async function AccountOverviewPage() {
       <PageHeader
         title={`Hello, ${user.fullName.split(" ")[0]}`}
         description="Track your orders, quotations, bookings and reviews in one place."
-        actions={<ButtonLink href="/browse">Browse marketplace</ButtonLink>}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {user.role === "customer" ? (
+              <ButtonLink href="/register">
+                <Store className="size-4" /> Create a storefront
+              </ButtonLink>
+            ) : null}
+            <ButtonLink href="/browse" variant={user.role === "customer" ? "secondary" : "primary"}>
+              Browse marketplace
+            </ButtonLink>
+          </div>
+        }
       />
+
+      {user.role === "customer" ? (
+        <div className="flex flex-col justify-between gap-4 rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50 via-white to-emerald-50/70 p-5 sm:flex-row sm:items-center">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-700 text-white">
+              <Store className="size-5" />
+            </span>
+            <div>
+              <p className="text-sm font-bold text-ink-900">Own a business in Akwa Ibom State?</p>
+              <p className="mt-0.5 text-xs leading-5 text-ink-600">
+                Because you&apos;re signed into your verified account, you can now create your storefront with a locked unique business name, custom subdomain, and direct Nigerian bank payouts.
+              </p>
+            </div>
+          </div>
+          <Link href="/register" className="btn-primary shrink-0 whitespace-nowrap">
+            Create your storefront <ArrowRight className="size-4" />
+          </Link>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Orders" value={stats?.orders ?? 0} hint="All time" icon={<Package className="size-4" />} />

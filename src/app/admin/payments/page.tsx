@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Mail, Search, Wallet } from "lucide-react";
+import { Landmark, Mail, Search, Wallet } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { getPaymentStats, listRefunds } from "@/lib/payments";
 import { gatewayStatus, getSettings } from "@/lib/settings";
 import { systemDb } from "@/lib/db";
 import { formatMoney, formatDateTime } from "@/lib/utils";
-import { Alert, Badge, Card, CardHeader, EmptyState, PageHeader, StatCard, Tabs } from "@/components/ui";
+import { Alert, Badge, Card, CardHeader, EmptyState, PageHeader, StatCard, StatusBadge, Tabs } from "@/components/ui";
 import { RefundForm, VerifyPaystackButton } from "@/components/admin-forms";
+import { AdminPayoutSettlementControls } from "@/components/admin-payout-row";
 
 export const metadata: Metadata = { title: "Payments · Admin" };
 
@@ -37,7 +38,7 @@ export default async function AdminPaymentsPage({
 
   const gateway = gatewayStatus(await getSettings());
 
-  const [rows, stats, refunds] = await Promise.all([
+  const [rows, stats, refunds, vendorPayouts] = await Promise.all([
     systemDb.query<{
       reference: string;
       scope: string;
@@ -59,6 +60,31 @@ export default async function AdminPaymentsPage({
     ),
     getPaymentStats(),
     listRefunds(),
+    systemDb.query<{
+      id: string;
+      store_id: string;
+      store_name: string;
+      amount: number;
+      status: string;
+      reference: string | null;
+      bank_name: string | null;
+      account_number: string | null;
+      account_name: string | null;
+      note: string | null;
+      created_at: string;
+      processed_at: string | null;
+    }>(
+      `select p.id, p.store_id, s.name as store_name, p.amount::float8 as amount, p.status, p.reference,
+              coalesce(p.bank_name, vp.bank_name) as bank_name,
+              coalesce(p.account_number, vp.account_number) as account_number,
+              coalesce(p.account_name, vp.account_name) as account_name,
+              p.note, p.created_at, p.processed_at
+         from vendor_payouts p
+         join stores s on s.id = p.store_id
+         left join vendor_profiles vp on vp.user_id = s.owner_id
+        order by case when p.status = 'pending' then 0 else 1 end, p.created_at desc
+        limit 40`,
+    ),
   ]);
 
   return (
@@ -85,10 +111,76 @@ export default async function AdminPaymentsPage({
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Collected" value={formatMoney(Number(stats?.total_volume ?? 0))} hint={`${stats?.success_count ?? 0} successful payments`} icon={<Wallet className="size-4" />} />
-        <StatCard label="Pending" value={stats?.pending_count ?? 0} hint="Awaiting confirmation" />
+        <StatCard label="Pending payouts" value={vendorPayouts.filter((p) => p.status === "pending").length} hint="Vendor bank withdrawals" icon={<Landmark className="size-4" />} />
         <StatCard label="Failed" value={stats?.failed_count ?? 0} hint="Declined or abandoned" />
         <StatCard label="Refund requests" value={refunds.filter((refund) => refund.status === "requested").length} hint="Need review" />
       </div>
+
+      {/* Vendor Payout Requests */}
+      <Card>
+        <CardHeader
+          title="Vendor Bank Payout Requests"
+          description="Settle unlocked escrow earnings directly to each vendor's verified Nigerian bank account and record the transfer reference."
+        />
+        {vendorPayouts.length === 0 ? (
+          <EmptyState
+            icon={<Landmark className="size-5" />}
+            title="No vendor payout requests yet"
+            description="When vendors withdraw unlocked escrow funds from /vendor/payouts, their bank account details appear here."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Storefront</th>
+                  <th>Destination Bank Account</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Requested</th>
+                  <th>Settlement Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vendorPayouts.map((payout) => (
+                  <tr key={payout.id}>
+                    <td>
+                      <Link href={`/admin/vendors/${payout.store_id}`} className="font-semibold text-ink-900 hover:text-brand-800">
+                        {payout.store_name}
+                      </Link>
+                      {payout.note ? <p className="text-xs text-ink-500">{payout.note}</p> : null}
+                    </td>
+                    <td className="text-xs">
+                      {payout.bank_name ? (
+                        <div>
+                          <p className="font-semibold text-ink-900">
+                            {payout.bank_name} · <span className="font-mono">{payout.account_number}</span>
+                          </p>
+                          <p className="text-ink-500">{payout.account_name}</p>
+                        </div>
+                      ) : (
+                        <span className="text-ink-400">No bank account saved</span>
+                      )}
+                    </td>
+                    <td className="font-semibold text-ink-900">{formatMoney(payout.amount)}</td>
+                    <td>
+                      <StatusBadge status={payout.status} />
+                    </td>
+                    <td className="text-xs text-ink-500">{formatDateTime(payout.created_at)}</td>
+                    <td>
+                      {payout.status === "pending" || payout.status === "processing" ? (
+                        <AdminPayoutSettlementControls payoutId={payout.id} />
+                      ) : (
+                        <span className="font-mono text-xs text-ink-600">{payout.reference ?? "Settled"}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       <Tabs
         links={[

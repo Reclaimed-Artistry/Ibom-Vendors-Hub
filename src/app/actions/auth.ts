@@ -136,16 +136,31 @@ export async function logoutAction() {
 }
 
 export async function registerVendorAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    return {
+      error:
+        "You must sign in with your Google account or create an account first before you can create a storefront.",
+    };
+  }
+  if (currentUser.role === "admin" || currentUser.role === "super_admin") {
+    return {
+      error: "Admin accounts cannot open a vendor storefront. Please sign in with a separate account.",
+    };
+  }
+
   const proofFile = formData.get("proofOfResidenceFile");
   let initialProofUrl = String(formData.get("proofOfResidenceUrl") ?? "").trim();
   const hasProofFile = proofFile instanceof File && proofFile.size > 0;
 
+  const rawPassword = String(formData.get("password") ?? "").trim();
+
   const raw = {
     businessName: formData.get("businessName"),
-    ownerName: formData.get("ownerName"),
-    email: formData.get("email"),
+    ownerName: formData.get("ownerName") || currentUser.fullName,
+    email: currentUser.email,
     phone: formData.get("phone"),
-    password: formData.get("password"),
+    password: rawPassword || undefined,
     categorySlug: formData.get("categorySlug"),
     description: formData.get("description"),
     city: formData.get("city"),
@@ -156,6 +171,9 @@ export async function registerVendorAction(_prev: ActionState, formData: FormDat
     proofOfResidenceUrl: initialProofUrl || (hasProofFile ? "pending-upload" : ""),
     cacRegistered: formData.get("cacRegistered") ?? "",
     cacNumber: formData.get("cacNumber") ?? "",
+    bankName: formData.get("bankName") ?? "",
+    accountNumber: formData.get("accountNumber") ?? "",
+    accountName: formData.get("accountName") ?? "",
     logoUrl: formData.get("logoUrl") ?? "",
     coverUrl: formData.get("coverUrl") ?? "",
     acceptTerms: formData.get("acceptTerms") ?? "",
@@ -178,6 +196,8 @@ export async function registerVendorAction(_prev: ActionState, formData: FormDat
 
     const result = await registerVendor({
       ...parsed.data,
+      authenticatedUserId: currentUser.id,
+      email: currentUser.email,
       proofOfResidenceUrl: initialProofUrl,
       logoUrl,
       coverUrl,
@@ -185,7 +205,7 @@ export async function registerVendorAction(_prev: ActionState, formData: FormDat
 
     const token = await createSessionToken({
       sub: result.userId,
-      email: parsed.data.email.trim().toLowerCase(),
+      email: currentUser.email.trim().toLowerCase(),
       role: "vendor",
       name: parsed.data.ownerName.trim(),
     });
@@ -196,7 +216,11 @@ export async function registerVendorAction(_prev: ActionState, formData: FormDat
     redirect(`/vendor?welcome=1${verify}`);
   } catch (error) {
     if (error && typeof error === "object" && "digest" in error) throw error;
-    return { error: error instanceof Error ? error.message : "Registration failed. Please try again." };
+    const msg = error instanceof Error ? error.message : "Registration failed. Please try again.";
+    if (/business name|store address/i.test(msg)) {
+      return { error: msg, fieldErrors: { businessName: msg } };
+    }
+    return { error: msg };
   }
 }
 

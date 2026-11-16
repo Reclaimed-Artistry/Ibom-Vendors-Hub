@@ -12,39 +12,71 @@ import type { Role } from "@/lib/db";
 
 export interface SubdomainCheck {
   available: boolean;
+  locked?: boolean;
   slug: string;
   suggestedSlug?: string;
   reason?: string;
 }
 
-/** Validate + reserve-check a business-name based subdomain. */
+export function normaliseBusinessName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/** Validate + uniqueness-check a business name and its subdomain. */
 export async function checkSubdomain(name: string, excludeStoreId?: string): Promise<SubdomainCheck> {
+  const cleanName = normaliseBusinessName(name);
   const slug = normaliseSubdomain(name);
-  if (!slug || slug.length < 3) {
+  if (!cleanName || !slug || slug.length < 3) {
     return { available: false, slug, reason: "Business name must contain at least 3 letters or numbers" };
   }
   if (slug.length > 48) {
     return { available: false, slug, reason: "Business name is too long for a store address" };
   }
-  if (isReservedSubdomain(slug)) {
-    return { available: false, slug, reason: "This address is reserved by the platform" };
-  }
 
-  const existing = await systemDb.maybeOne<{ hit: number }>(
-    `select 1 as hit from stores s
-      where (lower(s.slug) = lower($1) or exists (select 1 from store_domains d where lower(d.subdomain) = lower($1)))
-        and ($2::uuid is null or s.id <> $2::uuid)
-      union all
-     select 1 as hit from reserved_subdomains r where lower(r.name) = lower($1)
-     limit 1`,
-    [slug, excludeStoreId ?? null],
+  // Hard lock: no two vendors may ever use the same business name (case/space-insensitive)
+  const nameTaken = await systemDb.maybeOne<{ id: string; name: string }>(
+    `select id, name from stores
+      where lower(regexp_replace(btrim(name), '\\s+', ' ', 'g')) = $1
+        and ($2::uuid is null or id <> $2::uuid)
+      limit 1`,
+    [cleanName, excludeStoreId ?? null],
   );
-  if (existing) {
+  if (nameTaken) {
     return {
       available: false,
+      locked: true,
       slug,
-      reason: "That store address is already taken — try a variation of your business name",
+      reason: `Business name “${nameTaken.name}” is already in use and locked by another vendor. Please choose a unique business name.`,
     };
+  }
+
+  // Also block if another vendor already owns the exact subdomain / domain for that business name
+  const storeSlugTaken = await systemDb.maybeOne<{ name: string }>(
+    `select s.name from stores s
+      where (lower(s.slug) = lower($1) or exists (select 1 from store_domains d where lower(d.subdomain) = lower($1)))
+        and ($2::uuid is null or s.id <> $2::uuid)
+      limit 1`,
+    [slug, excludeStoreId ?? null],
+  );
+  if (storeSlugTaken) {
+    return {
+      available: false,
+      locked: true,
+      slug,
+      reason: `That business name / store address is already in use and locked by “${storeSlugTaken.name}”. Please choose a unique business name.`,
+    };
+  }
+
+  const reservedHit =
+    isReservedSubdomain(slug) ||
+    Boolean(
+      await systemDb.maybeOne<{ hit: number }>(
+        `select 1 as hit from reserved_subdomains r where lower(r.name) = lower($1) limit 1`,
+        [slug],
+      ),
+    );
+  if (reservedHit) {
+    return { available: false, slug, reason: "This address is reserved by the platform" };
   }
 
   const pending = await systemDb.maybeOne<{ id: string }>(
@@ -53,16 +85,20 @@ export async function checkSubdomain(name: string, excludeStoreId?: string): Pro
     [slug],
   );
   if (pending) {
-    return { available: false, slug, reason: "That store address is reserved by another request" };
+    return { available: false, locked: true, slug, reason: "That store address is reserved by another vendor" };
   }
 
   return { available: true, slug };
 }
 
-/** Resolve an available subdomain for a business name, using city or numeric suffix if the exact slug is taken/reserved. */
+/**
+ * Check availability of a business name & subdomain.
+ * If another vendor already uses the business name (or its store slug), it is
+ * strictly LOCKED (`available: false, locked: true`, no auto-suffix allowed).
+ */
 export async function resolveAvailableSubdomain(name: string, city?: string): Promise<SubdomainCheck> {
   const direct = await checkSubdomain(name);
-  if (direct.available) return direct;
+  if (direct.available || direct.locked) return direct;
 
   const baseRaw = normaliseSubdomain(name).slice(0, 36);
   const citySlug = normaliseSubdomain(city || "ibom").slice(0, 10) || "ibom";
@@ -70,21 +106,14 @@ export async function resolveAvailableSubdomain(name: string, city?: string): Pr
     return direct;
   }
 
-  const candidates: string[] = [];
-  if (citySlug) candidates.push(`${baseRaw}-${citySlug}`);
-  candidates.push(`${baseRaw}-store`, `${baseRaw}-hub`);
-  for (let i = 2; i <= 15; i += 1) {
-    candidates.push(`${baseRaw}-${i}`);
-  }
-
+  // Only reached when `slug` matched a platform-reserved system word (e.g. "support"), never another vendor's name
+  const candidates = [`${baseRaw}-${citySlug}`, `${baseRaw}-store`, `${baseRaw}-hub`];
   for (const candidate of candidates) {
     const check = await checkSubdomain(candidate);
     if (check.available) {
       return {
-        available: false,
-        slug: direct.slug,
-        suggestedSlug: check.slug,
-        reason: direct.reason,
+        available: true,
+        slug: check.slug,
       };
     }
   }
@@ -107,11 +136,12 @@ export async function suggestSubdomains(name: string) {
 }
 
 export interface RegisterVendorInput {
+  authenticatedUserId?: string;
   businessName: string;
   ownerName: string;
   email: string;
   phone: string;
-  password: string;
+  password?: string;
   categorySlug: string;
   description: string;
   city: string;
@@ -122,6 +152,9 @@ export interface RegisterVendorInput {
   proofOfResidenceUrl: string;
   cacRegistered: "yes" | "no" | boolean;
   cacNumber?: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
   logoUrl?: string;
   coverUrl?: string;
 }
@@ -140,38 +173,70 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
   if (!isAkwaIbomState(input.state)) {
     throw new Error("Every vendor on Ibom Vendors Hub must be located in Akwa Ibom State.");
   }
+  const cleanBusinessTitle = input.businessName.trim().replace(/\s+/g, " ");
+  if (cleanBusinessTitle.length < 3) {
+    throw new Error("Business name must contain at least 3 characters.");
+  }
+
   const cacRegistered = input.cacRegistered === true || input.cacRegistered === "yes";
   const cacNumber = cacRegistered ? (input.cacNumber ?? "").trim().toUpperCase() : null;
   if (cacRegistered && !cacNumber) {
     throw new Error("Enter your CAC registration number.");
   }
 
+  const bankName = (input.bankName ?? "").trim() || null;
+  const accountNumber = (input.accountNumber ?? "").trim() || null;
+  const accountName = (input.accountName ?? "").trim() || null;
+
   const settings = await getSettings();
-  const email = input.email.trim().toLowerCase();
   const category = await systemDb.maybeOne<{ id: string; slug: string; name: string }>(
     `select id, slug, name from store_categories where slug = $1 and is_active = true`,
     [input.categorySlug],
   );
   if (!category) throw new Error("Choose a valid business category");
 
-  const resolved = await resolveAvailableSubdomain(input.businessName, input.city);
-  const chosenSlug = resolved.available ? resolved.slug : resolved.suggestedSlug;
-  if (!chosenSlug) {
-    throw new Error(resolved.reason ?? "Business name must contain at least 3 letters or numbers");
+  // Enforce strict unique business name lock — never allow two vendors to share a name
+  const resolved = await resolveAvailableSubdomain(cleanBusinessTitle, input.city);
+  if (!resolved.available || !resolved.slug) {
+    throw new Error(
+      resolved.reason ??
+        "That business name is already in use and locked by another vendor. Please choose a unique business name.",
+    );
+  }
+  const chosenSlug = resolved.slug;
+
+  let existingUser: { id: string; email: string; role: string; status: string; password_hash: string | null } | null =
+    null;
+  if (input.authenticatedUserId) {
+    existingUser = await systemDb.maybeOne<{
+      id: string;
+      email: string;
+      role: string;
+      status: string;
+      password_hash: string | null;
+    }>(`select id, email, role, status, password_hash from users where id = $1`, [input.authenticatedUserId]);
+    if (!existingUser) {
+      throw new Error("Please sign in with Google or create an account first before creating a storefront.");
+    }
+  } else {
+    const lookupEmail = input.email.trim().toLowerCase();
+    existingUser = await systemDb.maybeOne<{
+      id: string;
+      email: string;
+      role: string;
+      status: string;
+      password_hash: string | null;
+    }>(`select id, email, role, status, password_hash from users where lower(email) = $1`, [lookupEmail]);
   }
 
-  const existingUser = await systemDb.maybeOne<{
-    id: string;
-    role: string;
-    status: string;
-  }>(`select id, role, status from users where lower(email) = $1`, [email]);
+  const email = (existingUser?.email ?? input.email).trim().toLowerCase();
 
   if (existingUser) {
     if (existingUser.status !== "active") {
       throw new Error("This account has been suspended. Please contact support.");
     }
     if (existingUser.role === "admin" || existingUser.role === "super_admin") {
-      throw new Error("Admin accounts cannot be converted into vendor accounts. Please use a separate business email.");
+      throw new Error("Admin accounts cannot be converted into vendor accounts. Please sign in with a separate account.");
     }
     const existingStore = await systemDb.maybeOne<{ id: string; name: string }>(
       `select id, name from stores where owner_id = $1 limit 1`,
@@ -179,12 +244,14 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
     );
     if (existingStore) {
       throw new Error(
-        `A storefront (${existingStore.name}) is already registered with this email. Please sign in to manage your store.`,
+        `Your account already owns a storefront (${existingStore.name}). Open your Vendor Dashboard to manage it.`,
       );
     }
+  } else if (!input.password || input.password.length < 8) {
+    throw new Error("Please sign in with Google or create an account first before creating a storefront.");
   }
 
-  const passwordHash = await hashPassword(input.password);
+  const passwordHash = input.password && input.password.length >= 8 ? await hashPassword(input.password) : null;
   const status = "pending";
   const defaultTrialDays = Math.max(settings.default_trial_days || 14, 14);
   const proofLabel = proofOfResidenceLabel(input.proofOfResidenceType);
@@ -200,83 +267,100 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
       where is_active = true order by trial_days desc, price asc limit 1`,
   );
 
-  const result = await withSystem(async (db) => {
-    const user = existingUser
-      ? await db.one<{ id: string }>(
-          `update users
-              set password_hash = $2,
-                  full_name = $3,
-                  phone = $4,
-                  role = 'vendor',
-                  updated_at = now()
-            where id = $1
-            returning id`,
-          [existingUser.id, passwordHash, input.ownerName.trim(), input.phone.trim()],
-        )
-      : await db.one<{ id: string }>(
-          `insert into users (email, password_hash, full_name, phone, role, email_verified_at)
-           values ($1,$2,$3,$4,'vendor', null)
-           returning id`,
-          [email, passwordHash, input.ownerName.trim(), input.phone.trim()],
-        );
+  let result: {
+    userId: string;
+    storeId: string;
+    slug: string;
+    status: string;
+    reviewDeadlineAt: string;
+    trialEndsAt: string | null;
+    planName: string;
+  };
+  try {
+    result = await withSystem(async (db) => {
+      const user = existingUser
+        ? await db.one<{ id: string }>(
+            `update users
+                set password_hash = coalesce($2, password_hash),
+                    full_name = $3,
+                    phone = $4,
+                    role = 'vendor',
+                    updated_at = now()
+              where id = $1
+              returning id`,
+            [existingUser.id, passwordHash, input.ownerName.trim(), input.phone.trim()],
+          )
+        : await db.one<{ id: string }>(
+            `insert into users (email, password_hash, full_name, phone, role, email_verified_at)
+             values ($1,$2,$3,$4,'vendor', null)
+             returning id`,
+            [email, passwordHash, input.ownerName.trim(), input.phone.trim()],
+          );
 
-    await db.execute(
-      `insert into vendor_profiles
-         (user_id, position, nin, proof_of_residence_type, proof_of_residence_url, cac_registered, cac_number, kyc_status)
-       values ($1, 'Owner', $2, $3, $4, $5, $6, 'submitted')
-       on conflict (user_id) do update
-         set nin = excluded.nin,
-             proof_of_residence_type = excluded.proof_of_residence_type,
-             proof_of_residence_url = excluded.proof_of_residence_url,
-             cac_registered = excluded.cac_registered,
-             cac_number = excluded.cac_number,
-             kyc_status = 'submitted',
-             updated_at = now()`,
-      [
-        user.id,
-        input.nin.trim(),
-        input.proofOfResidenceType.trim(),
-        input.proofOfResidenceUrl,
-        cacRegistered,
-        cacNumber,
-      ],
-    );
-    await db.execute(
-      `insert into user_roles (user_id, role) values ($1,'vendor') on conflict do nothing`,
-      [user.id],
-    );
+      await db.execute(
+        `insert into vendor_profiles
+           (user_id, position, nin, proof_of_residence_type, proof_of_residence_url, cac_registered, cac_number,
+            bank_name, account_number, account_name, kyc_status)
+         values ($1, 'Owner', $2, $3, $4, $5, $6, $7, $8, $9, 'submitted')
+         on conflict (user_id) do update
+           set nin = excluded.nin,
+               proof_of_residence_type = excluded.proof_of_residence_type,
+               proof_of_residence_url = excluded.proof_of_residence_url,
+               cac_registered = excluded.cac_registered,
+               cac_number = excluded.cac_number,
+               bank_name = coalesce(excluded.bank_name, vendor_profiles.bank_name),
+               account_number = coalesce(excluded.account_number, vendor_profiles.account_number),
+               account_name = coalesce(excluded.account_name, vendor_profiles.account_name),
+               kyc_status = 'submitted',
+               updated_at = now()`,
+        [
+          user.id,
+          input.nin.trim(),
+          input.proofOfResidenceType.trim(),
+          input.proofOfResidenceUrl,
+          cacRegistered,
+          cacNumber,
+          bankName,
+          accountNumber,
+          accountName,
+        ],
+      );
+      await db.execute(
+        `insert into user_roles (user_id, role) values ($1,'vendor') on conflict do nothing`,
+        [user.id],
+      );
 
-    const store = await db.one<{ id: string; slug: string; status: string; review_deadline_at: string }>(
-      `insert into stores
-         (owner_id, category_id, name, slug, tagline, description, logo_url, cover_url,
-          email, phone, city, state, address, country, status, approved_at,
-          review_deadline_at, access_until, delivery_fee, prep_time_minutes)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-               null,
-               now() + interval '48 hours',
-               case when $16::boolean then null else now() + make_interval(days => $17) end,
-               1500, 30)
-       returning id, slug, status, review_deadline_at`,
-      [
-        user.id,
-        category.id,
-        input.businessName.trim(),
-        chosenSlug,
-        input.description.slice(0, 120),
-        input.description.trim(),
-        input.logoUrl || null,
-        input.coverUrl || null,
-        email,
-        input.phone.trim(),
-        input.city.trim(),
-        AKWA_IBOM_STATE,
-        input.address?.trim() || null,
-        settings.country,
-        status,
-        Boolean(trialPlan),
-        defaultTrialDays,
-      ],
-    );
+      const store = await db.one<{ id: string; slug: string; status: string; review_deadline_at: string }>(
+        `insert into stores
+           (owner_id, category_id, name, slug, tagline, description, logo_url, cover_url,
+            email, phone, city, state, address, country, status, approved_at,
+            review_deadline_at, access_until, delivery_fee, prep_time_minutes)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
+                 null,
+                 now() + interval '48 hours',
+                 case when $16::boolean then null else now() + make_interval(days => $17) end,
+                 1500, 30)
+         returning id, slug, status, review_deadline_at`,
+        [
+          user.id,
+          category.id,
+          cleanBusinessTitle,
+          chosenSlug,
+          input.description.slice(0, 120),
+          input.description.trim(),
+          input.logoUrl || null,
+          input.coverUrl || null,
+          email,
+          input.phone.trim(),
+          input.city.trim(),
+          AKWA_IBOM_STATE,
+          input.address?.trim() || null,
+          settings.country,
+          status,
+          Boolean(trialPlan),
+          defaultTrialDays,
+        ],
+      );
 
     let trialEndsAt: string | null = null;
     let planName = "Free Trial";
@@ -302,10 +386,15 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
       [store.id],
     );
 
+    const bankSummary =
+      bankName && accountNumber && accountName
+        ? `${bankName} · ${accountNumber} (${accountName})`
+        : "Not provided yet (can be added in Vendor Payout Settings)";
+
     const adminMessageBody = [
       `New Storefront Registration — 48-Hour Verification Required`,
       ``,
-      `Business Name: ${input.businessName.trim()}`,
+      `Business Name: ${cleanBusinessTitle}`,
       `Subdomain Slug: ${chosenSlug}`,
       `Category: ${category.name}`,
       `Owner Name: ${input.ownerName.trim()}`,
@@ -315,6 +404,7 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
       `NIN: ${input.nin.trim()}`,
       `CAC Registration: ${cacSummary}`,
       `Proof of Residence: ${proofLabel}`,
+      `Payout Bank Account: ${bankSummary}`,
       `48-Hour Decision Deadline: ${new Date(store.review_deadline_at).toUTCString()}`,
       ``,
       `Please review all uploaded registration documents before approving or declining this storefront.`,
@@ -388,6 +478,14 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
       planName,
     };
   });
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      throw new Error(
+        "That business name is already in use and locked by another vendor. Please choose a unique business name.",
+      );
+    }
+    throw err;
+  }
 
   // Verification + pending-review + admin notification emails (outside the transaction — never block registration).
   let token = "";

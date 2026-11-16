@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, Clock, MapPin, Package, ShieldCheck, ShoppingBag, Star, Store, Truck, Utensils } from "lucide-react";
+import { getCurrentUser } from "@/lib/auth";
 import { getCategoriesWithCounts, getMarketplaceHighlights, searchMarketplace } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
 import { formatMoney, truncate } from "@/lib/utils";
@@ -15,7 +16,8 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 export default async function HomePage() {
-  const [settings, categories, highlights, featuredProducts] = await Promise.all([
+  const [user, settings, categories, highlights, featuredProducts] = await Promise.all([
+    getCurrentUser(),
     getSettings(),
     getCategoriesWithCounts(),
     getMarketplaceHighlights(),
@@ -84,9 +86,19 @@ export default async function HomePage() {
                 <p className="mt-2 text-sm leading-6 text-ink-200">
                   A catalogue, order dashboard, payment receipts and a storefront on your own subdomain — ready in minutes.
                 </p>
-                <Link href="/register" className="btn-gold mt-5 inline-flex">
-                  Open your storefront <ArrowRight className="ml-1 size-4" />
-                </Link>
+                {!user ? (
+                  <Link href="/register/customer" className="btn-gold mt-5 inline-flex">
+                    Create an account to get started <ArrowRight className="ml-1 size-4" />
+                  </Link>
+                ) : user.role === "customer" ? (
+                  <Link href="/register" className="btn-gold mt-5 inline-flex">
+                    Create your storefront <ArrowRight className="ml-1 size-4" />
+                  </Link>
+                ) : (
+                  <Link href={user.role === "vendor" ? "/vendor" : "/admin"} className="btn-gold mt-5 inline-flex">
+                    Open dashboard <ArrowRight className="ml-1 size-4" />
+                  </Link>
+                )}
                 <dl className="mt-6 grid grid-cols-3 gap-3 text-center text-white">
                   <div className="rounded-xl border border-white/10 bg-white/5 p-3">
                     <dt className="text-[10px] uppercase tracking-wide text-ink-300">Trial</dt>
@@ -289,8 +301,25 @@ export default async function HomePage() {
                 subscription billing and customer tracking. No code, no hosting bill, no commissions hidden in the fine print.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <Link href="/register" className="btn-gold">Create your storefront</Link>
-                <Link href="/vendor" className="btn-secondary border-white/20 bg-transparent text-white hover:bg-white/10">Vendor sign in</Link>
+                {!user ? (
+                  <>
+                    <Link href="/register/customer" className="btn-gold">
+                      Create your account first
+                    </Link>
+                    <Link href="/login" className="btn-secondary border-white/20 bg-transparent text-white hover:bg-white/10">
+                      Sign in (Google or email)
+                    </Link>
+                  </>
+                ) : user.role === "customer" ? (
+                  <>
+                    <Link href="/register" className="btn-gold">Create your storefront</Link>
+                    <Link href="/account" className="btn-secondary border-white/20 bg-transparent text-white hover:bg-white/10">My account</Link>
+                  </>
+                ) : (
+                  <Link href={user.role === "vendor" ? "/vendor" : "/admin"} className="btn-gold">
+                    Open {user.role === "vendor" ? "Vendor Dashboard" : "Admin Console"}
+                  </Link>
+                )}
               </div>
             </div>
             <dl className="grid grid-cols-2 gap-4 text-white">

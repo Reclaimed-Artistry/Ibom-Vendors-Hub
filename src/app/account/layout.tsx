@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Bell } from "lucide-react";
+import { ArrowRight, Bell, Store } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { SiteHeader } from "@/components/site-header";
@@ -54,6 +54,16 @@ export default async function AccountLayout({ children }: { children: React.Reac
                   className="flex items-center justify-between rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm font-semibold text-brand-900 shadow-sm hover:border-brand-400"
                 >
                   Vendor Dashboard <ArrowRight className="size-4" />
+                </Link>
+              ) : user.role === "customer" ? (
+                <Link
+                  href="/register"
+                  className="flex items-center justify-between rounded-2xl border border-brand-300 bg-brand-700 p-4 text-sm font-semibold text-white shadow-sm hover:bg-brand-800"
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <Store className="size-4" /> Create a Storefront
+                  </span>
+                  <ArrowRight className="size-4" />
                 </Link>
               ) : null}
               <Link href="/browse" className="flex items-center justify-between rounded-2xl border border-ink-100 bg-white p-4 text-sm font-semibold text-brand-700 shadow-sm hover:border-brand-300">

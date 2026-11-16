@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { Search, Store, Truck, UserRound } from "lucide-react";
+import { LayoutDashboard, Search, Store, Truck, UserPlus, UserRound } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { CartButton, CartDrawer } from "@/components/cart";
 import { getCurrentUser } from "@/lib/auth";
-import { getSettings, shortPlatformName } from "@/lib/settings";
 
 export async function SiteHeader() {
-  const [user, settings] = await Promise.all([getCurrentUser(), getSettings()]);
+  const user = await getCurrentUser();
   const dashboardHref =
     user?.role === "vendor" ? "/vendor" : user?.role === "customer" ? "/account" : user ? "/admin" : "/login";
 
@@ -33,13 +32,30 @@ export async function SiteHeader() {
           <Link href="/track" className="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100 sm:flex">
             <Truck className="size-4" /> Track
           </Link>
-          <Link href={user ? dashboardHref : "/login"} className="hidden items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100 sm:flex">
+          <Link
+            href={user ? dashboardHref : "/login"}
+            className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-2 text-sm font-medium text-ink-700 hover:bg-ink-100 sm:px-3"
+          >
             <UserRound className="size-4" /> {user ? user.fullName.split(" ")[0] : "Sign in"}
           </Link>
           <CartButton />
-          <Link href="/register" className="btn-primary hidden whitespace-nowrap sm:inline-flex">
-            Sell on {shortPlatformName(settings.platform_name)}
-          </Link>
+          {!user ? (
+            <Link href="/register/customer" className="btn-primary hidden whitespace-nowrap sm:inline-flex">
+              <UserPlus className="size-4" /> Create account
+            </Link>
+          ) : user.role === "customer" ? (
+            <Link href="/register" className="btn-primary whitespace-nowrap text-xs sm:text-sm">
+              <Store className="size-4" /> Create a storefront
+            </Link>
+          ) : user.role === "vendor" ? (
+            <Link href="/vendor" className="btn-primary hidden whitespace-nowrap sm:inline-flex">
+              <LayoutDashboard className="size-4" /> Vendor dashboard
+            </Link>
+          ) : (
+            <Link href="/admin" className="btn-primary hidden whitespace-nowrap sm:inline-flex">
+              <LayoutDashboard className="size-4" /> Admin console
+            </Link>
+          )}
         </nav>
       </div>
       <CartDrawer />

@@ -67,6 +67,7 @@ export default async function VendorLayout({ children }: { children: React.React
   const nav: DashboardNavItem[] = [
     { href: "/vendor", label: "Overview", icon: "overview", locked: isSubscriptionExpired },
     { href: "/vendor/orders", label: "Orders", icon: "orders", badge: counts?.orders || undefined, locked: isSubscriptionExpired },
+    { href: "/vendor/payouts", label: "Wallet & payouts", icon: "payments", locked: isSubscriptionExpired },
     { href: "/vendor/products", label: "Products & services", icon: "products", locked: isSubscriptionExpired },
     { href: "/vendor/announcements", label: "Announcements", icon: "announcements", locked: isSubscriptionExpired },
     { href: "/vendor/categories", label: "Categories", icon: "categories", locked: isSubscriptionExpired },
