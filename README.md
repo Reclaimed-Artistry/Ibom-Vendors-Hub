@@ -162,10 +162,10 @@ register claims the first storefront.
   with 403 and recorded in **Admin → Emails** with the provider's exact message. Verify the
   domain (or set `EMAIL_FROM`/the `email_from` platform setting to `onboarding@resend.dev`
   to deliver to the Resend account owner) and the failures clear on the next send.
-- `PAYSTACK_PUBLIC_KEY` (test) is configured but `PAYSTACK_SECRET_KEY` is not, so checkout
-  still runs on the sandbox gateway: Paystack needs the secret key to initialise and verify
-  a transaction, and a public key alone cannot charge anyone. Admin → Payments and
-  `/api/health` both report the exact key state.
+- Payments run on Paystack **test** keys (`pk_test_…` / `sk_test_…`, secret stored as a Vercel
+  sensitive variable) with the sandbox switch turned off, so checkouts create real Paystack
+  test transactions and are verified server-side. Switch the keys to live and re-check
+  before taking real money.
 
 ### Deploying to Vercel
 
@@ -210,6 +210,13 @@ test or live, where each came from (platform settings override the environment) 
 mismatch worth fixing — public key without a secret, mixed test/live keys, keys configured
 while the sandbox switch is still on. The same summary appears in Admin → Payments, Admin →
 Settings and the `payments` block of `/api/health`.
+
+*Test Paystack connection* on Admin → Payments runs `checkPaystackCredentials()`, which calls
+Paystack's `/balance` endpoint with the configured secret key — a key can be well-formed and
+still revoked, from another account or from the wrong mode, and that should never be discovered
+by a customer at checkout. The result is written to the audit log, so a rejected key is
+traceable. Register `https://<domain>/api/webhooks/paystack` under Settings → API Keys &
+Webhooks in Paystack; the webhook is verified with the same secret key (`x-paystack-signature`).
 
 ### Transactional email
 

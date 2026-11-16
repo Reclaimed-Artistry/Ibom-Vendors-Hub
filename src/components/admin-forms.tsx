@@ -13,6 +13,7 @@ import {
   savePlatformSettingsAction,
   sendTestEmailAction,
   suspendStoreAction,
+  verifyPaystackAction,
   type AdminState,
 } from "@/app/actions/admin";
 import { Alert, Field } from "@/components/ui";
@@ -358,5 +359,19 @@ export function RetryEmailsButton() {
         Retry failed messages
       </SubmitButton>
     </form>
+  );
+}
+
+export function VerifyPaystackButton() {
+  const [state, formAction] = useActionState<AdminState, FormData>(verifyPaystackAction, {});
+  return (
+    <div className="space-y-2">
+      <StateNote state={state} />
+      <form action={formAction}>
+        <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Checking with Paystack…">
+          Test Paystack connection
+        </SubmitButton>
+      </form>
+    </div>
   );
 }

@@ -7,8 +7,9 @@ import { systemDb, withSystem } from "@/lib/db";
 import { logActivity } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
 import { retryFailedEmails, sendEmail } from "@/lib/email";
-import { emailFrom, getSettings, resendKey, url } from "@/lib/settings";
+import { emailFrom, getSettings, paystackSecret, resendKey, url } from "@/lib/settings";
 import { approveStore, rejectStore, restoreStore, suspendStore, checkSubdomain } from "@/lib/stores";
+import { checkPaystackCredentials } from "@/lib/payments/gateway";
 import { adminGrantSubscription } from "@/lib/subscriptions";
 import { formatIssues, categorySchema } from "@/lib/validation";
 
@@ -527,4 +528,37 @@ export async function retryFailedEmailsAction() {
   });
   revalidatePath("/admin/emails");
   redirect(`/admin/emails?retried=${result.sent}&attempted=${result.retried}`);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Payment gateway                                                            */
+/* -------------------------------------------------------------------------- */
+
+export async function verifyPaystackAction(_prev: AdminState, _formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const settings = await getSettings();
+  const secret = paystackSecret(settings);
+  if (!secret) {
+    return { error: "No Paystack secret key configured. Add PAYSTACK_SECRET_KEY to the environment or save one in Platform settings." };
+  }
+
+  const result = await checkPaystackCredentials(secret);
+  await logActivity({
+    actorId: user.id,
+    actorRole: "admin",
+    action: "payments.gateway_checked",
+    entityType: "platform_settings",
+    entityId: "1",
+    description: result.ok
+      ? `Paystack key accepted (${result.balances?.map((row) => `${row.currency} ${row.balance}`).join(", ") || "no balance rows"})`
+      : `Paystack key rejected — ${result.error ?? "unknown error"}`,
+    meta: { ok: result.ok, error: result.error ?? null, balances: result.balances ?? [] },
+  });
+
+  if (!result.ok) return { error: `Paystack rejected the secret key — ${result.error ?? "unknown error"}` };
+  revalidatePath("/admin/payments");
+  const balances = result.balances?.length
+    ? result.balances.map((row) => `${row.currency} ${row.balance.toLocaleString("en-NG")}`).join(" · ")
+    : "no settled balance yet";
+  return { message: `The secret key authenticates with Paystack. Account balance: ${balances}.` };
 }

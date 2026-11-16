@@ -7,7 +7,7 @@ import { gatewayStatus, getSettings } from "@/lib/settings";
 import { systemDb } from "@/lib/db";
 import { formatMoney, formatDateTime } from "@/lib/utils";
 import { Alert, Badge, Card, CardHeader, EmptyState, PageHeader, StatCard, Tabs } from "@/components/ui";
-import { RefundForm } from "@/components/admin-forms";
+import { RefundForm, VerifyPaystackButton } from "@/components/admin-forms";
 
 export const metadata: Metadata = { title: "Payments · Admin" };
 
@@ -80,6 +80,7 @@ export default async function AdminPaymentsPage({
           Paystack dashboard → Settings → API Keys &amp; Webhooks; the webhook URL is{" "}
           <span className="font-mono">/api/webhooks/paystack</span> and must use the same test/live mode as the keys.
         </span>
+        {gateway.secretConfigured ? <div className="mt-2"><VerifyPaystackButton /></div> : null}
       </Alert>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

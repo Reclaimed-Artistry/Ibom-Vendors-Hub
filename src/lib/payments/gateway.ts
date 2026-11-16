@@ -158,3 +158,47 @@ export function verifyPaystackSignature(
   const b = Buffer.from(signature, "utf8");
   return a.length === b.length && timingSafeEqual(a, b);
 }
+
+export interface GatewayCheck {
+  ok: boolean;
+  balances?: Array<{ currency: string; balance: number }>;
+  error?: string;
+}
+
+/**
+ * Proves the configured secret key actually authenticates with Paystack.
+ *
+ * A key can be well-formed and still be revoked, from another account or from
+ * the wrong mode, and that only shows up when a customer tries to pay. Admin →
+ * Payments runs this against Paystack's /balance endpoint, which needs nothing
+ * but the secret key and never moves money.
+ */
+export async function checkPaystackCredentials(secretKey: string): Promise<GatewayCheck> {
+  if (!secretKey) return { ok: false, error: "No Paystack secret key configured" };
+  try {
+    const response = await fetch(`${PAYSTACK_BASE}/balance`, {
+      headers: { Authorization: `Bearer ${secretKey}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    const json = (await response.json().catch(() => ({}))) as {
+      status?: boolean;
+      message?: string;
+      data?: Array<{ currency?: string; balance?: number }>;
+    };
+    if (!response.ok || !json.status) {
+      return {
+        ok: false,
+        error: `Paystack ${response.status}: ${json.message ?? "the key was rejected"}`,
+      };
+    }
+    return {
+      ok: true,
+      balances: (json.data ?? []).map((row) => ({
+        currency: row.currency ?? "NGN",
+        balance: Number(row.balance ?? 0) / 100,
+      })),
+    };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Paystack could not be reached" };
+  }
+}
