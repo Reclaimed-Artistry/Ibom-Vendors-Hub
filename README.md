@@ -23,6 +23,7 @@ through **Resend**, hosting on **Vercel**.
 | Vendor dashboard | Overview, orders + fulfilment workflow, products & images, store categories, quotations, bookings, customers, reviews, messages, subscription/billing, store profile, account settings, notifications, CSV export |
 | Customer account | Orders with live timeline and tracking, quotations (accept/decline), bookings (cancel), addresses, reviews, notifications, profile & security |
 | Admin | Platform KPIs, vendor approvals/rejections/suspensions/restores/visibility, subscription grants & plan editor, payments + refunds, categories & feature flags (attributes + workflow JSON), subdomain change requests, audit log, message inbox, platform settings |
+| Flash announcements | Right-to-left ticker under the header on the marketplace, every storefront and the vendor workspace. Admins publish platform notices to vendors, customers or both; vendors flash their own sale to their shoppers and pick up to 12 products to feature. Pause, resume, delete, scheduled end dates, dismissible per reader, motion-safe |
 | Operations | Daily cron for subscription reminders/expiry, Paystack webhook with HMAC + amount verification, health endpoint, audit logging, in-app notifications + transactional email |
 
 ### Non-negotiables encoded in the system
