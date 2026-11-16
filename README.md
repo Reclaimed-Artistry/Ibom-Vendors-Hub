@@ -137,9 +137,35 @@ Paystack keys, sender address and maintenance flag.
 | `CRON_SECRET` | Bearer token required by `/api/cron/subscriptions` |
 | `NEXT_PUBLIC_DEV_EMAIL_LINKS` | `true` shows verification/reset links in the UI during local work |
 
-Deploy on Vercel with `vercel.json` (daily cron at 06:00 UTC). Add a wildcard domain
-`*.yourdomain.com` and point the Paystack webhook at
-`https://yourdomain.com/api/webhooks/paystack`.
+### Deploying to Vercel
+
+The project builds with `npm run vercel-build`, which applies `supabase/migrations/*.sql`,
+creates the first administrator when `ADMIN_EMAIL`/`ADMIN_PASSWORD` are set, and then
+runs `next build`. Every deploy is therefore self-migrating and idempotent.
+
+1. Create a Postgres database (Supabase project) and note its **pooler** connection
+   string: `postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:6543/postgres`.
+2. Import this repository in Vercel (framework: Next.js, no root directory) and set:
+
+   | Variable | Value |
+   | --- | --- |
+   | `DATABASE_URL` | the pooler URL above |
+   | `DATABASE_SSL` | `true` |
+   | `AUTH_SECRET` | `openssl rand -hex 32` |
+   | `CRON_SECRET` | `openssl rand -hex 24` |
+   | `NEXT_PUBLIC_APP_URL` | `https://<project>.vercel.app` |
+   | `NEXT_PUBLIC_ROOT_DOMAIN` | `<project>.vercel.app` |
+   | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | first platform administrator |
+   | `RESEND_API_KEY`, `EMAIL_FROM` | optional — without them email is logged, not sent |
+   | `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY` | optional — otherwise the sandbox gateway is used |
+
+3. Deploy. The build migrates the database and boots the admin account; the daily cron
+   in `vercel.json` (06:00 UTC) then keeps subscriptions healthy.
+4. Add the domain(s) in Vercel. For true vendor subdomains, add a wildcard domain
+   `*.yourdomain.com` and set `NEXT_PUBLIC_ROOT_DOMAIN` to `yourdomain.com`. On the
+   shared `*.vercel.app` host, storefronts are reachable at `/s/<slug>` (the middleware
+   still rewrites subdomains when a wildcard domain is attached).
+5. Point the Paystack webhook at `https://<your-domain>/api/webhooks/paystack`.
 
 ---
 

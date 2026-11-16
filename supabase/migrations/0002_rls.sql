@@ -21,6 +21,16 @@ begin
   end if;
 end $$;
 
+-- On managed Postgres (Supabase, RDS) the application connects as a non-superuser
+-- such as `postgres`, which must be a member of app_runtime to run SET ROLE.
+do $$
+begin
+  if exists (select 1 from pg_roles where rolname = 'postgres')
+     and not pg_has_role('postgres', 'app_runtime', 'member') then
+    execute 'grant app_runtime to postgres';
+  end if;
+end $$;
+
 grant usage on schema public to app_runtime;
 grant select, insert, update, delete on all tables in schema public to app_runtime;
 grant usage, select on all sequences in schema public to app_runtime;

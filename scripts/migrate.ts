@@ -25,7 +25,11 @@ export async function runMigrations(connectionString?: string) {
       [file],
     );
     if (rows.length) continue;
-    const sql = readFileSync(path.join(dir, file), "utf8");
+    // Files carry their own begin/commit for manual psql use; strip them so the
+    // whole file plus its bookkeeping row commit atomically here.
+    const sql = readFileSync(path.join(dir, file), "utf8")
+      .replace(/^\s*begin\s*;\s*/i, "")
+      .replace(/\s*commit\s*;\s*$/i, "");
     console.log(`→ applying ${file}`);
     try {
       await client.query("begin");
