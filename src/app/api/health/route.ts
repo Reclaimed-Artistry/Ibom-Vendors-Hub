@@ -1,9 +1,25 @@
 import { NextResponse } from "next/server";
-import { databaseHealthy } from "@/lib/db";
+import { databaseHealthy, systemDb } from "@/lib/db";
 import { gatewayStatus, getSettings } from "@/lib/settings";
 import { googleConfigured } from "@/lib/google-auth";
 
 export const dynamic = "force-dynamic";
+
+/** Counts what is live on the ticker — a number, never the message text. */
+async function liveAnnouncements(): Promise<{ total: number; vendors: number; customers: number } | null> {
+  try {
+    const row = await systemDb.maybeOne<{ total: number; vendors: number; customers: number }>(
+      `select count(*)::int as total,
+              count(*) filter (where audience in ('vendors','everyone'))::int as vendors,
+              count(*) filter (where audience in ('customers','everyone'))::int as customers
+         from announcements
+        where is_active and starts_at <= now() and (ends_at is null or ends_at > now())`,
+    );
+    return row ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function GET() {
   const database = await databaseHealthy();
@@ -25,6 +41,7 @@ export async function GET() {
       signIn: {
         google: (await googleConfigured()) ? "live" : settings.google_signin_enabled ? "unconfigured" : "off",
       },
+      announcements: await liveAnnouncements(),
       time: new Date().toISOString(),
     },
     { status: database ? 200 : 503 },
