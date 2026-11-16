@@ -311,14 +311,14 @@ export async function deleteProductAction(formData: FormData) {
   const productId = String(formData.get("productId") ?? "").trim();
   const redirectTo = String(formData.get("redirectTo") ?? "").trim();
 
-  if (productId) {
-    await deleteProductCompletely({
-      productId,
-      storeId: ctx.store.id,
-      actorId: ctx.user.id,
-      actorRole: "vendor",
-    });
-  }
+  const deleted = productId
+    ? await deleteProductCompletely({
+        productId,
+        storeId: ctx.store.id,
+        actorId: ctx.user.id,
+        actorRole: "vendor",
+      })
+    : null;
 
   revalidateTag("announcements");
   revalidateTag("categories");
@@ -327,14 +327,15 @@ export async function deleteProductAction(formData: FormData) {
   revalidatePath("/stores");
   revalidatePath(`/s/${ctx.store.slug}`, "layout");
   revalidatePath(`/s/${ctx.store.slug}/products`);
+  if (deleted?.productSlug) {
+    revalidatePath(`/s/${ctx.store.slug}/products/${deleted.productSlug}`);
+  }
   revalidatePath("/vendor");
   revalidatePath("/vendor/products");
   revalidatePath("/admin");
   revalidatePath(`/admin/vendors/${ctx.store.id}`);
 
-  if (redirectTo.startsWith("/vendor/products")) {
-    redirect(redirectTo);
-  }
+  redirect(redirectTo.startsWith("/vendor/products") ? redirectTo : "/vendor/products?deleted=1");
 }
 
 export async function deleteOwnStoreAction(_prev: VendorState, formData: FormData): Promise<VendorState> {

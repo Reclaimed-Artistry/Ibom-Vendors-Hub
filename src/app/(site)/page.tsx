@@ -15,6 +15,9 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   "shopping-bag": ShoppingBag,
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function HomePage() {
   const [user, settings, categories, highlights, featuredProducts] = await Promise.all([
     getCurrentUser(),

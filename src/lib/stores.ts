@@ -7,7 +7,7 @@ import { logActivity } from "@/lib/audit";
 import { notify, notifyAdmins } from "@/lib/notifications";
 import { sendEmail } from "@/lib/email";
 import { url } from "@/lib/settings";
-import { deleteStoredFiles, deleteStoreStorageFolder } from "@/lib/storage";
+import { deleteStoredFiles, deleteStoreStorageFolder, pruneOrphanStoreProductFiles } from "@/lib/storage";
 import type { Role } from "@/lib/db";
 
 export interface SubdomainCheck {
@@ -1006,18 +1006,29 @@ export async function deleteProductCompletely(input: {
     await db.execute(`delete from inventory_movements where product_id = $1`, [target.id]);
     await db.execute(`delete from products where id = $1`, [target.id]);
 
-    await logActivity({
-      actorId: input.actorId,
-      actorRole: input.actorRole,
-      storeId: target.store_id,
-      action: "product.deleted",
-      entityType: "product",
-      entityId: target.id,
-      description: `Permanently deleted product ${target.name}`,
-    });
+    // Remove stale creation/update log rows for this product so its old name never lingers in activity feeds
+    await db.execute(
+      `delete from activity_logs where entity_type = 'product' and entity_id = $1`,
+      [target.id],
+    );
+    await db.execute(
+      `delete from vendor_activity_logs where entity_type = 'product' and entity_id = $1`,
+      [target.id],
+    );
   });
 
   await deleteStoredFiles(images.map((img) => img.url));
+  const remainingImages = await systemDb.query<{ url: string }>(
+    `select pi.url
+       from product_images pi
+       join products p on p.id = pi.product_id
+      where p.store_id = $1`,
+    [target.store_id],
+  );
+  await pruneOrphanStoreProductFiles(
+    target.store_slug,
+    remainingImages.map((row) => row.url),
+  );
 
   return {
     storeId: target.store_id,

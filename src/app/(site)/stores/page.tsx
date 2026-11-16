@@ -5,6 +5,8 @@ import { EmptyState, Pagination, Badge } from "@/components/ui";
 import { truncate } from "@/lib/utils";
 
 export const metadata = { title: "All vendors" };
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function StoresPage({
   searchParams,

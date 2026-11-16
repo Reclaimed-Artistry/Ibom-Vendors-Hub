@@ -8,6 +8,9 @@ import { getSettings } from "@/lib/settings";
 import { formatMoney, truncate } from "@/lib/utils";
 import { Badge, EmptyState, Pagination } from "@/components/ui";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function StoreProductsPage({
   params,
   searchParams,

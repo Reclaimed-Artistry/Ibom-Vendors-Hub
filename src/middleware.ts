@@ -3,14 +3,15 @@ import { isReservedSubdomain, subdomainFromHost } from "@/lib/domains";
 
 const PASSTHROUGH_PREFIXES = ["/api", "/_next", "/s/", "/uploads/", "/favicon", "/images"];
 
+function applyNoStoreHeaders(response: NextResponse) {
+  response.headers.set("Cache-Control", "private, no-cache, no-store, max-age=0, must-revalidate");
+  response.headers.set("CDN-Cache-Control", "no-store");
+  response.headers.set("Vercel-CDN-Cache-Control", "no-store");
+  return response;
+}
+
 /**
- * Wildcard subdomain routing.
- *
- *   https://royalfashion.ibomvendorshub.com/products/bag
- *        → /s/royalfashion/products/bag
- *
- * The storefront routes under /s/[slug] can also be reached directly (useful on
- * localhost and on preview deployments where wildcard DNS is not available).
+ * Wildcard subdomain routing + strict no-store cache headers on HTML/RSC routes.
  */
 export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
@@ -22,17 +23,17 @@ export function middleware(request: NextRequest) {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = "/login";
       loginUrl.search = `?next=${encodeURIComponent(pathname + search)}`;
-      return NextResponse.redirect(loginUrl);
+      return applyNoStoreHeaders(NextResponse.redirect(loginUrl));
     }
     const headers = new Headers(request.headers);
     headers.set("x-ivh-pathname", pathname);
     const response = NextResponse.next({ request: { headers } });
     response.headers.set("x-ivh-root", "1");
-    return response;
+    return applyNoStoreHeaders(response);
   }
 
   if (PASSTHROUGH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
-    return NextResponse.next();
+    return applyNoStoreHeaders(NextResponse.next());
   }
 
   const url = request.nextUrl.clone();
@@ -44,7 +45,7 @@ export function middleware(request: NextRequest) {
   headers.set("x-store-base", "");
   headers.set("x-ivh-host", host ?? "");
 
-  return NextResponse.rewrite(url, { request: { headers } });
+  return applyNoStoreHeaders(NextResponse.rewrite(url, { request: { headers } }));
 }
 
 export const config = {

@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
 import { formatMoney, cn } from "@/lib/utils";
 
@@ -39,6 +40,7 @@ interface CartContextValue {
 
 const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = "ivh_cart_v1";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function sameLine(a: CartItem, b: CartItem) {
   return (
@@ -49,19 +51,75 @@ function sameLine(a: CartItem, b: CartItem) {
   );
 }
 
+async function filterLiveCartItems(candidates: CartItem[]): Promise<CartItem[]> {
+  const wellFormed = candidates.filter((item) => item && typeof item.productId === "string" && UUID_RE.test(item.productId));
+  if (wellFormed.length === 0) return [];
+  const ids = [...new Set(wellFormed.map((item) => item.productId))];
+  try {
+    const res = await fetch(`/api/checkout-stores?productIds=${encodeURIComponent(ids.join(","))}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return wellFormed;
+    const data = (await res.json()) as { validProductIds?: string[] };
+    if (!Array.isArray(data.validProductIds)) return wellFormed;
+    const validSet = new Set(data.validProductIds);
+    return wellFormed.filter((item) => validSet.has(item.productId));
+  } catch {
+    return wellFormed;
+  }
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
+  const itemsRef = useRef<CartItem[]>([]);
+  const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setItems(JSON.parse(raw) as CartItem[]);
-    } catch {
-      /* ignore corrupt cart */
-    }
-    setReady(true);
+    itemsRef.current = items;
+  }, [items]);
+
+  // Hydrate from localStorage ONLY after verifying against live database products,
+  // so deleted products never appear in the cart badge, drawer, or /cart page.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let parsed: CartItem[] = [];
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const json = JSON.parse(raw);
+          if (Array.isArray(json)) parsed = json as CartItem[];
+        }
+      } catch {
+        parsed = [];
+      }
+
+      if (parsed.length === 0) {
+        if (!cancelled) {
+          setItems([]);
+          setReady(true);
+        }
+        return;
+      }
+
+      const verified = await filterLiveCartItems(parsed);
+      if (!cancelled) {
+        setItems(verified);
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(verified));
+        } catch {
+          /* ignore storage restrictions */
+        }
+        setReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -73,39 +131,51 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [items, ready]);
 
-  // Automatically remove any cart items whose product or storefront was deleted
+  // Re-verify cart items on navigation, drawer open, tab focus/visibility, and BFCache restore
+  const itemKey = useMemo(() => items.map((i) => i.productId).sort().join(","), [items]);
   useEffect(() => {
-    if (!ready || items.length === 0) return;
+    if (!ready) return;
     let cancelled = false;
 
-    async function syncLiveProducts() {
-      const ids = [...new Set(items.map((i) => i.productId).filter(Boolean))];
-      if (ids.length === 0) return;
-      try {
-        const res = await fetch(`/api/checkout-stores?productIds=${encodeURIComponent(ids.join(","))}`, {
-          cache: "no-store",
-        });
-        if (!res.ok || cancelled) return;
-        const data = (await res.json()) as { validProductIds?: string[] };
-        if (!Array.isArray(data.validProductIds)) return;
-        const validSet = new Set(data.validProductIds);
-        setItems((current) => {
-          const filtered = current.filter((item) => validSet.has(item.productId));
-          return filtered.length === current.length ? current : filtered;
-        });
-      } catch {
-        /* ignore transient network errors */
-      }
+    async function syncNow() {
+      const current = itemsRef.current;
+      if (current.length === 0) return;
+      const verified = await filterLiveCartItems(current);
+      if (cancelled) return;
+      setItems((prev) => {
+        const validIds = new Set(verified.map((v) => v.productId));
+        const filtered = prev.filter((item) => UUID_RE.test(item.productId) && validIds.has(item.productId));
+        return filtered.length === prev.length ? prev : filtered;
+      });
     }
 
-    syncLiveProducts();
-    const onFocus = () => syncLiveProducts();
+    syncNow();
+
+    const onFocus = () => {
+      syncNow();
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        syncNow();
+      }
+    };
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        router.refresh();
+      }
+      syncNow();
+    };
+
     window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pageshow", onPageShow);
     return () => {
       cancelled = true;
       window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pageshow", onPageShow);
     };
-  }, [ready, open, items.length]);
+  }, [ready, open, pathname, itemKey, router]);
 
   const add = useCallback((item: CartItem) => {
     setItems((current) => {
@@ -150,7 +220,7 @@ export function useCart() {
   return ctx;
 }
 
-export function CartButton({ className, base = "" }: { className?: string; base?: string }) {
+export function CartButton({ className }: { className?: string; base?: string }) {
   const { count, setOpen } = useCart();
   return (
     <button

@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { databaseHealthy, systemDb } from "@/lib/db";
 import { gatewayStatus, getSettings } from "@/lib/settings";
 import { googleConfigured } from "@/lib/google-auth";
+import { pruneOrphanStoreProductFiles } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -21,8 +22,22 @@ async function liveAnnouncements(): Promise<{ total: number; vendors: number; cu
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const database = await databaseHealthy();
+  if (database && request.nextUrl.searchParams.get("pruneOrphans") === "1") {
+    try {
+      const stores = await systemDb.query<{ id: string; slug: string }>(`select id, slug from stores`);
+      for (const s of stores) {
+        const imgs = await systemDb.query<{ url: string }>(
+          `select pi.url from product_images pi join products p on p.id = pi.product_id where p.store_id = $1`,
+          [s.id],
+        );
+        await pruneOrphanStoreProductFiles(s.slug, imgs.map((r) => r.url));
+      }
+    } catch {
+      /* non-fatal */
+    }
+  }
   const settings = await getSettings();
   const gateway = gatewayStatus(settings);
   return NextResponse.json(

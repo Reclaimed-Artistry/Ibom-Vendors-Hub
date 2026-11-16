@@ -6,6 +6,8 @@ import { formatMoney } from "@/lib/utils";
 import { Badge, EmptyState, Pagination } from "@/components/ui";
 
 export const metadata = { title: "Browse the marketplace" };
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function BrowsePage({
   searchParams,

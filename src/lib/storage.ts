@@ -221,3 +221,55 @@ export async function deleteStoreStorageFolder(slug: string): Promise<void> {
     }).catch(() => {});
   }
 }
+
+/**
+ * Remove any orphaned files under `stores/<slug>/products/` that are no longer
+ * referenced by any `product_images` row for that store.
+ */
+export async function pruneOrphanStoreProductFiles(slug: string, activeUrls: string[]): Promise<void> {
+  const cleanSlug = slug.replace(/[^a-z0-9-]/gi, "");
+  if (!cleanSlug) return;
+
+  const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET || "storefronts";
+  if (!supabaseUrl || !serviceKey) return;
+
+  const publicPrefix = `${supabaseUrl}/storage/v1/object/public/${bucket}/`;
+  const keepPaths = new Set(
+    activeUrls
+      .filter((u) => u && u.startsWith(publicPrefix))
+      .map((u) => decodeURIComponent(u.slice(publicPrefix.length).split("?")[0])),
+  );
+
+  const prefix = `stores/${cleanSlug}/products`;
+  try {
+    const listRes = await fetch(`${supabaseUrl}/storage/v1/object/list/${bucket}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prefix, limit: 200 }),
+    });
+    if (!listRes.ok) return;
+    const items = (await listRes.json()) as Array<{ name?: string; id?: string | null }>;
+    const orphans = items
+      .filter((item) => item.name && item.id)
+      .map((item) => `${prefix}/${item.name}`)
+      .filter((fullPath) => !keepPaths.has(fullPath));
+    if (orphans.length > 0) {
+      await fetch(`${supabaseUrl}/storage/v1/object/${bucket}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prefixes: orphans }),
+      });
+    }
+  } catch {
+    /* ignore non-fatal cleanup errors */
+  }
+}
+

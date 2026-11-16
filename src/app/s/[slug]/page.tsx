@@ -8,13 +8,16 @@ import { formatMoney, formatDate, truncate, normalisePhone } from "@/lib/utils";
 import { Badge, ButtonLink, Card } from "@/components/ui";
 import { ContactForm } from "@/components/contact-form";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function StorefrontHome({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const { store, category, live, reason } = await resolveStore(slug);
   if (!store) notFound();
 
   const [settings, base, reviews] = await Promise.all([getSettings(), storeBase(slug), getStoreReviews(store.id, 3)]);
-  const { products } = await getStoreProducts({ storeId: store.id, limit: 48, includeUnavailable: true });
+  const { products } = await getStoreProducts({ storeId: store.id, limit: 48, includeUnavailable: false });
   const categories = await (await import("@/lib/db")).withPublic(async (db) =>
     db.query<{ id: string; name: string; slug: string; sort_order: number }>(
       `select id, name, slug, sort_order from product_categories where store_id = $1 and is_active order by sort_order, name`,

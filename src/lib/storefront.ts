@@ -145,7 +145,10 @@ export async function getStoreProducts(query: ProductQuery): Promise<{ products:
 
 export async function getStoreProduct(storeId: string, productSlug: string): Promise<Product | null> {
   return withPublic(async (db) =>
-    db.maybeOne<Product>(`${PRODUCT_SELECT} where p.store_id = $1 and p.slug = $2`, [storeId, productSlug]),
+    db.maybeOne<Product>(
+      `${PRODUCT_SELECT} where p.store_id = $1 and p.slug = $2 and p.is_available = true`,
+      [storeId, productSlug],
+    ),
   );
 }
 

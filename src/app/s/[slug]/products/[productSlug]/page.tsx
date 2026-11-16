@@ -11,6 +11,9 @@ import { ReviewForm } from "@/components/review-form";
 import { getCurrentUser } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function ProductPage({ params }: { params: Promise<{ slug: string; productSlug: string }> }) {
   const { slug, productSlug } = await params;
   const { store, category, live } = await resolveStore(slug);
