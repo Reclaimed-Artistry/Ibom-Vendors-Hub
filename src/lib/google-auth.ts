@@ -39,16 +39,16 @@ export const googleCredentials = cache(async (): Promise<GoogleCredentials | nul
 
   const storedId = settings.google_client_id?.trim() ?? "";
   const storedSecret = settings.google_client_secret?.trim() ?? "";
-  if (storedId && storedSecret) {
-    return { clientId: storedId, clientSecret: storedSecret, source: "dashboard" };
-  }
-
   const envId = process.env.GOOGLE_CLIENT_ID?.trim() ?? "";
   const envSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "";
-  if (envId && envSecret) {
-    return { clientId: envId, clientSecret: envSecret, source: "environment" };
-  }
-  return null;
+
+  // Field-by-field: a value saved in the dashboard wins, the environment fills
+  // in whatever is missing — so pasting only the client ID on a deployment that
+  // already has the secret in its environment works immediately.
+  const clientId = storedId || envId;
+  const clientSecret = storedSecret || envSecret;
+  if (!clientId || !clientSecret) return null;
+  return { clientId, clientSecret, source: storedId || storedSecret ? "dashboard" : "environment" };
 });
 
 export async function googleConfigured() {
