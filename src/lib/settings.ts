@@ -74,6 +74,78 @@ export function paymentMode(settings: PlatformSettings): "paystack" | "sandbox" 
   return paystackSecret(settings) ? "paystack" : "sandbox";
 }
 
+export type KeyKind = "missing" | "test" | "live" | "unknown";
+export type KeySource = "platform settings" | "environment" | "missing";
+
+export interface GatewayStatus {
+  mode: "paystack" | "sandbox";
+  secretConfigured: boolean;
+  publicConfigured: boolean;
+  secretKind: KeyKind;
+  publicKind: KeyKind;
+  secretSource: KeySource;
+  publicSource: KeySource;
+  publicHint: string;
+  warnings: string[];
+}
+
+function keyKind(value: string): KeyKind {
+  if (!value) return "missing";
+  if (value.startsWith("sk_test_") || value.startsWith("pk_test_")) return "test";
+  if (value.startsWith("sk_live_") || value.startsWith("pk_live_")) return "live";
+  return "unknown";
+}
+
+function mask(value: string) {
+  if (!value) return "";
+  return value.length <= 16 ? `${value.slice(0, 6)}…` : `${value.slice(0, 12)}…${value.slice(-4)}`;
+}
+
+/**
+ * What the payment stack can and cannot do right now.
+ *
+ * Paystack needs the *secret* key to initialise and verify a transaction; a
+ * public key on its own cannot charge anybody (this app redirects to Paystack's
+ * hosted checkout rather than using the inline popup). Surfacing that mismatch
+ * is more useful than silently staying in sandbox mode.
+ */
+export function gatewayStatus(settings: PlatformSettings): GatewayStatus {
+  const secret = paystackSecret(settings);
+  const pub = paystackPublic(settings);
+  const secretKind = keyKind(secret);
+  const publicKind = keyKind(pub);
+  const warnings: string[] = [];
+
+  if (!secret) {
+    warnings.push(
+      pub
+        ? "A public key alone cannot take payments — add the matching Paystack secret key (sk_test_… / sk_live_…) and checkout leaves sandbox mode."
+        : "No Paystack keys are configured, so checkout runs on the built-in sandbox gateway and no money moves.",
+    );
+  }
+  if (secret && !pub) {
+    warnings.push("Only the secret key is set. Transactions still work, but add the public key so both halves of the Paystack integration are visible to future admin changes.");
+  }
+  if (secretKind !== "missing" && publicKind !== "missing" && secretKind !== publicKind) {
+    warnings.push(`The secret key looks ${secretKind} while the public key looks ${publicKind} — mixing test and live keys makes Paystack reject every transaction.`);
+  }
+  if (secret && settings.sandbox_payments) {
+    warnings.push("Keys are configured but the sandbox switch is still on in Platform settings, so customers keep seeing the sandbox screen.");
+  }
+
+  return {
+    mode: paymentMode(settings),
+    secretConfigured: Boolean(secret),
+    publicConfigured: Boolean(pub),
+    secretKind,
+    publicKind,
+    secretSource: settings.paystack_secret_key ? "platform settings" : secret ? "environment" : "missing",
+    publicSource: settings.paystack_public_key ? "platform settings" : pub ? "environment" : "missing",
+    publicHint: mask(pub),
+    warnings,
+  };
+}
+
 /** Absolute URL helpers used in emails and redirects. */
 export function url(path: string) {
   return `${appUrl()}${path.startsWith("/") ? path : `/${path}`}`;

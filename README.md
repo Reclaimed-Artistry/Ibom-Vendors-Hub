@@ -162,7 +162,10 @@ register claims the first storefront.
   with 403 and recorded in **Admin → Emails** with the provider's exact message. Verify the
   domain (or set `EMAIL_FROM`/the `email_from` platform setting to `onboarding@resend.dev`
   to deliver to the Resend account owner) and the failures clear on the next send.
-- `PAYSTACK_*` is still unset, so checkout runs on the built-in sandbox gateway.
+- `PAYSTACK_PUBLIC_KEY` (test) is configured but `PAYSTACK_SECRET_KEY` is not, so checkout
+  still runs on the sandbox gateway: Paystack needs the secret key to initialise and verify
+  a transaction, and a public key alone cannot charge anyone. Admin → Payments and
+  `/api/health` both report the exact key state.
 
 ### Deploying to Vercel
 
@@ -193,6 +196,20 @@ runs `next build`. Every deploy is therefore self-migrating and idempotent.
    shared `*.vercel.app` host, storefronts are reachable at `/s/<slug>` (the middleware
    still rewrites subdomains when a wildcard domain is attached).
 5. Point the Paystack webhook at `https://<your-domain>/api/webhooks/paystack`.
+
+### Payments
+
+The gateway adapter (`src/lib/payments/gateway.ts`) talks to Paystack's REST API with the
+**secret** key: it creates the transaction server-side, returns Paystack's hosted checkout
+URL, and re-verifies amount + currency on the callback *and* on the signed webhook before a
+payment can be marked successful. Without a secret key it falls back to the sandbox gateway,
+which still records a real payment row and still requires server-side confirmation.
+
+`gatewayStatus()` (in `src/lib/settings.ts`) reports which keys are present, whether they are
+test or live, where each came from (platform settings override the environment) and every
+mismatch worth fixing — public key without a secret, mixed test/live keys, keys configured
+while the sandbox switch is still on. The same summary appears in Admin → Payments, Admin →
+Settings and the `payments` block of `/api/health`.
 
 ### Transactional email
 
