@@ -16,7 +16,8 @@
     "test:smoke": "tsx scripts/test-smoke.ts",
     "test": "npm run typecheck && npm run test:db",
     "vercel-build": "tsx scripts/migrate.ts && tsx scripts/bootstrap-admin.ts && next build",
-    "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts"
+    "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",
+    "brand:assets": "tsx scripts/make-brand.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.16",

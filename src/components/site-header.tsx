@@ -12,8 +12,8 @@ export async function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-ink-100 bg-ink-50/85 backdrop-blur">
-      <div className="container-page flex h-16 items-center justify-between gap-4">
-        <Logo />
+      <div className="container-page flex h-20 items-center justify-between gap-4">
+        <Logo height={46} href="/" />
         <form action="/browse" className="hidden flex-1 items-center gap-2 lg:flex">
           <div className="relative w-full max-w-xl">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
@@ -37,7 +37,7 @@ export async function SiteHeader() {
             <UserRound className="size-4" /> {user ? user.fullName.split(" ")[0] : "Sign in"}
           </Link>
           <CartButton />
-          <Link href="/register" className="btn-primary hidden sm:inline-flex">
+          <Link href="/register" className="btn-primary hidden whitespace-nowrap sm:inline-flex">
             Sell on {settings.platform_name.split(" ")[0]}
           </Link>
         </nav>

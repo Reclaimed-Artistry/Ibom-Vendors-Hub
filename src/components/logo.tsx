@@ -1,25 +1,66 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-export function Logo({ className, href = "/", invert = false }: { className?: string; href?: string; invert?: boolean }) {
+/**
+ * The official Ibom Vendors Hub lockup.
+ *
+ * The artwork (shopping bag + Akwa Ibom mark, swoosh, wordmark and the
+ * "One Hub. Every business. Endless opportunities." tagline) is used whole and
+ * never cropped: the files in /public/brand only had fully transparent padding
+ * removed. Sizing is height-driven with `w-auto` + `object-contain`, so the
+ * aspect ratio is preserved at every breakpoint.
+ *
+ * `invert` places the lockup on a white chip for dark surfaces, because the
+ * wordmark is dark green and would otherwise lose contrast.
+ */
+export function Logo({
+  className,
+  href = "/",
+  invert = false,
+  height = 40,
+}: {
+  className?: string;
+  href?: string;
+  invert?: boolean;
+  height?: number;
+}) {
   return (
-    <Link href={href} className={cn("group inline-flex items-center gap-2.5", className)} aria-label="Ibom Vendors Hub home">
-      <span
-        className={cn(
-          "flex size-9 items-center justify-center rounded-xl text-sm font-black tracking-tight",
-          invert ? "bg-white text-brand-900" : "bg-brand-900 text-white",
-        )}
-      >
-        IV
-      </span>
-      <span className="leading-none">
-        <span className={cn("block font-display text-[17px] font-bold tracking-tight", invert ? "text-white" : "text-ink-900")}>
-          Ibom Vendors Hub
-        </span>
-        <span className={cn("mt-1 block text-[10px] font-semibold uppercase tracking-[0.18em]", invert ? "text-brand-200" : "text-ink-400")}>
-          Akwa Ibom marketplace
-        </span>
+    <Link
+      href={href}
+      className={cn("group inline-flex shrink-0 items-center", className)}
+      aria-label="Ibom Vendors Hub — home"
+    >
+      <span className={cn("inline-flex items-center", invert && "rounded-xl bg-white px-3 py-2 shadow-sm")}>
+        <picture>
+          <source srcSet="/brand/ibom-vendors-hub-logo.webp" type="image/webp" />
+          <img
+            src="/brand/ibom-vendors-hub-logo.png"
+            alt="Ibom Vendors Hub — One Hub. Every Business. Endless Opportunities."
+            width={1200}
+            height={416}
+            style={{ height, width: "auto" }}
+            className="block object-contain"
+            decoding="async"
+          />
+        </picture>
       </span>
     </Link>
+  );
+}
+
+/** Bare lockup (no link) for footers of emails, receipts and print views. */
+export function LogoMark({ height = 32, className }: { height?: number; className?: string }) {
+  return (
+    <picture className={className}>
+      <source srcSet="/brand/ibom-vendors-hub-logo.webp" type="image/webp" />
+      <img
+        src="/brand/ibom-vendors-hub-logo.png"
+        alt="Ibom Vendors Hub"
+        width={1200}
+        height={416}
+        style={{ height, width: "auto" }}
+        className="block object-contain"
+      />
+    </picture>
   );
 }

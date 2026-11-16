@@ -9,7 +9,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
       <div className="relative hidden overflow-hidden bg-ink-900 p-10 lg:flex lg:flex-col lg:justify-between">
         <div className="absolute -right-40 top-1/4 size-[36rem] rounded-full bg-brand-800/40 blur-3xl" aria-hidden />
         <div className="relative">
-          <Logo invert />
+          <Logo invert height={48} />
         </div>
         <div className="relative max-w-md">
           <h2 className="font-display text-4xl leading-tight text-white">One login. Every part of your business.</h2>
@@ -30,8 +30,8 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
       </div>
       <div className="flex flex-col justify-center px-5 py-10 sm:px-10">
         <div className="mx-auto w-full max-w-md">
-          <div className="mb-8 lg:hidden">
-            <Logo />
+          <div className="mb-8 flex justify-center lg:hidden">
+            <Logo height={44} />
           </div>
           {children}
           <p className="mt-8 text-center text-xs text-ink-400">

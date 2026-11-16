@@ -442,9 +442,8 @@ function layout(content: RenderedEmail) {
   <table role="presentation" width="100%" style="background:#eef2f6;padding:28px 12px">
     <tr><td align="center">
       <table role="presentation" width="100%" style="max-width:600px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(15,23,42,.08)">
-        <tr><td style="background:${BRAND.ink};padding:20px 28px">
-          <span style="color:#ffffff;font-size:17px;font-weight:700;letter-spacing:-.2px">Ibom Vendors Hub</span>
-          <span style="color:${BRAND.gold};font-size:17px;font-weight:700">.</span>
+        <tr><td style="background:#ffffff;padding:18px 28px;border-bottom:1px solid #e2e8f0">
+          <img src="${esc(`${url("/brand/ibom-vendors-hub-logo.png")}`)}" alt="Ibom Vendors Hub" height="38" style="display:block;height:38px;width:auto;max-width:100%" />
         </td></tr>
         <tr><td style="padding:32px 28px">
           <h1 style="margin:0 0 12px;font-size:22px;line-height:1.25;color:${BRAND.ink}">${esc(content.heading)}</h1>

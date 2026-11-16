@@ -33,7 +33,7 @@ export default async function PayPage({ params }: { params: Promise<{ reference:
   return (
     <div className="min-h-screen bg-ink-50 py-10">
       <div className="mx-auto max-w-lg px-4">
-        <div className="mb-6 flex justify-center"><Logo /></div>
+        <div className="mb-6 flex justify-center"><Logo height={52} /></div>
         <div className="card card-pad">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-ink-400">
             <LockKeyhole className="size-3.5" /> Secure checkout

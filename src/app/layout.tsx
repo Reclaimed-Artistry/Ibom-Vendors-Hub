@@ -14,7 +14,20 @@ export const metadata: Metadata = {
     title: "Ibom Vendors Hub",
     description: "Every Akwa Ibom business, one address. Shop, book and track orders from verified local vendors.",
     type: "website",
+    images: [
+      {
+        url: "/brand/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Ibom Vendors Hub — One Hub. Every Business. Endless Opportunities.",
+      },
+    ],
   },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/brand/og-image.png"],
+  },
+  applicationName: "Ibom Vendors Hub", 
 };
 
 // Every page renders tenant-scoped, per-request data (the storefront host header,

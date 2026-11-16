@@ -5,6 +5,7 @@ import { MapPin, ShieldCheck } from "lucide-react";
 import { CartButton, CartDrawer } from "@/components/cart";
 import { resolveStore } from "@/lib/storefront";
 import { storeBase } from "@/lib/storefront-base";
+import { Logo } from "@/components/logo";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -74,9 +75,9 @@ export default async function StorefrontLayout({
             <ShieldCheck className="size-3.5 text-brand-600" />
             {store.name} is a verified vendor on Ibom Vendors Hub
           </p>
-          <p>
-            Powered by{" "}
-            <Link href="/" className="font-semibold text-ink-600 hover:text-brand-800">Ibom Vendors Hub</Link>
+          <p className="flex items-center gap-2">
+            Powered by
+            <Logo height={22} />
           </p>
         </div>
       </footer>

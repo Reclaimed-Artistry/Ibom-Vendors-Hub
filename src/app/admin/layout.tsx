@@ -4,6 +4,7 @@ import { Bell, ExternalLink, ShieldCheck } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { DashboardNav, LogoutButton, MobileNav, type DashboardNavItem } from "@/components/dashboard-nav";
+import { Logo } from "@/components/logo";
 
 export const metadata: Metadata = { title: "Admin · Ibom Vendors Hub" };
 
@@ -38,11 +39,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <aside className="hidden w-64 shrink-0 lg:block">
           <div className="sticky top-5 space-y-4">
             <div className="card-pad">
-              <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-400">
+              <Logo height={30} />
+              <p className="mt-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-400">
                 <ShieldCheck className="size-3.5" /> Platform control
               </p>
-              <p className="mt-1 text-base font-bold text-ink-900">Ibom Vendors Hub</p>
-              <p className="truncate text-xs text-ink-500">{user.email}</p>
+              <p className="mt-1 truncate text-xs text-ink-500">{user.email}</p>
               <Link href="/" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline">
                 Public site <ExternalLink className="size-3" />
               </Link>

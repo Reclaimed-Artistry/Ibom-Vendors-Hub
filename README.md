@@ -197,6 +197,25 @@ runs `next build`. Every deploy is therefore self-migrating and idempotent.
    still rewrites subdomains when a wildcard domain is attached).
 5. Point the Paystack webhook at `https://<your-domain>/api/webhooks/paystack`.
 
+### Brand assets
+
+The supplied logo (`assets/brand/logo-source.png`) is a transparent PNG lockup: shopping
+bag with the Akwa Ibom silhouette, swoosh, "Ibom Vendors Hub" wordmark and the tagline
+*One Hub. Every business. Endless opportunities.* `npm run brand:assets` regenerates every
+derivative from it — it removes only fully transparent padding (an exact alpha bounding box)
+and never crops the artwork:
+
+| Output | Use |
+| --- | --- |
+| `public/brand/ibom-vendors-hub-logo.png` / `.webp` | site header, footer, auth panel, dashboards, storefront footer, email header |
+| `public/brand/ibom-vendors-hub-logo-small.png` | compact surfaces |
+| `public/brand/og-image.png` | Open Graph / Twitter card |
+| `src/app/icon.png`, `src/app/apple-icon.png`, `public/brand/icon-512.png` | favicon and touch icons (full lockup letterboxed on white) |
+
+`<Logo>` renders the whole lockup with `object-contain`, height-driven sizing and `w-auto`, so
+it is never stretched or clipped; `invert` puts it on a white chip for dark surfaces because
+the wordmark is dark green.
+
 ### Google sign-in
 
 `/auth/google` runs a server-side authorization-code flow: it mints a CSRF `state` into an

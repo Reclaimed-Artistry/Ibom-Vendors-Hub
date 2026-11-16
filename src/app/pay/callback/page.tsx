@@ -48,7 +48,7 @@ export default async function PaymentCallbackPage({
   return (
     <div className="min-h-screen bg-ink-50 py-10">
       <div className="mx-auto max-w-lg px-4">
-        <div className="mb-6 flex justify-center"><Logo /></div>
+        <div className="mb-6 flex justify-center"><Logo height={52} /></div>
         <div className="card card-pad text-center">
           {success ? (
             <>

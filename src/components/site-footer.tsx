@@ -9,7 +9,7 @@ export async function SiteFooter() {
     <footer className="mt-16 border-t border-ink-100 bg-white">
       <div className="container-page grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <Logo />
+          <Logo height={54} />
           <p className="mt-4 max-w-xs text-sm leading-6 text-ink-500">{settings.tagline}</p>
           <p className="mt-4 text-sm text-ink-500">
             {settings.support_email}

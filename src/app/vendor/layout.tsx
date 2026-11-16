@@ -7,6 +7,7 @@ import { storeBase } from "@/lib/storefront-base";
 import { storefrontPath } from "@/lib/domains";
 import { Badge } from "@/components/ui";
 import { DashboardNav, LogoutButton, MobileNav, type DashboardNavItem } from "@/components/dashboard-nav";
+import { Logo } from "@/components/logo";
 
 export const metadata: Metadata = { title: "Vendor dashboard · Ibom Vendors Hub" };
 
@@ -55,7 +56,8 @@ export default async function VendorLayout({ children }: { children: React.React
         <aside className="hidden w-64 shrink-0 lg:block">
           <div className="sticky top-5 space-y-4">
             <div className="card-pad">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">Vendor workspace</p>
+              <Logo height={28} />
+              <p className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-ink-400">Vendor workspace</p>
               <p className="mt-1 truncate text-base font-bold text-ink-900">{store.name}</p>
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <Badge tone={store.status === "active" ? "success" : store.status === "pending" ? "warning" : "danger"}>
