@@ -42,8 +42,18 @@ export default async function HomePage() {
               <span className="text-brand-300">One address.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-ink-200">
-              From Mama Put Kitchen&apos;s jollof to hand-stitched leather from Ikot Ekpene. Discover {highlights.stats.stores} verified
-              vendors, order in minutes, and track every step — all in one place.
+              {highlights.stats.stores > 0 ? (
+                <>
+                  Restaurants, fashion houses, shoemakers, gadget stores and professionals from across the state. Discover{" "}
+                  {highlights.stats.stores} verified vendor{highlights.stats.stores === 1 ? "" : "s"}, order in minutes, and track
+                  every step — all in one place.
+                </>
+              ) : (
+                <>
+                  Restaurants, fashion houses, shoemakers, gadget stores and professionals from across Akwa Ibom are moving online
+                  here. Open your storefront today and be the first business customers find on the hub.
+                </>
+              )}
             </p>
             <form action="/browse" className="mt-8 flex flex-col gap-2 sm:flex-row">
               <div className="relative flex-1">
@@ -65,6 +75,34 @@ export default async function HomePage() {
           </div>
 
           <div className="relative">
+            {highlights.featured.length === 0 ? (
+              <div className="rounded-3xl border border-white/15 bg-white/5 p-6 backdrop-blur">
+                <span className="inline-flex items-center gap-2 rounded-full bg-brand-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-200">
+                  <Store className="size-3.5" /> Now onboarding vendors
+                </span>
+                <p className="mt-4 font-display text-2xl text-white">Your shop could be the first storefront here.</p>
+                <p className="mt-2 text-sm leading-6 text-ink-200">
+                  A catalogue, order dashboard, payment receipts and a storefront on your own subdomain — ready in minutes.
+                </p>
+                <Link href="/register" className="btn-gold mt-5 inline-flex">
+                  Open your storefront <ArrowRight className="ml-1 size-4" />
+                </Link>
+                <dl className="mt-6 grid grid-cols-3 gap-3 text-center text-white">
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <dt className="text-[10px] uppercase tracking-wide text-ink-300">Trial</dt>
+                    <dd className="mt-1 text-sm font-semibold">{settings.default_trial_days}d</dd>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <dt className="text-[10px] uppercase tracking-wide text-ink-300">Setup fee</dt>
+                    <dd className="mt-1 text-sm font-semibold">₦0</dd>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <dt className="text-[10px] uppercase tracking-wide text-ink-300">Categories</dt>
+                    <dd className="mt-1 text-sm font-semibold">{categories.length}</dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
             <div className="grid grid-cols-2 gap-4">
               {highlights.featured.slice(0, 4).map((store, index) => (
                 <Link
@@ -89,12 +127,14 @@ export default async function HomePage() {
                 </Link>
               ))}
             </div>
-            <div className="absolute -bottom-6 left-1/2 hidden -translate-x-1/2 items-center gap-3 rounded-2xl border border-white/10 bg-ink-800/90 px-4 py-3 backdrop-blur lg:flex">
-              <BadgeCheck className="size-5 text-brand-400" />
-              <p className="text-xs text-ink-200">
-                <span className="font-semibold text-white">{highlights.stats.products} live listings</span> across {highlights.stats.categories} categories
-              </p>
-            </div>
+            {highlights.stats.products > 0 ? (
+              <div className="absolute -bottom-6 left-1/2 hidden -translate-x-1/2 items-center gap-3 rounded-2xl border border-white/10 bg-ink-800/90 px-4 py-3 backdrop-blur lg:flex">
+                <BadgeCheck className="size-5 text-brand-400" />
+                <p className="text-xs text-ink-200">
+                  <span className="font-semibold text-white">{highlights.stats.products} live listings</span> across {highlights.stats.categories} categories
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
@@ -144,6 +184,17 @@ export default async function HomePage() {
               All vendors <ArrowRight className="size-4" />
             </Link>
           </div>
+          {highlights.featured.length === 0 ? (
+            <div className="mt-7 rounded-2xl border border-dashed border-ink-200 bg-ink-50 p-8 text-center">
+              <p className="font-display text-xl text-ink-900">No storefronts have opened yet.</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-500">
+                Vendors are onboarding now. If you run a business in Akwa Ibom, you can claim your address before your competitors do.
+              </p>
+              <Link href="/register" className="btn-primary mt-5 inline-flex">
+                Create your storefront
+              </Link>
+            </div>
+          ) : null}
           <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {highlights.featured.slice(0, 6).map((store) => (
               <Link key={store.id} href={`/s/${store.slug}`} className="group card overflow-hidden">
@@ -184,6 +235,17 @@ export default async function HomePage() {
             See all products <ArrowRight className="size-4" />
           </Link>
         </div>
+        {featuredProducts.products.length === 0 ? (
+          <div className="mt-7 rounded-2xl border border-dashed border-ink-200 bg-ink-50 p-8 text-center">
+            <p className="font-display text-xl text-ink-900">The shelves are being stocked.</p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-500">
+              Products appear here as soon as vendors publish them. Browse the categories above to see what is live right now.
+            </p>
+            <Link href="/browse" className="btn-secondary mt-5 inline-flex">
+              Browse the marketplace
+            </Link>
+          </div>
+        ) : null}
         <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {featuredProducts.products.map((product) => (
             <Link key={product.id} href={`/s/${product.store_slug}/products/${product.slug}`} className="group card overflow-hidden">

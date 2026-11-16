@@ -61,6 +61,9 @@ Supabase project instead (see `.env.example`) to run against managed Postgres.
 
 ### Demo accounts (after seeding)
 
+These only work against a seeded local database. Set `DEMO_MODE=1` to render the hint on `/login`;
+production never seeds vendors, so the hint stays hidden there.
+
 | Role | Email | Password |
 | --- | --- | --- |
 | Admin | `admin@ibomvendorshub.com` | `Admin1234!` |
