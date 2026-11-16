@@ -38,16 +38,16 @@ export function AnnouncementList({
   }
 
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-3">
       {items.map((item) => {
         const style = ANNOUNCEMENT_STYLES[item.kind] ?? ANNOUNCEMENT_STYLES.info;
         const Icon = style.icon;
         const status = when(item);
         return (
-          <li key={item.id} className="rounded-xl border border-ink-200 bg-white p-3">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0 flex-1 space-y-1">
-                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <li key={item.id} className="rounded-xl border border-ink-200 bg-white p-4 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
                   <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold", style.bar)}>
                     <Icon className="size-3" aria-hidden /> {style.label}
                   </span>
@@ -62,9 +62,9 @@ export function AnnouncementList({
                   <span className="text-ink-500">{status.label}</span>
                 </div>
                 <p className="font-semibold text-ink-900">{item.title}</p>
-                <p className="text-sm text-ink-600">{item.message}</p>
+                <p className="text-sm leading-6 text-ink-600">{item.message}</p>
                 {item.products.length ? (
-                  <p className="flex flex-wrap gap-1 pt-0.5">
+                  <p className="flex flex-wrap gap-1.5 pt-1">
                     {item.products.map((product) => (
                       <span key={product.id} className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-800">
                         {product.name}
@@ -73,7 +73,7 @@ export function AnnouncementList({
                   </p>
                 ) : null}
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5">
                 <form action={toggleAnnouncementAction}>
                   <input type="hidden" name="id" value={item.id} />
                   <input type="hidden" name="active" value={item.is_active ? "false" : "true"} />

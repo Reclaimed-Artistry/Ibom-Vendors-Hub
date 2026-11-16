@@ -13,26 +13,30 @@ export default async function AdminAnnouncementsPage() {
   const items = await listPlatformAnnouncements();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <PageHeader
         title="Flash announcements"
         description="Messages that scroll across the top of the screen. Target vendors for operational notices, customers for campaigns, or both."
       />
 
-      <div className="grid gap-4 xl:grid-cols-5">
+      <div className="grid gap-5 xl:grid-cols-5">
         <Card className="xl:col-span-2">
           <CardHeader
             title={<span className="flex items-center gap-2"><Megaphone className="size-4 text-brand-600" /> Compose</span>}
             description="Published announcements go live immediately — no deploy."
           />
-          <AnnouncementComposer mode="platform" />
+          <div className="card-pad">
+            <AnnouncementComposer mode="platform" />
+          </div>
         </Card>
         <Card className="xl:col-span-3">
           <CardHeader
             title="Published"
             description={`${items.length} platform announcement${items.length === 1 ? "" : "s"}`}
           />
-          <AnnouncementList items={items} showAudience />
+          <div className="card-pad">
+            <AnnouncementList items={items} showAudience />
+          </div>
         </Card>
       </div>
     </div>

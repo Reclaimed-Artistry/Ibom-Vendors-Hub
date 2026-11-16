@@ -20,26 +20,30 @@ export default async function VendorAnnouncementsPage() {
   ]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <PageHeader
         title="Flash announcements"
         description="Put a message on your storefront ticker — flash sales, clearance, restocks — and pick the products to feature in it."
       />
 
-      <div className="grid gap-4 xl:grid-cols-5">
+      <div className="grid gap-5 xl:grid-cols-5">
         <Card className="xl:col-span-2">
           <CardHeader
             title={<span className="flex items-center gap-2"><Megaphone className="size-4 text-brand-600" /> Compose</span>}
             description="Shown to shoppers on your storefront, under the header."
           />
-          <AnnouncementComposer mode="store" products={products} />
+          <div className="card-pad">
+            <AnnouncementComposer mode="store" products={products} />
+          </div>
         </Card>
         <Card className="xl:col-span-3">
           <CardHeader
             title="Published"
             description={`${items.length} storefront announcement${items.length === 1 ? "" : "s"}`}
           />
-          <AnnouncementList items={items} />
+          <div className="card-pad">
+            <AnnouncementList items={items} />
+          </div>
         </Card>
       </div>
     </div>

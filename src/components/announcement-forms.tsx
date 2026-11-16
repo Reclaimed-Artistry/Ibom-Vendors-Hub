@@ -60,11 +60,11 @@ export function AnnouncementComposer({
     );
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} className="space-y-5">
       {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
       {state.message ? <Alert tone="success">{state.message}</Alert> : null}
 
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-500">
           <Eye className="size-3.5" /> Live preview
         </p>
@@ -132,7 +132,7 @@ export function AnnouncementComposer({
         <input type="hidden" name="audience" value="customers" />
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Headline" htmlFor="ann-title" hint={`${title.length}/80`} required>
           <input
             id="ann-title"
@@ -164,7 +164,7 @@ export function AnnouncementComposer({
         />
       </Field>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Button label (optional)" htmlFor="ann-cta" hint="Shown when a link is set.">
           <input id="ann-cta" name="ctaLabel" className="input" maxLength={30} placeholder="Shop the sale" />
         </Field>
@@ -180,9 +180,9 @@ export function AnnouncementComposer({
             <span className="text-xs font-normal text-ink-500">({selected.length}/12 — they scroll with the message)</span>
           </p>
           {products.length ? (
-            <div className="max-h-56 space-y-1 overflow-y-auto rounded-lg border border-ink-200 bg-white p-2">
+            <div className="max-h-60 space-y-1 overflow-y-auto rounded-lg border border-ink-200 bg-white p-2.5">
               {products.map((product) => (
-                <label key={product.id} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm hover:bg-ink-50">
+                <label key={product.id} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-ink-50">
                   <input
                     type="checkbox"
                     name="productIds"
@@ -203,7 +203,7 @@ export function AnnouncementComposer({
         </div>
       ) : null}
 
-      <SubmitButton className="btn btn-primary" pendingLabel="Publishing…">
+      <SubmitButton className="btn btn-primary mt-1" pendingLabel="Publishing…">
         <Send className="size-3.5" /> {mode === "platform" ? "Publish announcement" : "Flash it to customers"}
       </SubmitButton>
     </form>
