@@ -140,6 +140,26 @@ Paystack keys, sender address and maintenance flag.
 | `CRON_SECRET` | Bearer token required by `/api/cron/subscriptions` |
 | `NEXT_PUBLIC_DEV_EMAIL_LINKS` | `true` shows verification/reset links in the UI during local work |
 
+### Live deployment
+
+The application is deployed at **https://ibom-vendors-hub.vercel.app** (Vercel project
+`ibom-vendors-hub`, Supabase project `zjoktecqfdjprjwiwdgj`, Frankfurt pooler). The
+production database carries reference data only — 7 categories, subscription plans and
+the reserved-subdomain list — so the marketplace starts empty and the first vendor to
+register claims the first storefront.
+
+- Health: `https://ibom-vendors-hub.vercel.app/api/health` → `{"status":"ok","database":true}`
+- Admin: the account named by `ADMIN_EMAIL` is created during the first build by
+  `scripts/bootstrap-admin.ts`; change its password from **Account → Profile** after
+  the first sign-in.
+- Storefronts: `https://ibom-vendors-hub.vercel.app/s/<slug>` until a wildcard domain is
+  attached (wildcards are not available on `*.vercel.app`).
+- Automatic git deployments are **off** on that project; a push does not redeploy.
+  Turn them on under *Vercel → Project → Settings → Git → Ignored Build Step /
+  Production branch*, or trigger a deployment from a new commit.
+- `RESEND_API_KEY` and `PAYSTACK_*` are not configured yet, so sign-in works but password
+  reset links are logged instead of emailed, and checkout runs on the sandbox gateway.
+
 ### Deploying to Vercel
 
 The project builds with `npm run vercel-build`, which applies `supabase/migrations/*.sql`,
