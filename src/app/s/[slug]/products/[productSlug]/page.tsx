@@ -1,0 +1,222 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { CheckCircle2, Clock, Package, ShieldCheck, Star, Truck } from "lucide-react";
+import { getStoreProduct, getStoreReviews, resolveStore } from "@/lib/storefront";
+import { getSettings } from "@/lib/settings";
+import { storeBase } from "@/lib/storefront-base";
+import { formatMoney, formatDate } from "@/lib/utils";
+import { Badge, ButtonLink, Card } from "@/components/ui";
+import { AddToCart } from "@/components/add-to-cart";
+import { getCurrentUser } from "@/lib/auth";
+
+export default async function ProductPage({ params }: { params: Promise<{ slug: string; productSlug: string }> }) {
+  const { slug, productSlug } = await params;
+  const { store, category, live } = await resolveStore(slug);
+  if (!store) notFound();
+  const product = await getStoreProduct(store.id, productSlug);
+  if (!product) notFound();
+
+  const [settings, base, reviews, user] = await Promise.all([
+    getSettings(),
+    storeBase(slug),
+    getStoreReviews(store.id, 4, product.id),
+    getCurrentUser(),
+  ]);
+  const features = (category?.features ?? {}) as Record<string, boolean>;
+  const money = (value: number) => formatMoney(value, product.currency, settings.currency_symbol);
+  const image = product.images?.[0]?.url ?? "/images/seed/product-jollof.svg";
+
+  return (
+    <div className="container-page py-8">
+      <nav className="mb-5 flex items-center gap-1.5 text-xs text-ink-400">
+        <Link href={base || "/"} className="hover:text-ink-700">{store.name}</Link>
+        <span>/</span>
+        <Link href={`${base}/products`} className="hover:text-ink-700">{features.serviceBooking ? "Services" : "Catalogue"}</Link>
+        <span>/</span>
+        <span className="text-ink-600">{product.name}</span>
+      </nav>
+
+      <div className="grid gap-8 lg:grid-cols-2">
+        <div>
+          <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white">
+            <img src={image} alt={product.name} className="aspect-square w-full object-cover" />
+          </div>
+          {product.images && product.images.length > 1 ? (
+            <div className="mt-3 grid grid-cols-4 gap-3">
+              {product.images.slice(1, 5).map((img) => (
+                <img key={img.id ?? img.url} src={img.url} alt="" className="aspect-square w-full rounded-xl border border-ink-100 object-cover" />
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            {product.kind === "service" ? <Badge tone="info">Service</Badge> : null}
+            {product.made_to_order ? <Badge tone="warning">Made to order</Badge> : null}
+            {product.condition ? <Badge tone="neutral">{product.condition}</Badge> : null}
+            {product.track_stock && product.stock_quantity > 0 ? <Badge tone="success">{product.stock_quantity} in stock</Badge> : null}
+            {product.track_stock && product.stock_quantity <= 0 ? <Badge tone="danger">Out of stock</Badge> : null}
+          </div>
+          <h1 className="mt-3 font-display text-3xl text-ink-900">{product.name}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-ink-500">
+            {product.rating_count > 0 ? (
+              <span className="inline-flex items-center gap-1 font-semibold text-gold-600">
+                <Star className="size-4 fill-current" /> {product.rating_avg} ({product.rating_count})
+              </span>
+            ) : (
+              <span>No reviews yet</span>
+            )}
+            {product.brand ? <span>Brand: {product.brand}</span> : null}
+            {product.sku ? <span>SKU: {product.sku}</span> : null}
+          </div>
+
+          <div className="mt-4 flex items-baseline gap-3">
+            <span className="text-3xl font-bold text-ink-900">
+              {product.pricing_type === "quotation" ? "Price on request" : money(product.price)}
+            </span>
+            {product.compare_at_price ? <span className="text-sm text-ink-400 line-through">{money(product.compare_at_price)}</span> : null}
+            {product.pricing_type === "from" ? <span className="text-xs text-ink-400">starting price</span> : null}
+          </div>
+
+          {product.short_description ? <p className="mt-4 text-sm leading-7 text-ink-600">{product.short_description}</p> : null}
+
+          <div className="mt-5 space-y-3">
+            {product.made_to_order ? (
+              <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm text-amber-900">
+                <Clock className="mt-0.5 size-4 shrink-0" />
+                <p>
+                  This item is made to order{product.production_days ? ` and takes about ${product.production_days} days to produce` : ""}. Add your
+                  measurements or instructions below; the vendor confirms the timeline when accepting.
+                </p>
+              </div>
+            ) : null}
+            {product.service_duration_minutes ? (
+              <p className="flex items-center gap-2 text-sm text-ink-500"><Clock className="size-4" /> Appointment length: {product.service_duration_minutes} minutes</p>
+            ) : null}
+            {product.warranty_info ? (
+              <p className="flex items-center gap-2 text-sm text-ink-500"><ShieldCheck className="size-4" /> {product.warranty_info}</p>
+            ) : null}
+            {product.prep_time_minutes ? (
+              <p className="flex items-center gap-2 text-sm text-ink-500"><Clock className="size-4" /> Preparation time: about {product.prep_time_minutes} minutes</p>
+            ) : null}
+            {product.portion ? <p className="flex items-center gap-2 text-sm text-ink-500"><Package className="size-4" /> Portion: {product.portion}</p> : null}
+            {features.delivery ? (
+              <p className="flex items-center gap-2 text-sm text-ink-500">
+                <Truck className="size-4" /> Delivery {store.delivery_fee > 0 ? money(store.delivery_fee) : "available"} · pickup available
+              </p>
+            ) : null}
+          </div>
+
+          <div className="mt-6">
+            {live ? (
+              <AddToCart product={product} store={store} currencySymbol={settings.currency_symbol} />
+            ) : (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                This storefront is offline, so new orders are disabled. Please check back later.
+              </div>
+            )}
+          </div>
+
+          {product.kind === "service" && live ? (
+            <div className="mt-3">
+              <ButtonLink href={`${base}/book/${product.slug}`} variant="secondary" className="w-full">Book this service</ButtonLink>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-10 grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
+        <div className="space-y-6">
+          <Card className="card-pad">
+            <h2 className="text-base font-semibold text-ink-900">Description</h2>
+            <p className="mt-2 whitespace-pre-line text-sm leading-7 text-ink-600">{product.description}</p>
+
+            {Object.keys(product.specifications ?? {}).length ? (
+              <div className="mt-5">
+                <h3 className="text-sm font-semibold text-ink-900">Specifications</h3>
+                <dl className="mt-2 divide-y divide-ink-100 overflow-hidden rounded-xl border border-ink-100">
+                  {Object.entries(product.specifications).map(([key, value]) => (
+                    <div key={key} className="grid grid-cols-2 gap-3 px-3 py-2 text-sm">
+                      <dt className="text-ink-500">{key}</dt>
+                      <dd className="font-medium text-ink-800">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            ) : null}
+
+            {Object.keys(product.attributes ?? {}).length ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {Object.entries(product.attributes).map(([key, value]) => (
+                  <span key={key} className="badge-neutral">{key}: {value}</span>
+                ))}
+              </div>
+            ) : null}
+
+            {product.size_guide?.length ? (
+              <div className="mt-5">
+                <h3 className="text-sm font-semibold text-ink-900">Size guide</h3>
+                <ul className="mt-2 space-y-1 text-sm text-ink-600">
+                  {product.size_guide.map((row, index) => (
+                    <li key={index}>{row.label}: {row.value}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </Card>
+
+          <Card className="card-pad">
+            <h2 className="text-base font-semibold text-ink-900">Reviews for this item</h2>
+            {reviews.length === 0 ? (
+              <p className="mt-2 text-sm text-ink-500">No reviews yet. Only customers with a completed order can review.</p>
+            ) : (
+              <ul className="mt-3 space-y-4">
+                {reviews.map((review) => (
+                  <li key={review.id} className="border-b border-ink-100 pb-4 last:border-0 last:pb-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-ink-900">{review.customer_name}</p>
+                      <span className="text-xs text-gold-600">{"★".repeat(review.rating)}</span>
+                    </div>
+                    {review.title ? <p className="text-sm font-medium text-ink-800">{review.title}</p> : null}
+                    <p className="mt-1 text-sm leading-6 text-ink-600">{review.comment}</p>
+                    <p className="mt-1 text-[11px] text-ink-400">{formatDate(review.created_at)}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
+
+        <div className="space-y-4">
+          <Card className="card-pad">
+            <div className="flex items-center gap-3">
+              <img src={store.logo_url ?? ""} alt="" className="size-12 rounded-xl border border-ink-100 object-cover" />
+              <div>
+                <p className="text-sm font-semibold text-ink-900">{store.name}</p>
+                <p className="text-xs text-ink-400">{store.city}, {store.state}</p>
+              </div>
+            </div>
+            <p className="mt-3 text-xs leading-6 text-ink-500">Sold and fulfilled by {store.name} on Ibom Vendors Hub.</p>
+            <ButtonLink href={base || "/"} variant="secondary" className="mt-3 w-full">Visit storefront</ButtonLink>
+          </Card>
+          {!user ? (
+            <Card className="card-pad">
+              <p className="text-sm font-semibold text-ink-900">Buying for the first time?</p>
+              <p className="mt-1 text-xs leading-6 text-ink-500">You can check out as a guest. Create an account to track orders and leave reviews.</p>
+              <ButtonLink href="/register/customer" variant="ghost" className="mt-2 w-full">Create an account</ButtonLink>
+            </Card>
+          ) : null}
+          <Card className="card-pad">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-ink-900"><CheckCircle2 className="size-4 text-brand-600" /> Buyer protection</h3>
+            <ul className="mt-2 space-y-1.5 text-xs leading-5 text-ink-500">
+              <li>Payments are verified server-side before orders are accepted.</li>
+              <li>Track every stage of production and delivery.</li>
+              <li>Report a problem within 7 days of delivery.</li>
+            </ul>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

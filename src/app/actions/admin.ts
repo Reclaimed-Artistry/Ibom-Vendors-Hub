@@ -1,0 +1,465 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { requireAdmin, getCurrentUser } from "@/lib/auth";
+import { systemDb, withSystem } from "@/lib/db";
+import { logActivity } from "@/lib/audit";
+import { notify } from "@/lib/notifications";
+import { sendEmail } from "@/lib/email";
+import { getSettings, url } from "@/lib/settings";
+import { approveStore, rejectStore, restoreStore, suspendStore, checkSubdomain } from "@/lib/stores";
+import { adminGrantSubscription } from "@/lib/subscriptions";
+import { formatIssues, categorySchema } from "@/lib/validation";
+
+export interface AdminState {
+  error?: string;
+  message?: string;
+  fieldErrors?: Record<string, string>;
+}
+
+async function admin() {
+  return requireAdmin();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Stores                                                                     */
+/* -------------------------------------------------------------------------- */
+
+export async function approveStoreAction(formData: FormData) {
+  const user = await admin();
+  const storeId = String(formData.get("storeId") ?? "");
+  await approveStore(storeId, user.id);
+  revalidatePath("/admin/vendors");
+  revalidatePath(`/admin/vendors/${storeId}`);
+  revalidatePath("/admin");
+}
+
+export async function rejectStoreAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const storeId = String(formData.get("storeId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (reason.length < 5) return { error: "Give the vendor a clear reason (at least 5 characters)" };
+  await rejectStore(storeId, user.id, reason);
+  const owner = await systemDb.maybeOne<{ email: string; full_name: string; name: string }>(
+    `select u.email, u.full_name, s.name from stores s join users u on u.id = s.owner_id where s.id = $1`,
+    [storeId],
+  );
+  if (owner) {
+    await sendEmail({
+      to: owner.email,
+      template: "store_suspended",
+      data: { name: owner.full_name, storeName: owner.name, reason, supportEmail: (await getSettings()).support_email },
+      dedupeKey: `store-rejected:${storeId}`,
+    });
+  }
+  revalidatePath("/admin/vendors");
+  revalidatePath(`/admin/vendors/${storeId}`);
+  return { message: "Application rejected and the vendor has been notified." };
+}
+
+export async function suspendStoreAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const storeId = String(formData.get("storeId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (reason.length < 5) return { error: "Explain why the store is being suspended" };
+  await suspendStore(storeId, user.id, reason);
+  revalidatePath("/admin/vendors");
+  revalidatePath(`/admin/vendors/${storeId}`);
+  return { message: "Store suspended. All data has been preserved." };
+}
+
+export async function restoreStoreAction(formData: FormData) {
+  const user = await admin();
+  const storeId = String(formData.get("storeId") ?? "");
+  await restoreStore(storeId, user.id);
+  revalidatePath("/admin/vendors");
+  revalidatePath(`/admin/vendors/${storeId}`);
+}
+
+export async function setStoreVisibilityAction(formData: FormData) {
+  await admin();
+  const storeId = String(formData.get("storeId") ?? "");
+  const visibility = formData.get("visibility") === "unlisted" ? "unlisted" : "public";
+  await systemDb.execute(`update stores set visibility = $2 where id = $1`, [storeId, visibility]);
+  revalidatePath("/admin/vendors");
+  revalidatePath(`/admin/vendors/${storeId}`);
+}
+
+export async function grantSubscriptionAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const storeId = String(formData.get("storeId") ?? "");
+  const planId = String(formData.get("planId") ?? "");
+  const note = String(formData.get("note") ?? "").trim();
+  if (!storeId || !planId) return { error: "Choose a plan" };
+  try {
+    await adminGrantSubscription({ storeId, planId, adminId: user.id, note: note || undefined });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not grant the subscription" };
+  }
+  revalidatePath(`/admin/vendors/${storeId}`);
+  revalidatePath("/admin/subscriptions");
+  return { message: "Subscription granted and the vendor notified." };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Plans                                                                      */
+/* -------------------------------------------------------------------------- */
+
+export async function savePlanAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const id = String(formData.get("planId") ?? "") || null;
+  const name = String(formData.get("name") ?? "").trim();
+  const price = Number(formData.get("price") ?? 0);
+  const durationDays = Number(formData.get("durationDays") ?? 30);
+  const productLimit = String(formData.get("productLimit") ?? "").trim();
+  const orderLimit = String(formData.get("orderLimit") ?? "").trim();
+  const features = String(formData.get("features") ?? "")
+    .split(/[\n,]/)
+    .map((feature) => feature.trim())
+    .filter(Boolean);
+  const isActive = formData.get("isActive") === "on";
+  const isFeatured = formData.get("isFeatured") === "on";
+
+  if (name.length < 2) return { error: "Enter a plan name" };
+  if (!Number.isFinite(price) || price < 0) return { error: "Enter a valid price" };
+
+  try {
+    await withSystem(async (db) => {
+      if (id) {
+        await db.execute(
+          `update subscription_plans set name=$2, price=$3, duration_days=$4, product_limit=$5, order_limit=$6,
+                  features=$7::jsonb, is_active=$8, is_featured=$9 where id=$1`,
+          [id, name, price, durationDays, productLimit ? Number(productLimit) : null, orderLimit ? Number(orderLimit) : null, JSON.stringify(features), isActive, isFeatured],
+        );
+      } else {
+        await db.execute(
+          `insert into subscription_plans (name, slug, price, duration_days, product_limit, order_limit, features, is_active, is_featured)
+           values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9)`,
+          [name, name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), price, durationDays, productLimit ? Number(productLimit) : null, orderLimit ? Number(orderLimit) : null, JSON.stringify(features), isActive, isFeatured],
+        );
+      }
+      await logActivity(
+        { actorId: user.id, actorRole: "admin", action: id ? "plan.updated" : "plan.created", entityType: "subscription_plan", entityId: id ?? undefined, description: name },
+        db,
+      );
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Plan could not be saved" };
+  }
+  revalidatePath("/admin/subscriptions");
+  return { message: "Plan saved." };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Payments & refunds                                                         */
+/* -------------------------------------------------------------------------- */
+
+export async function markPaymentRefundedAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const reference = String(formData.get("reference") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  const payment = await systemDb.maybeOne<{ id: string; status: string; store_id: string | null; order_id: string | null; amount: number; payer_email: string; currency: string }>(
+    `select id, status, store_id, order_id, amount, payer_email, currency from payments where reference = $1`,
+    [reference],
+  );
+  if (!payment) return { error: "Payment not found" };
+  if (payment.status !== "success") return { error: "Only successful payments can be refunded" };
+
+  await withSystem(async (db) => {
+    await db.execute(`update payments set status = 'refunded', failure_reason = $2 where id = $1`, [payment.id, reason || "Refunded by administrator"]);
+    await db.execute(
+      `insert into refunds (payment_id, order_id, store_id, amount, reason, status, requested_by, processed_by, processed_at)
+       values ($1,$2,$3,$4,$5,'processed',$6,$6,now())`,
+      [payment.id, payment.order_id, payment.store_id, payment.amount, reason || "Refunded by administrator", user.id],
+    );
+    if (payment.order_id) {
+      await db.execute(
+        `update orders set payment_status = 'refunded', status = 'cancelled', cancelled_at = now(), cancellation_reason = $2 where id = $1`,
+        [payment.order_id, reason || "Refunded by administrator"],
+      );
+    }
+    await logActivity(
+      {
+        actorId: user.id,
+        actorRole: "admin",
+        storeId: payment.store_id ?? undefined,
+        action: "payment.refunded",
+        entityType: "payment",
+        entityId: payment.id,
+        description: reference,
+        meta: { amount: payment.amount },
+      },
+      db,
+    );
+  });
+
+  await sendEmail({
+    to: payment.payer_email,
+    template: "refund_updated",
+    data: {
+      name: "there",
+      reference,
+      amount: payment.amount,
+      currency: payment.currency,
+      status: "processed",
+      note: reason || "Refunded by the platform team",
+    },
+    dedupeKey: `refund-admin:${payment.id}`,
+  });
+  revalidatePath("/admin/payments");
+  return { message: `Refund recorded for ${reference}.` };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Categories & feature flags                                                 */
+/* -------------------------------------------------------------------------- */
+
+export async function saveCategoryAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const id = String(formData.get("categoryId") ?? "") || null;
+  const features: Record<string, boolean> = {};
+  for (const key of String(formData.get("featureKeys") ?? "").split(",").filter(Boolean)) {
+    features[key] = formData.get(`feature_${key}`) === "on";
+  }
+  const attributes = String(formData.get("attributesJson") ?? "[]");
+  const workflow = String(formData.get("workflowJson") ?? "[]");
+
+  const parsed = categorySchema.safeParse({
+    name: formData.get("name"),
+    slug: formData.get("slug"),
+    description: formData.get("description") ?? "",
+    icon: formData.get("icon") ?? "",
+    features,
+    attributes: attributes,
+    workflow: workflow,
+    isActive: formData.get("isActive") === "on",
+  });
+  if (!parsed.success) return { error: "Check the category details", fieldErrors: formatIssues(parsed.error) };
+  const data = parsed.data;
+  const sortOrder = Number(formData.get("sortOrder") ?? 0) || 0;
+  let attributesParsed: unknown = [];
+  let workflowParsed: unknown = [];
+  try {
+    attributesParsed = JSON.parse(data.attributes || "[]");
+  } catch {
+    return { error: "Category attributes must be valid JSON" };
+  }
+  try {
+    workflowParsed = JSON.parse(data.workflow || "[]");
+  } catch {
+    return { error: "Workflow must be valid JSON" };
+  }
+  if (!Array.isArray(attributesParsed) || !Array.isArray(workflowParsed)) {
+    return { error: "Attributes and workflow must be JSON arrays" };
+  }
+
+  try {
+    await withSystem(async (db) => {
+      if (id) {
+        await db.execute(
+          `update store_categories set name=$2, slug=$3, description=$4, icon=$5, sort_order=$6, features=$7::jsonb,
+                  attributes=$8::jsonb, workflow=$9::jsonb, is_active=$10 where id=$1`,
+          [id, data.name, data.slug, data.description || null, data.icon || null, sortOrder, JSON.stringify(data.features), JSON.stringify(attributesParsed), JSON.stringify(workflowParsed), data.isActive],
+        );
+      } else {
+        await db.execute(
+          `insert into store_categories (name, slug, description, icon, sort_order, features, attributes, workflow, is_active)
+           values ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9)`,
+          [data.name, data.slug, data.description || null, data.icon || null, sortOrder, JSON.stringify(data.features), JSON.stringify(attributesParsed), JSON.stringify(workflowParsed), data.isActive],
+        );
+      }
+      await logActivity(
+        { actorId: user.id, actorRole: "admin", action: id ? "category.updated" : "category.created", entityType: "store_category", entityId: id ?? undefined, description: data.name },
+        db,
+      );
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Category could not be saved" };
+  }
+  revalidatePath("/admin/categories");
+  revalidatePath("/browse");
+  return { message: "Category saved." };
+}
+
+export async function toggleCategoryAction(formData: FormData) {
+  await admin();
+  const id = String(formData.get("categoryId") ?? "");
+  const active = formData.get("active") === "true";
+  await systemDb.execute(`update store_categories set is_active = $2 where id = $1`, [id, active]);
+  revalidatePath("/admin/categories");
+  revalidatePath("/browse");
+}
+
+/* -------------------------------------------------------------------------- */
+/* Subdomain requests                                                         */
+/* -------------------------------------------------------------------------- */
+
+export async function reviewSubdomainRequestAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const requestId = String(formData.get("requestId") ?? "");
+  const decision = String(formData.get("decision") ?? "");
+  const note = String(formData.get("note") ?? "").trim();
+  if (!["approved", "rejected"].includes(decision)) return { error: "Choose approve or reject" };
+
+  const request = await systemDb.maybeOne<{
+    id: string;
+    store_id: string;
+    requested_subdomain: string;
+    status: string;
+    store_name: string;
+    owner_id: string;
+    owner_email: string;
+    current_slug: string;
+  }>(
+    `select r.id, r.store_id, r.requested_subdomain, r.status, s.name as store_name, s.owner_id,
+            s.slug as current_slug, u.email as owner_email
+       from subdomain_change_requests r join stores s on s.id = r.store_id join users u on u.id = s.owner_id
+      where r.id = $1`,
+    [requestId],
+  );
+  if (!request) return { error: "Request not found" };
+  if (request.status !== "pending") return { error: "This request has already been reviewed" };
+
+  if (decision === "approved") {
+    const check = await checkSubdomain(request.requested_subdomain, request.store_id);
+    if (!check.available) return { error: check.reason ?? "That address is no longer available" };
+    await withSystem(async (db) => {
+      await db.execute(`update stores set slug = $2 where id = $1`, [request.store_id, check.slug]);
+      await db.execute(
+        `update subdomain_change_requests set status='approved', admin_note=$2, reviewed_by=$3, reviewed_at=now() where id=$1`,
+        [requestId, note || null, user.id],
+      );
+      await logActivity(
+        { actorId: user.id, actorRole: "admin", storeId: request.store_id, action: "subdomain.approved", entityType: "store", entityId: request.store_id, description: `${request.current_slug} → ${check.slug}` },
+        db,
+      );
+    });
+    await sendEmail({
+      to: request.owner_email,
+      template: "store_reactivated",
+      data: { storeUrl: url(`/s/${check.slug}`) },
+      dedupeKey: `subdomain-approved:${requestId}`,
+    });
+  } else {
+    await withSystem(async (db) => {
+      await db.execute(
+        `update subdomain_change_requests set status='rejected', admin_note=$2, reviewed_by=$3, reviewed_at=now() where id=$1`,
+        [requestId, note || null, user.id],
+      );
+      await logActivity(
+        { actorId: user.id, actorRole: "admin", storeId: request.store_id, action: "subdomain.rejected", entityType: "store", entityId: request.store_id, description: note },
+        db,
+      );
+    });
+  }
+
+  await notify({
+    userId: request.owner_id,
+    storeId: request.store_id,
+    type: `subdomain_${decision}`,
+    title: decision === "approved" ? "Store address changed" : "Store address request rejected",
+    body: decision === "approved" ? `Your storefront is now live at ${request.requested_subdomain}.` : note || "Contact support for details.",
+    actionUrl: "/vendor/store",
+    dedupeKey: `subdomain-${decision}:${requestId}`,
+  });
+
+  revalidatePath("/admin/subdomains");
+  revalidatePath("/admin/vendors");
+  return { message: `Request ${decision}.` };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Messages                                                                   */
+/* -------------------------------------------------------------------------- */
+
+export async function adminMessageAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const messageId = String(formData.get("messageId") ?? "");
+  const status = String(formData.get("status") ?? "");
+  const reply = String(formData.get("reply") ?? "").trim();
+  if (!["resolved", "closed", "open"].includes(status)) return { error: "Choose a status" };
+
+  const message = await systemDb.maybeOne<{ id: string; store_id: string | null; sender_email: string; subject: string; sender_name: string; store_name: string | null }>(
+    `select m.id, m.store_id, m.sender_email, m.subject, m.sender_name, s.name as store_name
+       from customer_messages m left join stores s on s.id = m.store_id where m.id = $1`,
+    [messageId],
+  );
+  if (!message) return { error: "Message not found" };
+
+  await withSystem(async (db) => {
+    await db.execute(`update customer_messages set status = $2 where id = $1`, [messageId, status]);
+    if (reply) {
+      await db.execute(
+        `insert into customer_messages (store_id, sender_name, sender_email, sender_role, category, subject, body, parent_id, status)
+         values ($1,$2,$3,'admin','support',$4,$5,$6,'awaiting_customer')`,
+        [message.store_id, "Ibom Vendors Hub support", (await getSettings()).support_email, `Re: ${message.subject}`, reply, messageId],
+      );
+    }
+    await logActivity(
+      { actorId: user.id, actorRole: "admin", storeId: message.store_id ?? undefined, action: "message.updated", entityType: "customer_message", entityId: messageId, description: status },
+      db,
+    );
+  });
+
+  if (reply) {
+    await sendEmail({
+      to: message.sender_email,
+      template: "message_received",
+      data: { name: message.sender_name, email: message.sender_email, storeName: message.store_name ?? "Ibom Vendors Hub", subject: `Re: ${message.subject}`, message: reply },
+      dedupeKey: `admin-reply:${messageId}:${Date.now()}`,
+    });
+  }
+  revalidatePath("/admin/messages");
+  return { message: reply ? "Reply sent." : "Message updated." };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Platform settings                                                          */
+/* -------------------------------------------------------------------------- */
+
+export async function savePlatformSettingsAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await getCurrentUser();
+  if (!user || !["admin", "super_admin"].includes(user.role)) return { error: "Administrator only" };
+
+  const str = (key: string) => String(formData.get(key) ?? "").trim();
+  const commission = Number(formData.get("commissionRate") ?? 5);
+  if (!Number.isFinite(commission) || commission < 0 || commission > 50) return { error: "Commission must be between 0 and 50%" };
+
+  try {
+    await withSystem(async (db) => {
+      await db.execute(
+        `update platform_settings set
+           platform_name=$1, tagline=$2, support_email=$3, support_phone=$4, main_domain=$5,
+           commission_rate=$6, default_trial_days=$7, grace_period_days=$8,
+           require_vendor_approval=$9, payments_enabled=$10, sandbox_payments=$11,
+           maintenance_mode=$12, paystack_public_key=$13, paystack_secret_key=$14, email_from=$15, updated_at=now()
+         where id = 1`,
+        [
+          str("platformName") || "Ibom Vendors Hub",
+          str("tagline") || "Every business. One address.",
+          str("supportEmail") || null,
+          str("supportPhone") || null,
+          str("mainDomain") || "localhost:3000",
+          commission,
+          Number(formData.get("trialDays") ?? 14),
+          Number(formData.get("graceDays") ?? 0),
+          formData.get("requireApproval") === "on",
+          formData.get("paymentsEnabled") === "on",
+          formData.get("sandboxPayments") === "on",
+          formData.get("maintenanceMode") === "on",
+          str("paystackPublicKey") || null,
+          str("paystackSecretKey") || null,
+          str("emailFrom") || null,
+        ],
+      );
+      await logActivity(
+        { actorId: user.id, actorRole: "admin", action: "settings.updated", entityType: "platform_settings", entityId: "1" },
+        db,
+      );
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Settings could not be saved" };
+  }
+  revalidatePath("/admin/settings");
+  return { message: "Platform settings saved." };
+}

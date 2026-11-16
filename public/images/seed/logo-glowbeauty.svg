@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900" role="img" aria-label="GB">
+  <defs>
+    <linearGradient id="gglowbeauty" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#4c1d95"/>
+    </linearGradient>
+    <pattern id="pglowbeauty" width="60" height="60" patternUnits="userSpaceOnUse" patternTransform="rotate(28)">
+      <rect width="60" height="60" fill="none"/>
+      <line x1="0" y1="0" x2="0" y2="60" stroke="#ddd6fe" stroke-opacity="0.12" stroke-width="8"/>
+    </pattern>
+  </defs>
+  <rect width="900" height="900" fill="url(#gglowbeauty)"/>
+  <rect width="900" height="900" fill="url(#pglowbeauty)"/>
+  <circle cx="740" cy="170" r="300" fill="#ddd6fe" opacity="0.10"/>
+  <circle cx="160" cy="780" r="220" fill="#ddd6fe" opacity="0.08"/>
+  <text x="450" y="470" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="250" fill="#ddd6fe" opacity="0.92">G</text>
+  <text x="450" y="620" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="40" letter-spacing="6" fill="#ffffff" opacity="0.85">GB</text>
+</svg>
