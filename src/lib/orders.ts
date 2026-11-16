@@ -4,7 +4,7 @@ import { initializeTransaction } from "@/lib/payments/gateway";
 import { sendEmail } from "@/lib/email";
 import { notify, notifyAdmins } from "@/lib/notifications";
 import { logActivity } from "@/lib/audit";
-import { getVendorContext } from "@/lib/auth";
+import { getVendorContext, vendorSuspensionMessage } from "@/lib/auth";
 import type { CheckoutInput } from "@/lib/validation";
 import type { Order, OrderItem, Store, StoreCategory } from "@/lib/types";
 import { workflowFor, workflowLabel } from "@/lib/storefront";
@@ -619,6 +619,8 @@ export async function updateOrderByVendor(input: {
   trackingNumber?: string;
 }) {
   const ctx = await getVendorContext();
+  const lockError = vendorSuspensionMessage(ctx);
+  if (lockError) throw new Error(lockError);
   const order = await systemDb.maybeOne<Order>(
     `select * from orders where id = $1 and store_id = $2`,
     [input.orderId, ctx.store.id],

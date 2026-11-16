@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { storeBase } from "@/lib/storefront-base";
 import { Alert, PageHeader } from "@/components/ui";
@@ -21,7 +21,7 @@ export default async function EditProductPage({
 }) {
   const { id } = await params;
   const { saved } = await searchParams;
-  const { store, category } = await getVendorContext();
+  const { store, category } = await requireActiveVendorContext();
 
   const product = await systemDb.maybeOne<{
     id: string;

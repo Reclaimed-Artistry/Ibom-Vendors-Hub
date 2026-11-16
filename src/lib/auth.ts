@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
-import { systemDb, type Actor } from "@/lib/db";
+import { systemDb, withSystem, type Actor } from "@/lib/db";
 import type { SessionUser, Store } from "@/lib/types";
 
 const COOKIE = "ivh_session";
@@ -131,6 +131,7 @@ export async function requireCustomer() {
 export interface VendorSubscription {
   id: string;
   status: "trialing" | "active" | "expired" | "cancelled" | "pending";
+  started_at: string;
   expires_at: string;
   plan_id: string;
   plan_name: string | null;
@@ -142,27 +143,73 @@ export interface VendorContext {
   user: SessionUser;
   store: Store;
   subscription: VendorSubscription | null;
+  lastSubscription: VendorSubscription | null;
+  effectiveExpiresAt: string | null;
+  effectiveStartedAt: string | null;
+  isSubscriptionExpired: boolean;
+  isManuallySuspended: boolean;
+  isAccountSuspended: boolean;
   category: import("@/lib/types").StoreCategory | null;
 }
 
-/** Vendor dashboard context: guarantees the user owns exactly one store. */
+/** Vendor dashboard context: guarantees the user owns a store and immediately enforces overdue subscription expiry. */
 export const getVendorContext = cache(async (): Promise<VendorContext> => {
   const user = await requireUser(["vendor"]);
-  const store = await systemDb.maybeOne<Store>(
+  let store = await systemDb.maybeOne<Store>(
     `select * from stores where owner_id = $1 order by created_at limit 1`,
     [user.id],
   );
   if (!store) redirect("/vendor/onboarding");
 
-  const subscription = await systemDb.maybeOne<VendorSubscription>(
-    `select s.id, s.status, s.expires_at, s.plan_id, p.name as plan_name, p.price as plan_price,
-            p.features as plan_features
-       from subscriptions s
-       join subscription_plans p on p.id = s.plan_id
-      where s.store_id = $1 and s.status in ('trialing','active')
-      order by s.expires_at desc limit 1`,
+  const overdueSub = await systemDb.maybeOne<{ id: string }>(
+    `select id from subscriptions
+      where store_id = $1 and status in ('trialing','active') and expires_at <= now()
+      limit 1`,
     [store.id],
   );
+  const overdueGrant =
+    !store.manual_suspension &&
+    (store.status === "active" || store.status === "pending") &&
+    Boolean(store.access_until && new Date(store.access_until).getTime() <= Date.now());
+
+  if (overdueSub || overdueGrant) {
+    await withSystem((db) => db.query(`select * from process_subscription_expiry()`));
+    const refreshed = await systemDb.maybeOne<Store>(`select * from stores where id = $1`, [store.id]);
+    if (refreshed) store = refreshed;
+  }
+
+  const [subscription, lastSubscription] = await Promise.all([
+    systemDb.maybeOne<VendorSubscription>(
+      `select s.id, s.status, s.started_at, s.expires_at, s.plan_id, p.name as plan_name, p.price as plan_price,
+              p.features as plan_features
+         from subscriptions s
+         join subscription_plans p on p.id = s.plan_id
+        where s.store_id = $1 and s.status in ('trialing','active') and s.expires_at > now()
+        order by s.expires_at desc limit 1`,
+      [store.id],
+    ),
+    systemDb.maybeOne<VendorSubscription>(
+      `select s.id, s.status, s.started_at, s.expires_at, s.plan_id, p.name as plan_name, p.price as plan_price,
+              p.features as plan_features
+         from subscriptions s
+         join subscription_plans p on p.id = s.plan_id
+        where s.store_id = $1
+        order by s.expires_at desc limit 1`,
+      [store.id],
+    ),
+  ]);
+
+  const hasUnexpiredAccessGrant = Boolean(
+    store.access_until && new Date(store.access_until).getTime() > Date.now(),
+  );
+  const effectiveExpiresAt = subscription?.expires_at ?? (hasUnexpiredAccessGrant ? store.access_until : null);
+  const effectiveStartedAt = subscription?.started_at ?? null;
+  const isManuallySuspended = Boolean(store.manual_suspension || store.status === "suspended");
+  const isSubscriptionExpired =
+    !isManuallySuspended &&
+    store.status !== "rejected" &&
+    (store.status === "expired" || (!subscription && !hasUnexpiredAccessGrant));
+  const isAccountSuspended = isSubscriptionExpired || isManuallySuspended || store.status === "rejected";
 
   const category = store.category_id
     ? await systemDb.maybeOne<import("@/lib/types").StoreCategory>(
@@ -171,8 +218,45 @@ export const getVendorContext = cache(async (): Promise<VendorContext> => {
       )
     : null;
 
-  return { user, store, subscription, category };
+  return {
+    user,
+    store,
+    subscription,
+    lastSubscription,
+    effectiveExpiresAt,
+    effectiveStartedAt,
+    isSubscriptionExpired,
+    isManuallySuspended,
+    isAccountSuspended,
+    category,
+  };
 });
+
+/**
+ * Operational vendor page guard: suspends dashboard navigation on subscription
+ * expiry and redirects the vendor directly to the subscription renewal screen.
+ */
+export async function requireActiveVendorContext(): Promise<VendorContext> {
+  const ctx = await getVendorContext();
+  if (ctx.isSubscriptionExpired) {
+    redirect("/vendor/subscription?suspended=1");
+  }
+  return ctx;
+}
+
+/** Returns a human-readable lock message when a vendor account is suspended, or null when operational. */
+export function vendorSuspensionMessage(ctx: VendorContext): string | null {
+  if (ctx.isSubscriptionExpired) {
+    return "Your vendor account is suspended because your subscription has expired. Renew your subscription to restore access.";
+  }
+  if (ctx.isManuallySuspended) {
+    return `Your store is suspended${ctx.store.suspension_reason ? `: ${ctx.store.suspension_reason}` : "."}`;
+  }
+  if (ctx.store.status === "rejected") {
+    return "Your store application was not approved.";
+  }
+  return null;
+}
 
 /* -------------------------------------------------------------------------- */
 /* One-time tokens (email verification, password reset)                       */

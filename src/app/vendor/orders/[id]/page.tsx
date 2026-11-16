@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MapPin, Phone, Mail, Truck, Package, Clock, ExternalLink } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { getOrderForActor } from "@/lib/orders";
 import { storeBase } from "@/lib/storefront-base";
 import { workflowFor, workflowLabel } from "@/lib/storefront";
@@ -56,7 +56,7 @@ function availableActions(status: string, paid: boolean): Array<{ key: string; l
 
 export default async function VendorOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const ctx = await getVendorContext();
+  const ctx = await requireActiveVendorContext();
   const detail = await getOrderForActor(id, { id: ctx.user.id, role: ctx.user.role, email: ctx.user.email });
   if (!detail || !detail.isOwner) notFound();
   const { order, items, history, tracking, category } = detail;

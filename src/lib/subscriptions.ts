@@ -51,12 +51,34 @@ export async function getStoreSubscription(storeId: string): Promise<StoreSubscr
             to_jsonb(p.*) as plan
        from subscriptions s
        join subscription_plans p on p.id = s.plan_id
-      where s.store_id = $1 and s.status in ('trialing','active')
+      where s.store_id = $1 and s.status in ('trialing','active') and s.expires_at > now()
       order by s.expires_at desc limit 1`,
     [storeId],
   );
   if (!row) return null;
   return { ...row, plan: { ...row.plan, price: Number(row.plan.price), features: row.plan.features ?? [] } };
+}
+
+export async function getLatestStoreSubscription(storeId: string): Promise<StoreSubscription | null> {
+  const row = await systemDb.maybeOne<StoreSubscription & { plan: Plan }>(
+    `select s.*,
+            to_jsonb(p.*) as plan
+       from subscriptions s
+       join subscription_plans p on p.id = s.plan_id
+      where s.store_id = $1
+      order by s.expires_at desc limit 1`,
+    [storeId],
+  );
+  if (!row) return null;
+  return { ...row, plan: { ...row.plan, price: Number(row.plan.price), features: row.plan.features ?? [] } };
+}
+
+export async function hasPriorSubscription(storeId: string): Promise<boolean> {
+  const row = await systemDb.maybeOne<{ id: string }>(
+    `select id from subscriptions where store_id = $1 limit 1`,
+    [storeId],
+  );
+  return Boolean(row);
 }
 
 export function subscriptionState(subscription: StoreSubscription | null) {
@@ -97,6 +119,9 @@ export async function purchaseSubscription(input: {
   const current = await getStoreSubscription(input.store.id);
 
   if (Number(input.plan.price) <= 0) {
+    if (input.plan.trial_days > 0 && (await hasPriorSubscription(input.store.id))) {
+      throw new Error("Your one-time free trial has already been used. Choose a paid plan to renew your subscription.");
+    }
     const applied = await withSystem(async (db) =>
       db.one<{ new_expires_at: string }>(
         `select * from apply_subscription_payment($1,$2,null,0,'admin_grant',null,$3)`,

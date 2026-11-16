@@ -249,6 +249,82 @@ async function main() {
     }
   }
 
+  console.log("\nExpiry suspension & renewal restoration");
+  if (expired) {
+    const expiredStore = await systemDb.one<{ id: string; owner_id: string }>(
+      `select id, owner_id from stores where id = $1`,
+      [expired.id],
+    );
+    const expiredOwner = await systemDb.one<{ email: string }>(
+      `select email from users where id = $1`,
+      [expiredStore.owner_id],
+    );
+    const expiredActor = { id: expiredStore.owner_id, role: "vendor" as const, email: expiredOwner.email };
+
+    const accessCheck = await systemDb.one<{ ok: boolean }>(
+      `select store_has_vendor_access($1) as ok`,
+      [expiredStore.id],
+    );
+    check("expired store lacks operational vendor access", accessCheck.ok === false, accessCheck);
+
+    const storeUpdateRows = await withActor(expiredActor, (db) =>
+      db.execute(`update stores set tagline = 'should-not-write' where id = $1`, [expiredStore.id]),
+    );
+    check("expired vendor cannot update store settings", storeUpdateRows === 0, storeUpdateRows);
+
+    let productInsertBlocked = false;
+    try {
+      await withActor(expiredActor, (db) =>
+        db.execute(
+          `insert into products (store_id, name, slug, price) values ($1, 'Blocked while expired', 'blocked-while-expired', 1000)`,
+          [expiredStore.id],
+        ),
+      );
+    } catch {
+      productInsertBlocked = true;
+    }
+    check("expired vendor cannot create products until renewal", productInsertBlocked);
+
+    const paidPlan = await systemDb.one<{ id: string }>(
+      `select id from subscription_plans where price > 0 and is_active = true order by price asc limit 1`,
+    );
+    const beforeHistoryCount = await systemDb.one<{ count: number }>(
+      `select count(*)::int as count from subscription_history where store_id = $1`,
+      [expiredStore.id],
+    );
+    const renewed = await systemDb.one<{ id: string; subscription_id: string; new_expires_at: string }>(
+      `select id, subscription_id, new_expires_at from apply_subscription_payment($1, $2, null, 7500, 'gateway', null, 'Test renewal')`,
+      [expiredStore.id, paidPlan.id],
+    );
+    const afterRenewal = await systemDb.one<{ status: string; ok: boolean; live: boolean }>(
+      `select status, store_has_vendor_access(id) as ok, store_is_live(id) as live from stores where id = $1`,
+      [expiredStore.id],
+    );
+    check(
+      "renewing subscription unsuspends account and restores live storefront immediately",
+      afterRenewal.status === "active" && afterRenewal.ok === true && afterRenewal.live === true,
+      afterRenewal,
+    );
+
+    // Roll back the probe renewal so the seeded expired store stays expired for other checks/demos
+    await systemDb.execute(
+      `update subscriptions set status = 'active', expires_at = now() - interval '1 minute' where id = $1`,
+      [renewed.subscription_id],
+    );
+    await systemDb.execute(`select * from process_subscription_expiry()`);
+    const reSuspended = await systemDb.one<{ status: string; ok: boolean; suspended_at: string | null }>(
+      `select status, store_has_vendor_access(id) as ok, suspended_at from stores where id = $1`,
+      [expiredStore.id],
+    );
+    check(
+      "automatic expiry re-suspends store and records suspended_at",
+      reSuspended.status === "expired" && reSuspended.ok === false && Boolean(reSuspended.suspended_at),
+      reSuspended,
+    );
+    await systemDb.execute(`delete from subscription_payments where id = $1`, [renewed.id]);
+    void beforeHistoryCount;
+  }
+
   console.log(`\n${checks - failures}/${checks} checks passed`);
   if (failures > 0) process.exitCode = 1;
   process.exit(failures > 0 ? 1 : 0);

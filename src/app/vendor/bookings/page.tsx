@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { CalendarClock, Clock, MapPin } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { formatDate, timeAgo } from "@/lib/utils";
 import { Badge, Card, EmptyState, PageHeader, Tabs } from "@/components/ui";
@@ -22,7 +22,7 @@ export default async function VendorBookingsPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  const { store, category } = await getVendorContext();
+  const { store, category } = await requireActiveVendorContext();
   const { status = "upcoming" } = await searchParams;
 
   const params: unknown[] = [store.id];

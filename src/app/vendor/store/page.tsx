@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ExternalLink, Globe, Lock, ShieldCheck } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { storeBase } from "@/lib/storefront-base";
 import { storefrontUrl } from "@/lib/domains";
@@ -12,7 +12,7 @@ import { StoreSettingsForm, SubdomainRequestForm, type StoreSettingsValues } fro
 export const metadata: Metadata = { title: "Store profile · Vendor dashboard" };
 
 export default async function VendorStorePage() {
-  const { store, category } = await getVendorContext();
+  const { store, category } = await requireActiveVendorContext();
   const [base, pending] = await Promise.all([
     storeBase(store.slug),
     systemDb.maybeOne<{ requested_subdomain: string; status: string; created_at: string; admin_note: string | null }>(

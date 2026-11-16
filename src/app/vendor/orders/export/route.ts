@@ -1,4 +1,4 @@
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { workflowLabel } from "@/lib/storefront";
 
@@ -8,7 +8,7 @@ function cell(value: unknown): string {
 }
 
 export async function GET() {
-  const { store, category } = await getVendorContext();
+  const { store, category } = await requireActiveVendorContext();
   const rows = await systemDb.query<{
     reference: string;
     created_at: string;

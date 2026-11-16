@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Megaphone } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { listStoreAnnouncements } from "@/lib/announcements";
 import { systemDb } from "@/lib/db";
 import { Card, CardHeader, PageHeader } from "@/components/ui";
@@ -10,7 +10,7 @@ import { AnnouncementList } from "@/components/announcement-list";
 export const metadata: Metadata = { title: "Announcements · Vendor" };
 
 export default async function VendorAnnouncementsPage() {
-  const { store } = await getVendorContext();
+  const { store } = await requireActiveVendorContext();
   const [items, products] = await Promise.all([
     listStoreAnnouncements(store.id),
     systemDb.query<{ id: string; name: string }>(

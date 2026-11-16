@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ImageIcon, Package, Plus, Search } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { formatMoney } from "@/lib/utils";
 import { Alert, Badge, ButtonLink, EmptyState, PageHeader, Pagination } from "@/components/ui";
@@ -18,7 +18,7 @@ export default async function VendorProductsPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string; page?: string; category?: string }>;
 }) {
-  const { store } = await getVendorContext();
+  const { store } = await requireActiveVendorContext();
   const { q, status, page: pageParam, category } = await searchParams;
   const page = Math.max(1, Number(pageParam ?? 1) || 1);
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FileText } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { formatMoney, formatDate, timeAgo } from "@/lib/utils";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, Tabs } from "@/components/ui";
@@ -23,7 +23,7 @@ export default async function VendorQuotationsPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  const { store, category } = await getVendorContext();
+  const { store, category } = await requireActiveVendorContext();
   const { status = "open" } = await searchParams;
 
   const params: unknown[] = [store.id];

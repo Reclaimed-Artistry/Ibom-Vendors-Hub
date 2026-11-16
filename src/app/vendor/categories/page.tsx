@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Tags } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { Badge, Card, CardHeader, EmptyState, PageHeader } from "@/components/ui";
 import { CategoryForm } from "@/components/vendor-forms";
@@ -11,7 +11,7 @@ import { deleteProductCategoryAction } from "@/app/actions/vendor";
 export const metadata: Metadata = { title: "Categories · Vendor dashboard" };
 
 export default async function VendorCategoriesPage() {
-  const { store, category } = await getVendorContext();
+  const { store, category } = await requireActiveVendorContext();
   const rows = await systemDb.query<{ id: string; name: string; product_count: number; is_active: boolean }>(
     `select c.id, c.name, c.is_active,
             (select count(*)::int from products p where p.category_id = c.id) as product_count

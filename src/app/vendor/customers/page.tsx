@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Search, Users } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { formatMoney, formatDate } from "@/lib/utils";
 import { Avatar, EmptyState, PageHeader } from "@/components/ui";
@@ -13,7 +13,7 @@ export default async function VendorCustomersPage({
 }: {
   searchParams: Promise<{ q?: string }>;
 }) {
-  const { store } = await getVendorContext();
+  const { store } = await requireActiveVendorContext();
   const { q } = await searchParams;
 
   const params: unknown[] = [store.id];

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getVendorContext, getCurrentUser } from "@/lib/auth";
+import { getVendorContext, getCurrentUser, vendorSuspensionMessage } from "@/lib/auth";
 import { systemDb, withActor } from "@/lib/db";
 import { logActivity } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
@@ -50,6 +50,8 @@ function parseJsonField<T>(value: FormDataEntryValue | null, fallback: T): T {
 
 export async function saveProductAction(_prev: VendorState, formData: FormData): Promise<VendorState> {
   const ctx = await getVendorContext();
+  const lockError = vendorSuspensionMessage(ctx);
+  if (lockError) return { error: lockError };
   const productId = String(formData.get("productId") ?? "") || null;
   const categoryFeatures = (ctx.category?.features ?? {}) as Record<string, boolean>;
 
@@ -270,6 +272,7 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
 
 export async function deleteProductAction(formData: FormData) {
   const ctx = await getVendorContext();
+  if (vendorSuspensionMessage(ctx)) redirect("/vendor/subscription?suspended=1");
   const productId = String(formData.get("productId") ?? "");
   await withActor({ id: ctx.user.id, role: "vendor", email: ctx.user.email }, async (db) => {
     await db.execute(`delete from products where id = $1 and store_id = $2`, [productId, ctx.store.id]);
@@ -284,6 +287,7 @@ export async function deleteProductAction(formData: FormData) {
 
 export async function toggleProductAvailabilityAction(formData: FormData) {
   const ctx = await getVendorContext();
+  if (vendorSuspensionMessage(ctx)) redirect("/vendor/subscription?suspended=1");
   const productId = String(formData.get("productId") ?? "");
   const available = formData.get("available") === "true";
   await withActor({ id: ctx.user.id, role: "vendor", email: ctx.user.email }, async (db) => {
@@ -295,6 +299,8 @@ export async function toggleProductAvailabilityAction(formData: FormData) {
 
 export async function createProductCategoryAction(_prev: VendorState, formData: FormData): Promise<VendorState> {
   const ctx = await getVendorContext();
+  const lockError = vendorSuspensionMessage(ctx);
+  if (lockError) return { error: lockError };
   const name = String(formData.get("name") ?? "").trim();
   if (name.length < 2) return { error: "Enter a category name" };
   await withActor({ id: ctx.user.id, role: "vendor", email: ctx.user.email }, async (db) => {
@@ -310,6 +316,7 @@ export async function createProductCategoryAction(_prev: VendorState, formData: 
 
 export async function deleteProductCategoryAction(formData: FormData) {
   const ctx = await getVendorContext();
+  if (vendorSuspensionMessage(ctx)) redirect("/vendor/subscription?suspended=1");
   const categoryId = String(formData.get("categoryId") ?? "");
   await withActor({ id: ctx.user.id, role: "vendor", email: ctx.user.email }, async (db) => {
     await db.execute(`delete from product_categories where id = $1 and store_id = $2`, [categoryId, ctx.store.id]);
@@ -323,6 +330,8 @@ export async function deleteProductCategoryAction(formData: FormData) {
 
 export async function saveStoreSettingsAction(_prev: VendorState, formData: FormData): Promise<VendorState> {
   const ctx = await getVendorContext();
+  const lockError = vendorSuspensionMessage(ctx);
+  if (lockError) return { error: lockError };
   const parsed = storeSettingsSchema.safeParse({
     name: formData.get("name"),
     tagline: formData.get("tagline") ?? "",
@@ -444,6 +453,8 @@ export async function vendorOrderAction(_prev: VendorState, formData: FormData):
 
 export async function respondQuotationAction(_prev: VendorState, formData: FormData): Promise<VendorState> {
   const ctx = await getVendorContext();
+  const lockError = vendorSuspensionMessage(ctx);
+  if (lockError) return { error: lockError };
   const parsed = quotationResponseSchema.safeParse({
     quotationId: formData.get("quotationId"),
     amount: formData.get("amount"),
@@ -511,6 +522,7 @@ export async function respondQuotationAction(_prev: VendorState, formData: FormD
 
 export async function bookingAction(formData: FormData) {
   const ctx = await getVendorContext();
+  if (vendorSuspensionMessage(ctx)) redirect("/vendor/subscription?suspended=1");
   const bookingId = String(formData.get("bookingId") ?? "");
   const status = String(formData.get("status") ?? "");
   if (!["confirmed", "completed", "cancelled", "rescheduled", "no_show"].includes(status)) return;
@@ -565,6 +577,8 @@ export async function bookingAction(formData: FormData) {
 
 export async function respondReviewAction(_prev: VendorState, formData: FormData): Promise<VendorState> {
   const ctx = await getVendorContext();
+  const lockError = vendorSuspensionMessage(ctx);
+  if (lockError) return { error: lockError };
   const reviewId = String(formData.get("reviewId") ?? "");
   const response = String(formData.get("response") ?? "").trim();
   if (response.length < 3) return { error: "Write a short response first" };
@@ -586,6 +600,8 @@ export async function respondReviewAction(_prev: VendorState, formData: FormData
 
 export async function replyMessageAction(_prev: VendorState, formData: FormData): Promise<VendorState> {
   const ctx = await getVendorContext();
+  const lockError = vendorSuspensionMessage(ctx);
+  if (lockError) return { error: lockError };
   const messageId = String(formData.get("messageId") ?? "");
   const body = String(formData.get("body") ?? "").trim();
   if (body.length < 2) return { error: "Write a reply first" };

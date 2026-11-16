@@ -1,8 +1,7 @@
 "use server";
 
 import { revalidatePath, revalidateTag } from "next/cache";
-import { requireAdmin, getCurrentUser } from "@/lib/auth";
-import { getVendorContext } from "@/lib/auth";
+import { requireAdmin, getCurrentUser, getVendorContext, vendorSuspensionMessage } from "@/lib/auth";
 import { systemDb, isUniqueViolation } from "@/lib/db";
 import { logActivity } from "@/lib/audit";
 import { isAnnouncementKind } from "@/lib/announcements";
@@ -164,6 +163,8 @@ export async function createStoreAnnouncementAction(
   formData: FormData,
 ): Promise<AnnouncementState> {
   const context = await getVendorContext();
+  const lockError = vendorSuspensionMessage(context);
+  if (lockError) return { error: lockError };
   const { error, value } = parse(formData, ["customers"]);
   if (error || !value) return { error };
 
@@ -209,11 +210,9 @@ export async function toggleAnnouncementAction(formData: FormData) {
   const isAdmin = user.role === "admin" || user.role === "super_admin";
   let allowed = isAdmin;
   if (!allowed && row.scope === "store" && row.store_id) {
-    const owned = await systemDb.maybeOne<{ id: string }>(
-      `select id from stores where id = $1 and owner_id = $2`,
-      [row.store_id, user.id],
-    );
-    allowed = Boolean(owned);
+    const ctx = await getVendorContext();
+    if (vendorSuspensionMessage(ctx)) return;
+    allowed = ctx.store.id === row.store_id;
   }
   if (!allowed) return;
 
@@ -243,11 +242,9 @@ export async function deleteAnnouncementAction(formData: FormData) {
   const isAdmin = user.role === "admin" || user.role === "super_admin";
   let allowed = isAdmin;
   if (!allowed && row.scope === "store" && row.store_id) {
-    const owned = await systemDb.maybeOne<{ id: string }>(
-      `select id from stores where id = $1 and owner_id = $2`,
-      [row.store_id, user.id],
-    );
-    allowed = Boolean(owned);
+    const ctx = await getVendorContext();
+    if (vendorSuspensionMessage(ctx)) return;
+    allowed = ctx.store.id === row.store_id;
   }
   if (!allowed) return;
 

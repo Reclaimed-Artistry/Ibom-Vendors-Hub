@@ -307,22 +307,22 @@ function template(name: string, data: EmailData): RenderedEmail {
       return {
         subject:
           name === "subscription_renewed"
-            ? "Your subscription has been renewed"
+            ? "Your subscription has been renewed — account active"
             : "Your subscription is active",
         heading: name === "subscription_renewed" ? "Subscription renewed" : "Subscription activated",
-        intro: `Your ${data.planName ?? ""} plan is active. Your storefront is online and accepting orders.`,
+        intro: `Your ${data.planName ?? ""} plan is active. Your vendor account and storefront are online and accepting orders.`,
         rows: [
           ["Plan", data.planName ?? ""],
           ["Amount", money(data.amount, data.currency)],
           ["Valid until", data.expiresAt ?? ""],
         ],
-        cta: { label: "Manage subscription", href: url("/vendor/subscription") },
+        cta: { label: "Open vendor dashboard", href: url("/vendor") },
       };
     case "subscription_expiring":
       return {
         subject: `Your store subscription expires in ${data.daysRemaining ?? "a few"} days`,
         heading: "Your subscription is expiring",
-        intro: `Your ${data.planName ?? ""} subscription expires on ${data.expiresAt ?? "soon"}. Renew now to keep your storefront online and avoid losing sales.`,
+        intro: `Your ${data.planName ?? ""} subscription expires on ${data.expiresAt ?? "soon"}. After expiry, your vendor account and storefront will be suspended until you renew.`,
         rows: [
           ["Days remaining", String(data.daysRemaining ?? "")],
           ["Expiry date", data.expiresAt ?? ""],
@@ -331,10 +331,10 @@ function template(name: string, data: EmailData): RenderedEmail {
       };
     case "subscription_expired":
       return {
-        subject: "Your storefront is offline — subscription expired",
+        subject: "Vendor account suspended — subscription expired",
         heading: "Your subscription has expired",
-        intro: `Your subscription expired on ${data.expiresAt ?? "today"} and your storefront is no longer publicly visible. Your data is safe — renew to reactivate instantly.`,
-        cta: { label: "Renew now", href: url("/vendor/subscription") },
+        intro: `Your subscription expired on ${data.expiresAt ?? "today"}. Your vendor account and public storefront are now suspended until you renew. All your products, images and order history remain safe.`,
+        cta: { label: "Renew subscription to restore access", href: url("/vendor/subscription") },
       };
     case "store_suspended":
       return {

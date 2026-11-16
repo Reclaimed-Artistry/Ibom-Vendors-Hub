@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Download, Search, ShoppingBag } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { getVendorOrderList } from "@/lib/orders";
 import { workflowFor, workflowLabel } from "@/lib/storefront";
 import { formatMoney, formatDateTime } from "@/lib/utils";
@@ -25,7 +25,7 @@ export default async function VendorOrdersPage({
 }: {
   searchParams: Promise<{ status?: string; q?: string; page?: string }>;
 }) {
-  const { store, category } = await getVendorContext();
+  const { store, category } = await requireActiveVendorContext();
   const { status = "all", q, page } = await searchParams;
   const result = await getVendorOrderList(store.id, { status, search: q, page: Number(page ?? 1) || 1 });
   const stages = workflowFor(category);

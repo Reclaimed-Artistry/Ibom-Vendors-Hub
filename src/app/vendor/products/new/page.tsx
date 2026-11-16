@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { PageHeader } from "@/components/ui";
 import { ProductForm } from "@/components/product-form";
@@ -8,7 +8,7 @@ import { ProductForm } from "@/components/product-form";
 export const metadata: Metadata = { title: "New product · Vendor dashboard" };
 
 export default async function NewProductPage() {
-  const { store, category } = await getVendorContext();
+  const { store, category } = await requireActiveVendorContext();
   const categories = await systemDb.query<{ id: string; name: string }>(
     `select id, name from product_categories where store_id = $1 order by sort_order, name`,
     [store.id],

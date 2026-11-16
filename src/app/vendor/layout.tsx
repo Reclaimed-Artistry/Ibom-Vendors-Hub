@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, Bell, Clock, ExternalLink, MailWarning, ShieldAlert } from "lucide-react";
+import { redirect } from "next/navigation";
+import { ArrowUpRight, Bell, Clock, ExternalLink, Lock, MailWarning, ShieldAlert } from "lucide-react";
 import { getVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { storeBase } from "@/lib/storefront-base";
 import { storefrontPath } from "@/lib/domains";
+import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui";
 import { DashboardNav, LogoutButton, MobileNav, type DashboardNavItem } from "@/components/dashboard-nav";
 import { Logo } from "@/components/logo";
 import { VendorAnnouncements } from "@/components/announcement-strip";
+import { SubscriptionCountdown } from "@/components/subscription-countdown";
 
 export const metadata: Metadata = { title: "Vendor dashboard · Ibom Vendors Hub" };
 
@@ -18,39 +22,68 @@ function daysLeft(expiresAt: string | null): number {
 }
 
 export default async function VendorLayout({ children }: { children: React.ReactNode }) {
-  const { user, store, subscription, category } = await getVendorContext();
+  const {
+    user,
+    store,
+    subscription,
+    lastSubscription,
+    effectiveExpiresAt,
+    effectiveStartedAt,
+    isSubscriptionExpired,
+    category,
+  } = await getVendorContext();
+
+  const pathname = (await headers()).get("x-ivh-pathname") ?? "";
+  if (
+    isSubscriptionExpired &&
+    pathname &&
+    pathname !== "/vendor/subscription" &&
+    !pathname.startsWith("/vendor/subscription/") &&
+    pathname !== "/vendor/onboarding"
+  ) {
+    redirect("/vendor/subscription?suspended=1");
+  }
+
   const base = await storeBase(store.slug);
   const [counts, unread] = await Promise.all([
-    systemDb.maybeOne<{ orders: number; quotations: number; bookings: number; messages: number; reviews: number }>(
-      `select
-         (select count(*)::int from orders where store_id = $1 and status not in ('completed','cancelled','rejected')) as orders,
-         (select count(*)::int from service_quotations where store_id = $1 and status in ('requested','quoted')) as quotations,
-         (select count(*)::int from service_bookings where store_id = $1 and status in ('pending','confirmed')) as bookings,
-         (select count(*)::int from customer_messages where store_id = $1 and status in ('new','open')) as messages,
-         (select count(*)::int from reviews where store_id = $1 and vendor_response is null) as reviews`,
-      [store.id],
+    isSubscriptionExpired
+      ? Promise.resolve(null)
+      : systemDb.maybeOne<{ orders: number; quotations: number; bookings: number; messages: number; reviews: number }>(
+          `select
+             (select count(*)::int from orders where store_id = $1 and status not in ('completed','cancelled','rejected')) as orders,
+             (select count(*)::int from service_quotations where store_id = $1 and status in ('requested','quoted')) as quotations,
+             (select count(*)::int from service_bookings where store_id = $1 and status in ('pending','confirmed')) as bookings,
+             (select count(*)::int from customer_messages where store_id = $1 and status in ('new','open')) as messages,
+             (select count(*)::int from reviews where store_id = $1 and vendor_response is null) as reviews`,
+          [store.id],
+        ),
+    systemDb.maybeOne<{ count: number }>(
+      `select count(*)::int as count from notifications where user_id = $1 and read_at is null`,
+      [user.id],
     ),
-    systemDb.maybeOne<{ count: number }>(`select count(*)::int as count from notifications where user_id = $1 and read_at is null`, [user.id]),
   ]);
 
   const nav: DashboardNavItem[] = [
-    { href: "/vendor", label: "Overview", icon: "overview" },
-    { href: "/vendor/orders", label: "Orders", icon: "orders", badge: counts?.orders || undefined },
-    { href: "/vendor/products", label: "Products & services", icon: "products" },
-    { href: "/vendor/announcements", label: "Announcements", icon: "announcements" },
-    { href: "/vendor/categories", label: "Categories", icon: "categories" },
-    { href: "/vendor/quotations", label: "Quotations", icon: "quotations", badge: counts?.quotations || undefined },
-    { href: "/vendor/bookings", label: "Bookings", icon: "bookings", badge: counts?.bookings || undefined },
-    { href: "/vendor/customers", label: "Customers", icon: "customers" },
-    { href: "/vendor/reviews", label: "Reviews", icon: "reviews", badge: counts?.reviews || undefined },
-    { href: "/vendor/messages", label: "Messages", icon: "messages", badge: counts?.messages || undefined },
+    { href: "/vendor", label: "Overview", icon: "overview", locked: isSubscriptionExpired },
+    { href: "/vendor/orders", label: "Orders", icon: "orders", badge: counts?.orders || undefined, locked: isSubscriptionExpired },
+    { href: "/vendor/products", label: "Products & services", icon: "products", locked: isSubscriptionExpired },
+    { href: "/vendor/announcements", label: "Announcements", icon: "announcements", locked: isSubscriptionExpired },
+    { href: "/vendor/categories", label: "Categories", icon: "categories", locked: isSubscriptionExpired },
+    { href: "/vendor/quotations", label: "Quotations", icon: "quotations", badge: counts?.quotations || undefined, locked: isSubscriptionExpired },
+    { href: "/vendor/bookings", label: "Bookings", icon: "bookings", badge: counts?.bookings || undefined, locked: isSubscriptionExpired },
+    { href: "/vendor/customers", label: "Customers", icon: "customers", locked: isSubscriptionExpired },
+    { href: "/vendor/reviews", label: "Reviews", icon: "reviews", badge: counts?.reviews || undefined, locked: isSubscriptionExpired },
+    { href: "/vendor/messages", label: "Messages", icon: "messages", badge: counts?.messages || undefined, locked: isSubscriptionExpired },
     { href: "/vendor/subscription", label: "Subscription", icon: "subscription" },
-    { href: "/vendor/store", label: "Store profile", icon: "store" },
-    { href: "/vendor/settings", label: "Account settings", icon: "settings" },
+    { href: "/vendor/store", label: "Store profile", icon: "store", locked: isSubscriptionExpired },
+    { href: "/vendor/settings", label: "Account settings", icon: "settings", locked: isSubscriptionExpired },
   ];
 
-  const remaining = daysLeft(subscription?.expires_at ?? store.access_until);
-  const expiringSoon = store.status === "active" && remaining <= 5;
+  const remaining = daysLeft(effectiveExpiresAt);
+  const expiringSoon = !isSubscriptionExpired && remaining > 0 && remaining <= 5;
+  const displayPlanName =
+    subscription?.plan_name ??
+    (effectiveExpiresAt && !subscription ? "Admin access grant" : lastSubscription?.plan_name ?? "No active plan");
 
   return (
     <div className="min-h-screen bg-ink-50">
@@ -63,8 +96,18 @@ export default async function VendorLayout({ children }: { children: React.React
               <p className="mt-2 text-[11px] font-semibold uppercase tracking-wider text-ink-400">Vendor workspace</p>
               <p className="mt-1 truncate text-base font-bold text-ink-900">{store.name}</p>
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <Badge tone={store.status === "active" ? "success" : store.status === "pending" ? "warning" : "danger"}>
-                  {store.status}
+                <Badge
+                  tone={
+                    isSubscriptionExpired
+                      ? "danger"
+                      : store.status === "active"
+                        ? "success"
+                        : store.status === "pending"
+                          ? "warning"
+                          : "danger"
+                  }
+                >
+                  {isSubscriptionExpired ? "suspended · expired" : store.status}
                 </Badge>
                 {category ? <span className="text-xs text-ink-500">{category.name}</span> : null}
               </div>
@@ -80,16 +123,21 @@ export default async function VendorLayout({ children }: { children: React.React
               </div>
             </div>
 
-            <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-sm">
+            <div className={`rounded-2xl border p-4 shadow-sm ${isSubscriptionExpired ? "border-red-200 bg-white" : "border-ink-100 bg-white"}`}>
               <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-ink-400">
-                <Clock className="size-3.5" /> Subscription
+                <Clock className="size-3.5" /> Subscription countdown
               </p>
-              <p className="mt-1 text-sm font-semibold text-ink-900">{subscription?.plan_name ?? "No active plan"}</p>
-              <p className={`mt-1 text-xs ${expiringSoon || remaining === 0 ? "font-semibold text-amber-700" : "text-ink-500"}`}>
-                {remaining > 0 ? `${remaining} day${remaining === 1 ? "" : "s"} remaining` : "Expired — renew to go live"}
-              </p>
+              <p className="mt-1 text-sm font-semibold text-ink-900">{displayPlanName}</p>
+              <SubscriptionCountdown
+                variant="sidebar"
+                expiresAt={effectiveExpiresAt ?? lastSubscription?.expires_at ?? null}
+                startedAt={effectiveStartedAt}
+                planName={displayPlanName}
+                status={subscription?.status ?? lastSubscription?.status ?? null}
+                isSuspendedForExpiry={isSubscriptionExpired}
+              />
               <Link href="/vendor/subscription" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline">
-                Manage plan <ArrowUpRight className="size-3" />
+                {isSubscriptionExpired ? "Renew subscription" : "Manage plan"} <ArrowUpRight className="size-3" />
               </Link>
             </div>
           </div>
@@ -108,15 +156,26 @@ export default async function VendorLayout({ children }: { children: React.React
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Link href="/vendor/notifications" className="btn btn-ghost btn-sm relative" aria-label="Notifications">
-                <Bell className="size-4" />
-                {unread?.count ? (
-                  <span className="absolute -right-0.5 -top-0.5 grid size-4 place-items-center rounded-full bg-brand-600 text-[10px] font-bold text-white">
-                    {unread.count > 9 ? "9+" : unread.count}
-                  </span>
-                ) : null}
-              </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <SubscriptionCountdown
+                variant="header"
+                expiresAt={effectiveExpiresAt ?? lastSubscription?.expires_at ?? null}
+                isSuspendedForExpiry={isSubscriptionExpired}
+              />
+              {isSubscriptionExpired ? (
+                <span className="btn btn-ghost btn-sm cursor-not-allowed opacity-50" title="Locked until subscription renewal">
+                  <Lock className="size-4 text-red-500" />
+                </span>
+              ) : (
+                <Link href="/vendor/notifications" className="btn btn-ghost btn-sm relative" aria-label="Notifications">
+                  <Bell className="size-4" />
+                  {unread?.count ? (
+                    <span className="absolute -right-0.5 -top-0.5 grid size-4 place-items-center rounded-full bg-brand-600 text-[10px] font-bold text-white">
+                      {unread.count > 9 ? "9+" : unread.count}
+                    </span>
+                  ) : null}
+                </Link>
+              )}
               <Link href={base} target="_blank" className="btn btn-secondary btn-sm hidden sm:inline-flex">
                 Storefront <ExternalLink className="size-3.5" />
               </Link>
@@ -124,28 +183,30 @@ export default async function VendorLayout({ children }: { children: React.React
           </header>
 
           <div className="space-y-4">
-            {store.status === "expired" ? (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                <p className="flex items-start gap-2">
-                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+            {isSubscriptionExpired ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-950">
+                <p className="flex items-start gap-2.5">
+                  <ShieldAlert className="mt-0.5 size-4 shrink-0 text-red-600" />
                   <span>
-                    Your subscription has expired, so your storefront is offline. Your products, images and order history are safe.
+                    <strong className="font-semibold">Account suspended — subscription expired</strong>
+                    {lastSubscription?.expires_at ? ` (${formatDateTime(lastSubscription.expires_at)})` : ""}. Your vendor
+                    dashboard tools and public storefront are locked until you renew your subscription. Your products,
+                    images and order history remain intact.
                   </span>
                 </p>
-                <Link href="/vendor/subscription" className="btn btn-primary btn-sm">Renew now</Link>
               </div>
             ) : null}
-            {store.status === "pending" ? (
+            {!isSubscriptionExpired && store.status === "pending" ? (
               <div className="flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
                 <Clock className="mt-0.5 size-4 shrink-0" />
                 <span>Application under review. You can prepare products and settings now — your storefront goes live once an admin approves it.</span>
               </div>
             ) : null}
-            {store.status === "suspended" ? (
+            {store.status === "suspended" || store.manual_suspension ? (
               <div className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
                 <ShieldAlert className="mt-0.5 size-4 shrink-0" />
                 <span>
-                  Store suspended{store.suspension_reason ? `: ${store.suspension_reason}` : ""}. Customer-facing features are paused and your data is retained.
+                  Store suspended{store.suspension_reason ? `: ${store.suspension_reason}` : ""}. Customer-facing features and store edits are paused while your data is retained.
                 </span>
               </div>
             ) : null}
@@ -159,9 +220,15 @@ export default async function VendorLayout({ children }: { children: React.React
               </div>
             ) : null}
             {expiringSoon ? (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-100 bg-white px-4 py-3 text-sm text-ink-700">
-                <p>Your {subscription?.plan_name ?? "plan"} renews in {remaining} day{remaining === 1 ? "" : "s"}.</p>
-                <Link href="/vendor/subscription" className="btn btn-secondary btn-sm">Manage subscription</Link>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
+                <p>
+                  Your <strong>{displayPlanName}</strong> expires in{" "}
+                  <strong>
+                    {remaining} day{remaining === 1 ? "" : "s"}
+                  </strong>
+                  . Renew early to avoid automatic account suspension.
+                </p>
+                <Link href="/vendor/subscription" className="btn btn-primary btn-sm">Renew now</Link>
               </div>
             ) : null}
           </div>

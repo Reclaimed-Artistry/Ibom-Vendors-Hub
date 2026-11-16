@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { timeAgo } from "@/lib/utils";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, Tabs } from "@/components/ui";
@@ -14,7 +14,7 @@ export default async function VendorMessagesPage({
 }: {
   searchParams: Promise<{ status?: string; id?: string }>;
 }) {
-  const { store } = await getVendorContext();
+  const { store } = await requireActiveVendorContext();
   const { status = "all", id } = await searchParams;
 
   const params: unknown[] = [store.id];

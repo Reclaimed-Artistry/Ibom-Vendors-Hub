@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 import { Alert, Badge, Card, CardHeader, PageHeader } from "@/components/ui";
@@ -9,7 +9,7 @@ import { LogoutButton } from "@/components/dashboard-nav";
 export const metadata: Metadata = { title: "Account settings · Vendor dashboard" };
 
 export default async function VendorSettingsPage() {
-  const { user, store } = await getVendorContext();
+  const { user, store } = await requireActiveVendorContext();
   const dbUser = await systemDb.maybeOne<{ phone: string | null; created_at: string; last_login_at: string | null }>(
     `select phone, created_at, last_login_at from users where id = $1`,
     [user.id],

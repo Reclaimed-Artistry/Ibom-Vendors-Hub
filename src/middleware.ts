@@ -18,7 +18,9 @@ export function middleware(request: NextRequest) {
   const subdomain = subdomainFromHost(host);
 
   if (!subdomain || isReservedSubdomain(subdomain)) {
-    const response = NextResponse.next();
+    const headers = new Headers(request.headers);
+    headers.set("x-ivh-pathname", pathname);
+    const response = NextResponse.next({ request: { headers } });
     response.headers.set("x-ivh-root", "1");
     return response;
   }

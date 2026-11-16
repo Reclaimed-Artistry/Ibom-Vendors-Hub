@@ -13,11 +13,12 @@ import {
   TrendingUp,
   Wallet,
 } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { getStoreSubscription } from "@/lib/subscriptions";
-import { formatMoney, formatDate, formatDateTime, timeAgo } from "@/lib/utils";
+import { formatMoney, formatDateTime, timeAgo } from "@/lib/utils";
 import { Alert, ButtonLink, Card, CardHeader, EmptyState, PageHeader, StatCard, StatusBadge } from "@/components/ui";
+import { SubscriptionCountdown } from "@/components/subscription-countdown";
 
 export const metadata: Metadata = { title: "Vendor overview · Ibom Vendors Hub" };
 
@@ -26,7 +27,7 @@ export default async function VendorOverviewPage({
 }: {
   searchParams: Promise<{ welcome?: string; verifyUrl?: string }>;
 }) {
-  const { store } = await getVendorContext();
+  const { store, effectiveExpiresAt, effectiveStartedAt } = await requireActiveVendorContext();
   const { welcome, verifyUrl } = await searchParams;
   const subscription = await getStoreSubscription(store.id);
 
@@ -82,9 +83,6 @@ export default async function VendorOverviewPage({
   ]);
 
   const currency = "NGN";
-  const daysRemaining = subscription
-    ? Math.max(0, Math.ceil((new Date(subscription.expires_at).getTime() - Date.now()) / 86_400_000))
-    : 0;
 
   return (
     <div className="space-y-5">
@@ -162,26 +160,19 @@ export default async function VendorOverviewPage({
         </Card>
 
         <div className="space-y-4">
-          <Card className="card-pad">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Subscription</p>
-                <p className="mt-1 text-lg font-bold text-ink-900">{subscription?.plan.name ?? "No plan"}</p>
-                <p className="mt-0.5 text-sm text-ink-500">
-                  {daysRemaining > 0 ? `${daysRemaining} days left` : "Expired"}
-                  {subscription ? ` · ends ${formatDate(subscription.expires_at)}` : ""}
-                </p>
-              </div>
-              <span className={`badge ${store.status === "active" ? "badge-success" : "badge-warning"}`}>{store.status}</span>
-            </div>
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-ink-100">
-              <div className="h-full rounded-full bg-brand-500" style={{ width: `${Math.min(100, (daysRemaining / 30) * 100)}%` }} />
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <ButtonLink href="/vendor/subscription" size="sm" variant="secondary">Manage plan</ButtonLink>
+          <div className="space-y-2.5">
+            <SubscriptionCountdown
+              variant="hero"
+              expiresAt={subscription?.expires_at ?? effectiveExpiresAt}
+              startedAt={subscription?.started_at ?? effectiveStartedAt}
+              planName={subscription?.plan.name ?? (effectiveExpiresAt ? "Admin access grant" : "No plan")}
+              status={subscription?.status ?? null}
+            />
+            <div className="flex flex-wrap gap-2">
+              <ButtonLink href="/vendor/subscription" size="sm" variant="secondary">Manage / extend plan</ButtonLink>
               <Link href="/vendor/store" className="btn btn-ghost btn-sm">Edit storefront</Link>
             </div>
-          </Card>
+          </div>
 
           <Card>
             <CardHeader title="Upcoming bookings" action={<Link href="/vendor/bookings" className="text-xs font-semibold text-brand-700 hover:underline">All</Link>} />

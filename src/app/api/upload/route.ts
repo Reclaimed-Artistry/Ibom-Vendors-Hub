@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getVendorContext, vendorSuspensionMessage } from "@/lib/auth";
 import { uploadImage } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +8,12 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  if (user.role === "vendor") {
+    const ctx = await getVendorContext();
+    const lockError = vendorSuspensionMessage(ctx);
+    if (lockError) return NextResponse.json({ error: lockError }, { status: 403 });
+  }
 
   const formData = await request.formData();
   const file = formData.get("file");

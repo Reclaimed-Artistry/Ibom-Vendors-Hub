@@ -9,6 +9,7 @@ import {
   FileText,
   Flag,
   LayoutDashboard,
+  Lock,
   LogOut,
   Mail,
   Megaphone,
@@ -58,6 +59,7 @@ export interface DashboardNavItem {
   label: string;
   icon: DashboardIcon;
   badge?: number;
+  locked?: boolean;
 }
 
 export function DashboardNav({ items, compact = false }: { items: DashboardNavItem[]; compact?: boolean }) {
@@ -67,16 +69,20 @@ export function DashboardNav({ items, compact = false }: { items: DashboardNavIt
     <nav className={compact ? "grid gap-1" : "space-y-1"}>
       {items.map((item) => {
         const Icon = ICONS[item.icon] ?? LayoutDashboard;
-        const active = pathname === item.href || (item.href !== "/vendor" && item.href !== "/admin" && pathname.startsWith(`${item.href}/`));
+        const active = !item.locked && (pathname === item.href || (item.href !== "/vendor" && item.href !== "/admin" && pathname.startsWith(`${item.href}/`)));
         return (
           <Link
             key={item.href}
-            href={item.href}
-            className={`sidebar-link ${active ? "sidebar-link-active" : ""}`}
+            href={item.locked ? "/vendor/subscription?suspended=1" : item.href}
+            title={item.locked ? "Suspended — renew your subscription to unlock" : undefined}
+            aria-disabled={item.locked || undefined}
+            className={`sidebar-link ${active ? "sidebar-link-active" : ""} ${item.locked ? "opacity-55 hover:bg-red-50/50 hover:text-ink-600" : ""}`}
           >
             <Icon className="size-4 shrink-0" aria-hidden />
             <span className="flex-1 truncate">{item.label}</span>
-            {item.badge ? (
+            {item.locked ? (
+              <Lock className="size-3.5 shrink-0 text-red-500" aria-label="Locked until renewal" />
+            ) : item.badge ? (
               <span className="rounded-full bg-brand-600 px-2 py-0.5 text-[11px] font-semibold text-white">{item.badge}</span>
             ) : null}
           </Link>

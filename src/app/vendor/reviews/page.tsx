@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Star } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { formatDate, timeAgo } from "@/lib/utils";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, StatCard } from "@/components/ui";
@@ -13,7 +13,7 @@ export default async function VendorReviewsPage({
 }: {
   searchParams: Promise<{ filter?: string }>;
 }) {
-  const { store } = await getVendorContext();
+  const { store } = await requireActiveVendorContext();
   const { filter = "all" } = await searchParams;
 
   const [summary, rows] = await Promise.all([

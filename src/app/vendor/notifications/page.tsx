@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Bell } from "lucide-react";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { timeAgo } from "@/lib/utils";
 import { markNotificationsReadAction } from "@/app/actions/vendor";
@@ -23,8 +23,7 @@ export default async function VendorNotificationsPage({
 }: {
   searchParams: Promise<{ filter?: string }>;
 }) {
-  const user = await getCurrentUser();
-  if (!user) return null;
+  const { user } = await requireActiveVendorContext();
   const { filter = "all" } = await searchParams;
 
   const rows = await systemDb.query<{ id: string; title: string; body: string | null; action_url: string | null; read_at: string | null; created_at: string; type: string }>(
