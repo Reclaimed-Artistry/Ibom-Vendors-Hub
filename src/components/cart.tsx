@@ -73,6 +73,40 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [items, ready]);
 
+  // Automatically remove any cart items whose product or storefront was deleted
+  useEffect(() => {
+    if (!ready || items.length === 0) return;
+    let cancelled = false;
+
+    async function syncLiveProducts() {
+      const ids = [...new Set(items.map((i) => i.productId).filter(Boolean))];
+      if (ids.length === 0) return;
+      try {
+        const res = await fetch(`/api/checkout-stores?productIds=${encodeURIComponent(ids.join(","))}`, {
+          cache: "no-store",
+        });
+        if (!res.ok || cancelled) return;
+        const data = (await res.json()) as { validProductIds?: string[] };
+        if (!Array.isArray(data.validProductIds)) return;
+        const validSet = new Set(data.validProductIds);
+        setItems((current) => {
+          const filtered = current.filter((item) => validSet.has(item.productId));
+          return filtered.length === current.length ? current : filtered;
+        });
+      } catch {
+        /* ignore transient network errors */
+      }
+    }
+
+    syncLiveProducts();
+    const onFocus = () => syncLiveProducts();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [ready, open, items.length]);
+
   const add = useCallback((item: CartItem) => {
     setItems((current) => {
       const index = current.findIndex((line) => sameLine(line, item));

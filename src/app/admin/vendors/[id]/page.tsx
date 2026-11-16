@@ -10,8 +10,15 @@ import { storeBase } from "@/lib/storefront-base";
 import { proofOfResidenceLabel } from "@/lib/akwa-ibom";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/utils";
 import { Badge, Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
-import { restoreStoreAction, setStoreVisibilityAction, verifyVendorKycAction } from "@/app/actions/admin";
+import {
+  adminDeleteProductAction,
+  adminDeleteStoreAction,
+  restoreStoreAction,
+  setStoreVisibilityAction,
+  verifyVendorKycAction,
+} from "@/app/actions/admin";
 import { SubmitButton } from "@/components/submit-button";
+import { ConfirmSubmit } from "@/components/confirm-button";
 import { GrantSubscriptionForm, SuspendStoreForm } from "@/components/admin-forms";
 import { KycDocumentReviewPanel } from "@/components/kyc-document-review";
 import type { VendorProfile } from "@/lib/types";
@@ -70,7 +77,7 @@ export default async function AdminVendorDetailPage({ params }: { params: Promis
       [store.id],
     ),
     systemDb.query<{ id: string; name: string; price: number; is_available: boolean }>(
-      `select id, name, price, is_available from products where store_id = $1 order by created_at desc limit 6`,
+      `select id, name, price, is_available from products where store_id = $1 order by created_at desc limit 24`,
       [store.id],
     ),
     systemDb.query<{ id: string; action: string; description: string | null; created_at: string; actor_role: string }>(
@@ -279,7 +286,19 @@ export default async function AdminVendorDetailPage({ params }: { params: Promis
                 {products.map((product) => (
                   <li key={product.id} className="flex items-center justify-between gap-2 px-5 py-2.5 text-sm">
                     <span className="truncate text-ink-800">{product.name}</span>
-                    <span className="shrink-0 text-xs text-ink-500">{formatMoney(Number(product.price))}</span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-xs text-ink-500">{formatMoney(Number(product.price))}</span>
+                      <form action={adminDeleteProductAction}>
+                        <input type="hidden" name="productId" value={product.id} />
+                        <input type="hidden" name="storeId" value={store.id} />
+                        <ConfirmSubmit
+                          className="btn btn-ghost btn-sm text-red-600 hover:bg-red-50"
+                          message={`Permanently delete product “${product.name}” from the site?`}
+                        >
+                          Delete
+                        </ConfirmSubmit>
+                      </form>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -334,6 +353,31 @@ export default async function AdminVendorDetailPage({ params }: { params: Promis
             <div className="card-pad">
               <GrantSubscriptionForm storeId={store.id} plans={plans.map((plan) => ({ id: plan.id, name: plan.name, price: Number(plan.price) }))} />
             </div>
+          </Card>
+
+          <Card className="border-red-200 bg-red-50/30">
+            <CardHeader
+              title="Delete storefront permanently"
+              description="Removes this storefront, all its products, images, and records from the site completely."
+            />
+            <form action={adminDeleteStoreAction} className="card-pad space-y-3">
+              <input type="hidden" name="storeId" value={store.id} />
+              <input type="hidden" name="redirectTo" value="/admin/vendors?deleted=1" />
+              <label className="block">
+                <span className="label text-xs">Reason (optional, sent to owner)</span>
+                <input
+                  name="reason"
+                  className="input bg-white text-xs"
+                  placeholder="e.g. Duplicate or fraudulent registration"
+                />
+              </label>
+              <ConfirmSubmit
+                className="btn-danger w-full"
+                message={`Permanently delete storefront “${store.name}” and all its products from the site? This cannot be undone.`}
+              >
+                Delete storefront permanently
+              </ConfirmSubmit>
+            </form>
           </Card>
         </div>
       </div>

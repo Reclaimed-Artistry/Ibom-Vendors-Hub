@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Check, ExternalLink, FileCheck2, ShieldCheck } from "lucide-react";
-import { saveStoreSettingsAction, saveVendorKycAction, type VendorState } from "@/app/actions/vendor";
+import { deleteOwnStoreAction, saveStoreSettingsAction, saveVendorKycAction, type VendorState } from "@/app/actions/vendor";
 import { requestSubdomainChangeAction, type ActionState } from "@/app/actions/auth";
 import { AKWA_IBOM_LGAS, AKWA_IBOM_STATE, PROOF_OF_RESIDENCE_TYPES } from "@/lib/akwa-ibom";
 import { Alert, Badge, Field } from "@/components/ui";
@@ -425,6 +425,48 @@ export function SubdomainRequestForm({ currentSlug, suggested }: { currentSlug: 
         <textarea id="subdomain-reason" name="reason" rows={2} className="textarea" placeholder="Rebrand, typo fix, etc." required />
       </Field>
       <SubdomainSubmit />
+    </form>
+  );
+}
+
+export function DeleteOwnStoreForm({ storeName, storeSlug }: { storeName: string; storeSlug: string }) {
+  const [state, formAction] = useActionState<VendorState, FormData>(deleteOwnStoreAction, {});
+  const [confirmText, setConfirmText] = useState("");
+  const matches =
+    confirmText.trim().toLowerCase() === storeName.trim().toLowerCase() ||
+    confirmText.trim().toLowerCase() === storeSlug.trim().toLowerCase();
+
+  return (
+    <form action={formAction} className="card card-pad space-y-3 border-red-200 bg-red-50/30">
+      <div>
+        <h2 className="text-base font-semibold text-red-950">Delete storefront permanently</h2>
+        <p className="mt-1 text-xs text-red-900/80">
+          Deleting your store permanently removes <strong>{storeName}</strong>, all its products, uploaded images, and
+          public storefront links from Ibom Vendors Hub immediately. This cannot be undone.
+        </p>
+      </div>
+      {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
+      <Field
+        label={`Type "${storeName}" to confirm`}
+        htmlFor="confirmStoreName"
+        required
+      >
+        <input
+          id="confirmStoreName"
+          name="confirmStoreName"
+          value={confirmText}
+          onChange={(e) => setConfirmText(e.target.value)}
+          className="input bg-white"
+          placeholder={storeName}
+          required
+        />
+      </Field>
+      <SubmitButton
+        className={`btn-danger w-full ${!matches ? "opacity-60" : ""}`}
+        pendingLabel="Deleting storefront…"
+      >
+        Delete storefront permanently
+      </SubmitButton>
     </form>
   );
 }

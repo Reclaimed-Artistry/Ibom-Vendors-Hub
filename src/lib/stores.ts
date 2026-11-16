@@ -7,6 +7,8 @@ import { logActivity } from "@/lib/audit";
 import { notify, notifyAdmins } from "@/lib/notifications";
 import { sendEmail } from "@/lib/email";
 import { url } from "@/lib/settings";
+import { deleteStoredFiles, deleteStoreStorageFolder } from "@/lib/storage";
+import type { Role } from "@/lib/db";
 
 export interface SubdomainCheck {
   available: boolean;
@@ -861,6 +863,203 @@ export async function getStoreOwnerEmail(storeId: string) {
        from stores s join users u on u.id = s.owner_id where s.id = $1`,
     [storeId],
   );
+}
+
+/**
+ * Permanently remove a product, all its variants/add-ons/images/reviews, any
+ * single-product flash announcements, and its uploaded storage assets.
+ */
+export async function deleteProductCompletely(input: {
+  productId: string;
+  storeId?: string;
+  actorId: string;
+  actorRole: Role;
+}): Promise<{ storeId: string; storeSlug: string; productSlug: string; productName: string } | null> {
+  const target = await systemDb.maybeOne<{
+    id: string;
+    store_id: string;
+    name: string;
+    slug: string;
+    store_slug: string;
+  }>(
+    `select p.id, p.store_id, p.name, p.slug, s.slug as store_slug
+       from products p
+       join stores s on s.id = p.store_id
+      where p.id = $1 and ($2::uuid is null or p.store_id = $2::uuid)`,
+    [input.productId, input.storeId ?? null],
+  );
+  if (!target) return null;
+
+  const images = await systemDb.query<{ url: string }>(
+    `select url from product_images where product_id = $1`,
+    [target.id],
+  );
+
+  await withSystem(async (db) => {
+    // Delete any store announcement that ONLY promoted this product so no dead promo remains
+    await db.execute(
+      `delete from announcements a
+        where a.store_id = $1
+          and exists (select 1 from announcement_products ap where ap.announcement_id = a.id and ap.product_id = $2)
+          and not exists (select 1 from announcement_products ap where ap.announcement_id = a.id and ap.product_id <> $2)`,
+      [target.store_id, target.id],
+    );
+
+    await db.execute(`delete from inventory_movements where product_id = $1`, [target.id]);
+    await db.execute(`delete from products where id = $1`, [target.id]);
+
+    await logActivity({
+      actorId: input.actorId,
+      actorRole: input.actorRole,
+      storeId: target.store_id,
+      action: "product.deleted",
+      entityType: "product",
+      entityId: target.id,
+      description: `Permanently deleted product ${target.name}`,
+    });
+  });
+
+  await deleteStoredFiles(images.map((img) => img.url));
+
+  return {
+    storeId: target.store_id,
+    storeSlug: target.store_slug,
+    productSlug: target.slug,
+    productName: target.name,
+  };
+}
+
+/**
+ * Permanently remove a storefront, its entire product catalogue, orders,
+ * messages, announcements, subscriptions, storage files, and vendor profile.
+ */
+export async function deleteStoreCompletely(input: {
+  storeId: string;
+  actorId: string;
+  actorRole: Role;
+  reason?: string;
+}): Promise<{ storeName: string; storeSlug: string; ownerId: string; ownerEmail: string } | null> {
+  const store = await systemDb.maybeOne<{
+    id: string;
+    owner_id: string;
+    name: string;
+    slug: string;
+    logo_url: string | null;
+    cover_url: string | null;
+    owner_email: string;
+    owner_name: string;
+    owner_role: string;
+    proof_url: string | null;
+  }>(
+    `select s.id, s.owner_id, s.name, s.slug, s.logo_url, s.cover_url,
+            u.email as owner_email, u.full_name as owner_name, u.role as owner_role,
+            vp.proof_of_residence_url as proof_url
+       from stores s
+       join users u on u.id = s.owner_id
+       left join vendor_profiles vp on vp.user_id = s.owner_id
+      where s.id = $1`,
+    [input.storeId],
+  );
+  if (!store) return null;
+
+  const [productImages, otherStoresCount] = await Promise.all([
+    systemDb.query<{ url: string }>(
+      `select pi.url
+         from product_images pi
+         join products p on p.id = pi.product_id
+        where p.store_id = $1`,
+      [store.id],
+    ),
+    systemDb.one<{ count: number }>(
+      `select count(*)::int as count from stores where owner_id = $1 and id <> $2`,
+      [store.owner_id, store.id],
+    ),
+  ]);
+
+  const downgradeVendor = otherStoresCount.count === 0 && store.owner_role === "vendor";
+
+  await withSystem(async (db) => {
+    await db.execute(`delete from refunds where store_id = $1`, [store.id]);
+    await db.execute(`delete from payments where store_id = $1`, [store.id]);
+    await db.execute(`delete from activity_logs where store_id = $1`, [store.id]);
+    await db.execute(`delete from stores where id = $1`, [store.id]);
+
+    if (downgradeVendor) {
+      await db.execute(`delete from vendor_profiles where user_id = $1`, [store.owner_id]);
+      await db.execute(`delete from user_roles where user_id = $1 and role = 'vendor'`, [store.owner_id]);
+      await db.execute(
+        `insert into user_roles (user_id, role) values ($1, 'customer') on conflict do nothing`,
+        [store.owner_id],
+      );
+      await db.execute(
+        `insert into customer_profiles (user_id) values ($1) on conflict do nothing`,
+        [store.owner_id],
+      );
+      await db.execute(`update users set role = 'customer', updated_at = now() where id = $1`, [
+        store.owner_id,
+      ]);
+    }
+
+    await logActivity({
+      actorId: input.actorId,
+      actorRole: input.actorRole,
+      storeId: null,
+      action: "store.deleted",
+      entityType: "store",
+      entityId: store.id,
+      description: `Permanently deleted storefront ${store.name} (${store.slug})${input.reason ? ` — ${input.reason}` : ""}`,
+      meta: { slug: store.slug, ownerEmail: store.owner_email },
+    });
+
+    if (input.actorRole === "admin" || input.actorRole === "super_admin") {
+      await notify({
+        userId: store.owner_id,
+        storeId: null,
+        type: "store_deleted",
+        title: "Storefront permanently deleted",
+        body: `${store.name} has been permanently removed from Ibom Vendors Hub.${input.reason ? ` Reason: ${input.reason}` : ""}`,
+        actionUrl: "/",
+        dedupeKey: `store-deleted:${store.id}`,
+      });
+    }
+  });
+
+  const urlsToPurge: Array<string | null> = [
+    store.logo_url,
+    store.cover_url,
+    ...productImages.map((img) => img.url),
+  ];
+  if (downgradeVendor && store.proof_url) {
+    urlsToPurge.push(store.proof_url);
+  }
+  await Promise.all([
+    deleteStoredFiles(urlsToPurge),
+    deleteStoreStorageFolder(store.slug),
+  ]);
+
+  if (input.actorRole === "admin" || input.actorRole === "super_admin") {
+    try {
+      await sendEmail({
+        to: store.owner_email,
+        template: "store_deleted",
+        data: {
+          name: store.owner_name,
+          storeName: store.name,
+          reason: input.reason,
+        },
+        dedupeKey: `store-deleted-email:${store.id}`,
+      });
+    } catch (err) {
+      console.error("[deleteStoreCompletely] Non-fatal email error:", err);
+    }
+  }
+
+  return {
+    storeName: store.name,
+    storeSlug: store.slug,
+    ownerId: store.owner_id,
+    ownerEmail: store.owner_email,
+  };
 }
 
 export { isUniqueViolation };

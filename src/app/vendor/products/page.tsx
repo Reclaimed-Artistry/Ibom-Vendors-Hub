@@ -16,10 +16,10 @@ const PAGE_SIZE = 12;
 export default async function VendorProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; page?: string; category?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; page?: string; category?: string; deleted?: string }>;
 }) {
   const { store } = await requireActiveVendorContext();
-  const { q, status, page: pageParam, category } = await searchParams;
+  const { q, status, page: pageParam, category, deleted } = await searchParams;
   const page = Math.max(1, Number(pageParam ?? 1) || 1);
 
   const filters: string[] = ["p.store_id = $1"];
@@ -82,6 +82,12 @@ export default async function VendorProductsPage({
         description="What customers see on your storefront, with pricing, stock and category-specific details."
         actions={<ButtonLink href="/vendor/products/new"><Plus className="size-4" /> Add product</ButtonLink>}
       />
+
+      {deleted ? (
+        <Alert tone="success" title="Product deleted">
+          The product and its images have been permanently removed from your storefront and the marketplace.
+        </Alert>
+      ) : null}
 
       <form className="card card-pad flex flex-wrap items-end gap-3" action="/vendor/products">
         <label className="min-w-48 flex-1">

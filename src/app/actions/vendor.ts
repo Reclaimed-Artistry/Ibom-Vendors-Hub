@@ -1,8 +1,14 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
-import { getVendorContext, getCurrentUser, vendorSuspensionMessage } from "@/lib/auth";
+import {
+  createSessionToken,
+  getCurrentUser,
+  getVendorContext,
+  setSessionCookie,
+  vendorSuspensionMessage,
+} from "@/lib/auth";
 import { systemDb, withActor } from "@/lib/db";
 import { logActivity } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
@@ -11,7 +17,7 @@ import { uploadImage, uploadVerificationDocument } from "@/lib/storage";
 import { AKWA_IBOM_STATE } from "@/lib/akwa-ibom";
 import { getSettings } from "@/lib/settings";
 import { updateOrderByVendor } from "@/lib/orders";
-import { resubmitStoreForReview } from "@/lib/stores";
+import { deleteProductCompletely, deleteStoreCompletely, resubmitStoreForReview } from "@/lib/stores";
 import { purchaseSubscription, getPlans } from "@/lib/subscriptions";
 import { productSchema, storeSettingsSchema, vendorKycSchema, quotationResponseSchema, formatIssues } from "@/lib/validation";
 import { toSlug } from "@/lib/utils";
@@ -287,17 +293,86 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
 
 export async function deleteProductAction(formData: FormData) {
   const ctx = await getVendorContext();
-  if (vendorSuspensionMessage(ctx)) redirect("/vendor/subscription?suspended=1");
-  const productId = String(formData.get("productId") ?? "");
-  await withActor({ id: ctx.user.id, role: "vendor", email: ctx.user.email }, async (db) => {
-    await db.execute(`delete from products where id = $1 and store_id = $2`, [productId, ctx.store.id]);
-    await logActivity(
-      { actorId: ctx.user.id, actorRole: "vendor", storeId: ctx.store.id, action: "product.deleted", entityType: "product", entityId: productId },
-      db,
-    );
-  });
+  if (ctx.isSubscriptionExpired || ctx.isManuallySuspended) {
+    redirect("/vendor/subscription?suspended=1");
+  }
+  const productId = String(formData.get("productId") ?? "").trim();
+  const redirectTo = String(formData.get("redirectTo") ?? "").trim();
+
+  if (productId) {
+    await deleteProductCompletely({
+      productId,
+      storeId: ctx.store.id,
+      actorId: ctx.user.id,
+      actorRole: "vendor",
+    });
+  }
+
+  revalidateTag("announcements");
+  revalidateTag("categories");
+  revalidatePath("/", "layout");
+  revalidatePath("/browse");
+  revalidatePath("/stores");
+  revalidatePath(`/s/${ctx.store.slug}`, "layout");
+  revalidatePath(`/s/${ctx.store.slug}/products`);
+  revalidatePath("/vendor");
   revalidatePath("/vendor/products");
-  revalidatePath(`/s/${ctx.store.slug}`);
+  revalidatePath("/admin");
+  revalidatePath(`/admin/vendors/${ctx.store.id}`);
+
+  if (redirectTo.startsWith("/vendor/products")) {
+    redirect(redirectTo);
+  }
+}
+
+export async function deleteOwnStoreAction(_prev: VendorState, formData: FormData): Promise<VendorState> {
+  const ctx = await getVendorContext();
+  const confirmText = String(formData.get("confirmStoreName") ?? "").trim();
+  if (
+    confirmText.toLowerCase() !== ctx.store.name.trim().toLowerCase() &&
+    confirmText.toLowerCase() !== ctx.store.slug.trim().toLowerCase()
+  ) {
+    return {
+      error: `Type "${ctx.store.name}" (or "${ctx.store.slug}") to confirm permanent storefront deletion.`,
+    };
+  }
+
+  const deleted = await deleteStoreCompletely({
+    storeId: ctx.store.id,
+    actorId: ctx.user.id,
+    actorRole: "vendor",
+    reason: "Deleted by storefront owner",
+  });
+  if (!deleted) {
+    return { error: "Storefront could not be found." };
+  }
+
+  const remainingStore = await systemDb.maybeOne<{ id: string }>(
+    `select id from stores where owner_id = $1 limit 1`,
+    [ctx.user.id],
+  );
+  if (!remainingStore && ctx.user.role === "vendor") {
+    const token = await createSessionToken({
+      sub: ctx.user.id,
+      email: ctx.user.email,
+      role: "customer",
+      name: ctx.user.fullName,
+    });
+    await setSessionCookie(token);
+  }
+
+  revalidateTag("announcements");
+  revalidateTag("categories");
+  revalidatePath("/", "layout");
+  revalidatePath("/browse");
+  revalidatePath("/stores");
+  revalidatePath(`/s/${deleted.storeSlug}`, "layout");
+  revalidatePath("/vendor");
+  revalidatePath("/admin");
+  revalidatePath("/admin/vendors");
+  revalidatePath("/admin/messages");
+
+  redirect(remainingStore ? "/vendor" : "/?storeDeleted=1");
 }
 
 export async function toggleProductAvailabilityAction(formData: FormData) {

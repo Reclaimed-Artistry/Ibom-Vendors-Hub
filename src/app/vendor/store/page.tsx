@@ -8,6 +8,7 @@ import { storefrontUrl } from "@/lib/domains";
 import { formatDate } from "@/lib/utils";
 import { Alert, Badge, Card, CardHeader, PageHeader } from "@/components/ui";
 import {
+  DeleteOwnStoreForm,
   StoreSettingsForm,
   SubdomainRequestForm,
   VendorKycForm,
@@ -126,6 +127,8 @@ export default async function VendorStorePage() {
             </p>
             <ContactPlatformLink />
           </Card>
+
+          <DeleteOwnStoreForm storeName={store.name} storeSlug={store.slug} />
         </div>
       </div>
     </div>

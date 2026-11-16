@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -123,4 +123,101 @@ export async function uploadImage(file: File, folder = "general"): Promise<strin
  */
 export async function uploadVerificationDocument(file: File, folder = "vendor-kyc"): Promise<string> {
   return storeBytes(file, folder, ALLOWED_DOCS, true);
+}
+
+/**
+ * Remove stored files (Supabase Storage public URLs or local /uploads/... paths).
+ * Best-effort and never throws, so DB deletion always completes cleanly.
+ */
+export async function deleteStoredFiles(urls: Array<string | null | undefined>): Promise<void> {
+  const unique = [...new Set(urls.map((u) => (u ?? "").trim()).filter(Boolean))];
+  if (unique.length === 0) return;
+
+  const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET || "storefronts";
+  const publicPrefix = supabaseUrl ? `${supabaseUrl}/storage/v1/object/public/${bucket}/` : "";
+
+  const bucketPaths: string[] = [];
+  for (const fileUrl of unique) {
+    if (fileUrl.startsWith("data:") || fileUrl.startsWith("/images/seed/")) continue;
+    if (publicPrefix && fileUrl.startsWith(publicPrefix)) {
+      const objectPath = decodeURIComponent(fileUrl.slice(publicPrefix.length).split("?")[0]);
+      if (objectPath) bucketPaths.push(objectPath);
+      continue;
+    }
+    if (fileUrl.startsWith("/uploads/") && !process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      const rel = fileUrl.replace(/^\/uploads\//, "").replace(/\.\./g, "");
+      if (rel) {
+        await unlink(path.join(process.cwd(), "public", "uploads", rel)).catch(() => {});
+      }
+    }
+  }
+
+  if (bucketPaths.length > 0 && supabaseUrl && serviceKey) {
+    try {
+      await fetch(`${supabaseUrl}/storage/v1/object/${bucket}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ prefixes: bucketPaths }),
+      });
+    } catch (err) {
+      console.warn("[storage] Non-fatal Supabase object cleanup error:", err);
+    }
+  }
+}
+
+/**
+ * Purge all objects stored under `stores/<slug>/...` when a storefront is deleted.
+ */
+export async function deleteStoreStorageFolder(slug: string): Promise<void> {
+  const cleanSlug = slug.replace(/[^a-z0-9-]/gi, "");
+  if (!cleanSlug) return;
+
+  const supabaseUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET || "storefronts";
+
+  if (supabaseUrl && serviceKey) {
+    for (const sub of ["products", "branding", "uploads", ""]) {
+      const prefix = sub ? `stores/${cleanSlug}/${sub}` : `stores/${cleanSlug}`;
+      try {
+        const listRes = await fetch(`${supabaseUrl}/storage/v1/object/list/${bucket}`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serviceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ prefix, limit: 200 }),
+        });
+        if (!listRes.ok) continue;
+        const items = (await listRes.json()) as Array<{ name?: string; id?: string | null }>;
+        const paths = items
+          .filter((item) => item.name && item.id)
+          .map((item) => `${prefix}/${item.name}`);
+        if (paths.length > 0) {
+          await fetch(`${supabaseUrl}/storage/v1/object/${bucket}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${serviceKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ prefixes: paths }),
+          });
+        }
+      } catch {
+        /* ignore non-fatal cleanup errors */
+      }
+    }
+  }
+
+  if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    await rm(path.join(process.cwd(), "public", "uploads", "stores", cleanSlug), {
+      recursive: true,
+      force: true,
+    }).catch(() => {});
+  }
 }

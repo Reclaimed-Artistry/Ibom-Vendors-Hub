@@ -8,7 +8,15 @@ import { logActivity } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
 import { retryFailedEmails, sendEmail } from "@/lib/email";
 import { emailFrom, getSettings, paystackSecret, resendKey, url } from "@/lib/settings";
-import { approveStore, rejectStore, restoreStore, suspendStore, checkSubdomain } from "@/lib/stores";
+import {
+  approveStore,
+  checkSubdomain,
+  deleteProductCompletely,
+  deleteStoreCompletely,
+  rejectStore,
+  restoreStore,
+  suspendStore,
+} from "@/lib/stores";
 import { checkPaystackCredentials } from "@/lib/payments/gateway";
 import { adminGrantSubscription } from "@/lib/subscriptions";
 import { formatIssues, categorySchema } from "@/lib/validation";
@@ -103,6 +111,69 @@ export async function restoreStoreAction(formData: FormData) {
   await restoreStore(storeId, user.id);
   revalidatePath("/admin/vendors");
   revalidatePath(`/admin/vendors/${storeId}`);
+}
+
+export async function adminDeleteStoreAction(formData: FormData) {
+  const user = await admin();
+  const storeId = String(formData.get("storeId") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "").trim() || "Removed by platform administrator";
+  const redirectTo = String(formData.get("redirectTo") ?? "").trim();
+  if (!storeId) return;
+
+  const deleted = await deleteStoreCompletely({
+    storeId,
+    actorId: user.id,
+    actorRole: user.role,
+    reason,
+  });
+
+  revalidateTag("announcements");
+  revalidateTag("categories");
+  revalidatePath("/", "layout");
+  revalidatePath("/browse");
+  revalidatePath("/stores");
+  if (deleted?.storeSlug) {
+    revalidatePath(`/s/${deleted.storeSlug}`, "layout");
+  }
+  revalidatePath("/admin");
+  revalidatePath("/admin/vendors");
+  revalidatePath("/admin/messages");
+  revalidatePath("/admin/subscriptions");
+  revalidatePath("/vendor");
+
+  if (redirectTo.startsWith("/admin/")) {
+    redirect(redirectTo);
+  }
+}
+
+export async function adminDeleteProductAction(formData: FormData) {
+  const user = await admin();
+  const productId = String(formData.get("productId") ?? "").trim();
+  const storeId = String(formData.get("storeId") ?? "").trim() || undefined;
+  if (!productId) return;
+
+  const deleted = await deleteProductCompletely({
+    productId,
+    storeId,
+    actorId: user.id,
+    actorRole: user.role,
+  });
+
+  revalidateTag("announcements");
+  revalidateTag("categories");
+  revalidatePath("/", "layout");
+  revalidatePath("/browse");
+  revalidatePath("/stores");
+  if (deleted?.storeSlug) {
+    revalidatePath(`/s/${deleted.storeSlug}`, "layout");
+    revalidatePath(`/s/${deleted.storeSlug}/products`);
+  }
+  revalidatePath("/vendor");
+  revalidatePath("/vendor/products");
+  revalidatePath("/admin");
+  if (deleted?.storeId) {
+    revalidatePath(`/admin/vendors/${deleted.storeId}`);
+  }
 }
 
 export async function setStoreVisibilityAction(formData: FormData) {

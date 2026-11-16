@@ -161,6 +161,13 @@ function template(name: string, data: EmailData): RenderedEmail {
         cta: { label: "Update verification documents", href: url("/vendor/store") },
         footnote: "Once you upload updated verification documents in your Store Profile, our team will re-review your application within 48 hours.",
       };
+    case "store_deleted":
+      return {
+        subject: `Storefront permanently removed — ${data.storeName ?? ""}`.trim(),
+        heading: "Storefront deleted",
+        intro: `Hi ${data.name ?? "there"}, the storefront ${data.storeName ?? ""} and its catalogue have been permanently deleted from Ibom Vendors Hub.${data.reason ? ` Reason: ${data.reason}` : ""}`,
+        cta: { label: "Visit Ibom Vendors Hub", href: site },
+      };
     case "customer_welcome":
       return {
         subject: "Welcome to Ibom Vendors Hub",

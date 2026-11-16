@@ -127,10 +127,11 @@ export default async function EditProductPage({
       </div>
       <div className="mt-6 rounded-2xl border border-red-100 bg-white p-4">
         <h2 className="text-sm font-semibold text-ink-900">Delete product</h2>
-        <p className="mt-1 text-sm text-ink-500">Removes it from your storefront. Past orders keep their records.</p>
+        <p className="mt-1 text-sm text-ink-500">Permanently removes this product and its uploaded images from the entire site.</p>
         <form action={deleteProductAction} className="mt-3">
           <input type="hidden" name="productId" value={product.id} />
-          <ConfirmSubmit message={`Delete “${product.name}”? This cannot be undone.`}>Delete this product</ConfirmSubmit>
+          <input type="hidden" name="redirectTo" value="/vendor/products?deleted=1" />
+          <ConfirmSubmit message={`Permanently delete “${product.name}” from the site? This cannot be undone.`}>Delete this product</ConfirmSubmit>
         </form>
       </div>
     </div>

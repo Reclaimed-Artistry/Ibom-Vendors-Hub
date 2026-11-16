@@ -5,8 +5,10 @@ import { requireAdmin } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { storefrontUrl } from "@/lib/domains";
 import { formatDate } from "@/lib/utils";
-import { Badge, EmptyState, PageHeader, Pagination, Tabs } from "@/components/ui";
+import { Alert, Badge, EmptyState, PageHeader, Pagination, Tabs } from "@/components/ui";
 import { ReviewCountdown } from "@/components/review-countdown";
+import { ConfirmSubmit } from "@/components/confirm-button";
+import { adminDeleteStoreAction } from "@/app/actions/admin";
 
 export const metadata: Metadata = { title: "Vendors · Admin" };
 
@@ -15,10 +17,10 @@ const PAGE_SIZE = 20;
 export default async function AdminVendorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string; deleted?: string }>;
 }) {
   await requireAdmin();
-  const { status = "all", q, page: pageParam } = await searchParams;
+  const { status = "all", q, page: pageParam, deleted } = await searchParams;
   const page = Math.max(1, Number(pageParam ?? 1) || 1);
 
   const params: unknown[] = [];
@@ -88,7 +90,13 @@ export default async function AdminVendorsPage({
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Vendors" description="Every storefront on the platform. Suspension never deletes data." />
+      <PageHeader title="Vendors" description="Every storefront on the platform. Suspension preserves data; deletion removes the storefront completely." />
+
+      {deleted ? (
+        <Alert tone="success" title="Storefront permanently deleted">
+          The storefront, all its products, and its uploaded files have been completely removed from the site.
+        </Alert>
+      ) : null}
 
       <Tabs
         links={[
@@ -128,6 +136,7 @@ export default async function AdminVendorsPage({
                 <th className="text-center">Orders</th>
                 <th>Status</th>
                 <th>Joined</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -158,6 +167,22 @@ export default async function AdminVendorsPage({
                     {store.visibility === "unlisted" ? <p className="mt-1 text-[11px] text-ink-400">unlisted</p> : null}
                   </td>
                   <td className="text-xs text-ink-500">{formatDate(store.created_at)}</td>
+                  <td className="text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Link href={`/admin/vendors/${store.id}`} className="btn btn-ghost btn-sm">
+                        Manage
+                      </Link>
+                      <form action={adminDeleteStoreAction}>
+                        <input type="hidden" name="storeId" value={store.id} />
+                        <ConfirmSubmit
+                          className="btn btn-ghost btn-sm text-red-600 hover:bg-red-50"
+                          message={`Permanently delete storefront “${store.name}” and all its products from the site?`}
+                        >
+                          Delete
+                        </ConfirmSubmit>
+                      </form>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
