@@ -3,7 +3,7 @@ import { Search, Store, Truck, UserRound } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { CartButton, CartDrawer } from "@/components/cart";
 import { getCurrentUser } from "@/lib/auth";
-import { getSettings } from "@/lib/settings";
+import { getSettings, shortPlatformName } from "@/lib/settings";
 
 export async function SiteHeader() {
   const [user, settings] = await Promise.all([getCurrentUser(), getSettings()]);
@@ -38,7 +38,7 @@ export async function SiteHeader() {
           </Link>
           <CartButton />
           <Link href="/register" className="btn-primary hidden whitespace-nowrap sm:inline-flex">
-            Sell on {settings.platform_name.split(" ")[0]}
+            Sell on {shortPlatformName(settings.platform_name)}
           </Link>
         </nav>
       </div>

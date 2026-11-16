@@ -66,6 +66,16 @@ const cachedSettings = unstable_cache(loadSettings, ["platform-settings"], {
 
 export const getSettings = cache(cachedSettings);
 
+/**
+ * Compact form of the platform name for tight spots like the header CTA:
+ * "Ibom Vendors Hub" → "Ibom VH" (first word kept, the rest as initials).
+ */
+export function shortPlatformName(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return words[0] ?? "";
+  return [words[0], words.slice(1).map((word) => word[0]?.toUpperCase() ?? "").join("")].join(" ");
+}
+
 export function paystackSecret(settings: PlatformSettings) {
   return settings.paystack_secret_key || process.env.PAYSTACK_SECRET_KEY || "";
 }
