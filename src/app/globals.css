@@ -142,3 +142,32 @@
   .prose-site li { @apply mb-1 text-sm leading-7 text-ink-600; }
   .divider { @apply my-5 h-px w-full bg-ink-100; }
 }
+
+/* Announcement ticker: right → left, seamless (the row is duplicated). */
+@keyframes ivh-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.ivh-marquee {
+  animation-name: ivh-marquee;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-duration: 24s;
+  will-change: transform;
+}
+
+.ivh-marquee:hover,
+.ivh-marquee:focus-within {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ivh-marquee {
+    animation: none;
+  }
+}

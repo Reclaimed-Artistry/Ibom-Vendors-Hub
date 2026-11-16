@@ -6,6 +6,7 @@ import { CartButton, CartDrawer } from "@/components/cart";
 import { resolveStore } from "@/lib/storefront";
 import { storeBase } from "@/lib/storefront-base";
 import { Logo } from "@/components/logo";
+import { CustomerAnnouncements } from "@/components/announcement-strip";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
@@ -68,6 +69,7 @@ export default async function StorefrontLayout({
           </div>
         ) : null}
       </header>
+      <CustomerAnnouncements storeId={store.id} />
       <main className="flex-1">{children}</main>
       <footer className="border-t border-ink-100 bg-white py-8">
         <div className="container-page flex flex-col items-center justify-between gap-3 text-xs text-ink-400 sm:flex-row">

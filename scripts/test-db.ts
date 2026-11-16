@@ -169,6 +169,86 @@ async function main() {
   );
   check("Google sign-in switch has a sane default", typeof toggle?.google_signin_enabled === "boolean", toggle);
 
+
+  console.log("\nAnnouncements");
+  const annTables = await systemDb.query<{ tablename: string; rowsecurity: boolean }>(
+    `select tablename, rowsecurity from pg_tables
+      where schemaname = 'public' and tablename in ('announcements','announcement_products')
+      order by tablename`,
+  );
+  check(
+    "announcement tables exist with RLS on",
+    annTables.length === 2 && annTables.every((row) => row.rowsecurity),
+    annTables,
+  );
+
+  if (storeA) {
+    const ownerA = await systemDb.one<{ email: string }>(`select email from users where id = $1`, [storeA.owner_id]);
+    const actorA = { id: storeA.owner_id, role: "vendor" as const, email: ownerA.email };
+
+    const published = await withActor(actorA, (db) =>
+      db.maybeOne<{ id: string }>(
+        `insert into announcements (scope, store_id, audience, kind, title, message)
+         values ('store', $1, 'customers', 'flash_sale', 'RLS probe', 'probe') returning id`,
+        [storeA.id],
+      ),
+    );
+    check("a vendor can publish to their own storefront", Boolean(published));
+
+    if (published) {
+      const anonView = await withPublic((db) =>
+        db.maybeOne<{ id: string }>(`select id from announcements where id = $1`, [published.id]),
+      );
+      check("shoppers can read a live storefront announcement", Boolean(anonView));
+
+      await systemDb.execute(
+        `update announcements set ends_at = now() - interval '1 hour' where id = $1`,
+        [published.id],
+      );
+      const afterEnd = await withPublic((db) =>
+        db.maybeOne<{ id: string }>(`select id from announcements where id = $1`, [published.id]),
+      );
+      check("a finished announcement drops out of the ticker feed", !afterEnd);
+      await systemDb.execute(`delete from announcements where id = $1`, [published.id]);
+    }
+
+    if (storeB) {
+      const ownerB = await systemDb.one<{ email: string }>(`select email from users where id = $1`, [storeB.owner_id]);
+      let blocked = false;
+      try {
+        await withActor({ id: storeB.owner_id, role: "vendor", email: ownerB.email }, (db) =>
+          db.query(
+            `insert into announcements (scope, store_id, audience, kind, title, message)
+             values ('store', $1, 'customers', 'info', 'cross tenant', 'probe')`,
+            [storeA.id],
+          ),
+        );
+      } catch {
+        blocked = true;
+      }
+      check("a vendor cannot publish into another store", blocked);
+    }
+
+    const platformProbe = await systemDb.maybeOne<{ id: string }>(
+      `insert into announcements (scope, audience, kind, title, message)
+       values ('platform', 'vendors', 'warning', 'vendor only probe', 'probe') returning id`,
+    );
+    if (platformProbe) {
+      const anonSees = await withPublic((db) =>
+        db.maybeOne<{ id: string }>(`select id from announcements where id = $1`, [platformProbe.id]),
+      );
+      check("vendor-only platform notices stay off the public site", !anonSees);
+      const adminRow = await systemDb.maybeOne<{ id: string }>(`select id from users where role = 'super_admin' limit 1`);
+      if (adminRow) {
+        const adminSees = await withActor({ id: adminRow.id, role: "super_admin", email: null }, (db) =>
+          db.maybeOne<{ id: string }>(`select id from announcements where id = $1`, [platformProbe.id]),
+        );
+        check("admins can read the notices they publish", Boolean(adminSees));
+      }
+      await systemDb.execute(`delete from announcements where id = $1`, [platformProbe.id]);
+    }
+  }
+
   console.log(`\n${checks - failures}/${checks} checks passed`);
   if (failures > 0) process.exitCode = 1;
   process.exit(failures > 0 ? 1 : 0);

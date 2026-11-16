@@ -38,7 +38,7 @@ export default async function AdminSettingsPage() {
                 sandboxPayments: settings.sandbox_payments,
                 maintenanceMode: settings.maintenance_mode,
                 paystackPublicKey: settings.paystack_public_key ?? "",
-                paystackSecretKey: settings.paystack_secret_key ?? "",
+                hasPaystackSecret: Boolean(settings.paystack_secret_key || process.env.PAYSTACK_SECRET_KEY),
                 emailFrom: settings.email_from ?? "",
               }}
             />

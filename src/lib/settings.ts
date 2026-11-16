@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { systemDb } from "@/lib/db";
 import type { PlatformSettings } from "@/lib/types";
 import { appUrl, rootDomain } from "@/lib/domains";
@@ -34,7 +35,7 @@ const DEFAULTS: PlatformSettings = {
   maintenance_mode: false,
 };
 
-export const getSettings = cache(async (): Promise<PlatformSettings> => {
+async function loadSettings(): Promise<PlatformSettings> {
   try {
     const row = await systemDb.maybeOne<PlatformSettings>(
       `select * from platform_settings where id = 1`,
@@ -50,7 +51,20 @@ export const getSettings = cache(async (): Promise<PlatformSettings> => {
   } catch {
     return DEFAULTS;
   }
+}
+
+/**
+ * Settings power the header, footer and money formatting on every page, so the
+ * row is cached across requests instead of costing a database round trip per
+ * render. `cache()` still de-duplicates within a request; settings writes call
+ * revalidateTag("settings") so a save is visible on the next paint.
+ */
+const cachedSettings = unstable_cache(loadSettings, ["platform-settings"], {
+  tags: ["settings"],
+  revalidate: 300,
 });
+
+export const getSettings = cache(cachedSettings);
 
 export function paystackSecret(settings: PlatformSettings) {
   return settings.paystack_secret_key || process.env.PAYSTACK_SECRET_KEY || "";

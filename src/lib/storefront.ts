@@ -1,3 +1,5 @@
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { withPublic, systemDb } from "@/lib/db";
 import type { Product, Store, StoreCategory } from "@/lib/types";
 
@@ -23,34 +25,46 @@ function offlineReason(store: Store): string | undefined {
  * Resolve a storefront by subdomain slug through the public RLS context, so a
  * store that is suspended/expired/pending is *invisible to the database*, not
  * merely hidden by the UI.
+ *
+ * The store and its category come back in one statement (the layout, the page
+ * and generateMetadata all need them), and `cache()` makes those three callers
+ * share a single lookup per request.
  */
-export async function resolveStore(slug: string): Promise<StoreResolution> {
+export const resolveStore = cache(async (slug: string): Promise<StoreResolution> => {
   const clean = slug.toLowerCase();
-  const visible = await withPublic(async (db) =>
-    db.maybeOne<Store>(`select * from stores where slug = $1`, [clean]),
+
+  const visible = await withPublic((db) =>
+    db.maybeOne<Store & { category_row: StoreCategory | null }>(
+      `select s.*, to_jsonb(c) as category_row
+         from stores s
+         left join store_categories c on c.id = s.category_id
+        where s.slug = $1`,
+      [clean],
+    ),
   );
 
-  if (visible) {
-    const category = visible.category_id
-      ? await withPublic(async (db) =>
-          db.maybeOne<StoreCategory>(`select * from store_categories where id = $1`, [visible.category_id!]),
-        )
-      : null;
-    return { store: { ...visible, category }, category, live: true };
-  }
+  if (visible) return shape(visible, true);
 
   // The public view returned nothing: find out why (server-side only) so we can
   // show a helpful "store offline" page instead of a 404.
-  const exists = await systemDb.maybeOne<Store>(`select * from stores where slug = $1`, [clean]);
+  const exists = await systemDb.maybeOne<Store & { category_row: StoreCategory | null }>(
+    `select s.*, to_jsonb(c) as category_row
+       from stores s
+       left join store_categories c on c.id = s.category_id
+      where s.slug = $1`,
+    [clean],
+  );
   if (!exists) return { store: null, category: null, live: false, reason: undefined };
-  const category = exists.category_id
-    ? await systemDb.maybeOne<StoreCategory>(`select * from store_categories where id = $1`, [exists.category_id])
-    : null;
+  return shape(exists, false);
+});
+
+function shape(row: Store & { category_row: StoreCategory | null }, live: boolean): StoreResolution {
+  const { category_row: category, ...store } = row;
   return {
-    store: { ...exists, category },
+    store: { ...store, category } as Store,
     category,
-    live: false,
-    reason: offlineReason(exists),
+    live,
+    reason: live ? undefined : offlineReason(store as Store),
   };
 }
 
@@ -269,11 +283,17 @@ export async function getCategoriesWithCounts() {
   );
 }
 
-export async function getStoreCategories() {
-  return withPublic(async (db) =>
-    db.query<StoreCategory>(`select * from store_categories where is_active = true order by sort_order, name`),
-  );
-}
+/** Taxonomy changes rarely; cached across requests and invalidated on save. */
+export const getStoreCategories = cache(
+  unstable_cache(
+    async () =>
+      withPublic(async (db) =>
+        db.query<StoreCategory>(`select * from store_categories where is_active = true order by sort_order, name`),
+      ),
+    ["store-categories"],
+    { tags: ["categories"], revalidate: 300 },
+  ),
+);
 
 export async function getStoreReviews(storeId: string, limit = 6, productId?: string) {
   return withPublic(async (db) =>

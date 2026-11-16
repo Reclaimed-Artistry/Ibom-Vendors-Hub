@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin, getCurrentUser } from "@/lib/auth";
 import { systemDb, withSystem } from "@/lib/db";
@@ -278,6 +278,7 @@ export async function saveCategoryAction(_prev: AdminState, formData: FormData):
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Category could not be saved" };
   }
+  revalidateTag("categories");
   revalidatePath("/admin/categories");
   revalidatePath("/browse");
   return { message: "Category saved." };
@@ -288,6 +289,7 @@ export async function toggleCategoryAction(formData: FormData) {
   const id = String(formData.get("categoryId") ?? "");
   const active = formData.get("active") === "true";
   await systemDb.execute(`update store_categories set is_active = $2 where id = $1`, [id, active]);
+  revalidateTag("categories");
   revalidatePath("/admin/categories");
   revalidatePath("/browse");
 }
@@ -471,6 +473,7 @@ export async function saveGoogleSignInAction(_prev: AdminState, formData: FormDa
     meta: { clientIdSuffix: clientId.slice(-28), secretUpdated: Boolean(clientSecret), enabled },
   });
 
+  revalidateTag("settings");
   revalidatePath("/admin/settings");
   revalidatePath("/login");
   revalidatePath("/register/customer");
@@ -511,7 +514,8 @@ export async function savePlatformSettingsAction(_prev: AdminState, formData: Fo
            platform_name=$1, tagline=$2, support_email=$3, support_phone=$4, main_domain=$5,
            commission_rate=$6, default_trial_days=$7, grace_period_days=$8,
            require_vendor_approval=$9, payments_enabled=$10, sandbox_payments=$11,
-           maintenance_mode=$12, paystack_public_key=$13, paystack_secret_key=$14, email_from=$15, updated_at=now()
+           maintenance_mode=$12, paystack_public_key=$13,
+           paystack_secret_key=coalesce(nullif($14,''), paystack_secret_key), email_from=$15, updated_at=now()
          where id = 1`,
         [
           str("platformName") || "Ibom Vendors Hub",
@@ -539,7 +543,9 @@ export async function savePlatformSettingsAction(_prev: AdminState, formData: Fo
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Settings could not be saved" };
   }
+  revalidateTag("settings");
   revalidatePath("/admin/settings");
+  revalidatePath("/", "layout");
   return { message: "Platform settings saved." };
 }
 

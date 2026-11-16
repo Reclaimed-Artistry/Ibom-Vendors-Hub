@@ -8,6 +8,7 @@ import { storefrontPath } from "@/lib/domains";
 import { Badge } from "@/components/ui";
 import { DashboardNav, LogoutButton, MobileNav, type DashboardNavItem } from "@/components/dashboard-nav";
 import { Logo } from "@/components/logo";
+import { VendorAnnouncements } from "@/components/announcement-strip";
 
 export const metadata: Metadata = { title: "Vendor dashboard · Ibom Vendors Hub" };
 
@@ -36,6 +37,7 @@ export default async function VendorLayout({ children }: { children: React.React
     { href: "/vendor", label: "Overview", icon: "overview" },
     { href: "/vendor/orders", label: "Orders", icon: "orders", badge: counts?.orders || undefined },
     { href: "/vendor/products", label: "Products & services", icon: "products" },
+    { href: "/vendor/announcements", label: "Announcements", icon: "announcements" },
     { href: "/vendor/categories", label: "Categories", icon: "categories" },
     { href: "/vendor/quotations", label: "Quotations", icon: "quotations", badge: counts?.quotations || undefined },
     { href: "/vendor/bookings", label: "Bookings", icon: "bookings", badge: counts?.bookings || undefined },
@@ -52,6 +54,7 @@ export default async function VendorLayout({ children }: { children: React.React
 
   return (
     <div className="min-h-screen bg-ink-50">
+      <VendorAnnouncements />
       <div className="mx-auto flex max-w-[1440px] gap-6 px-4 py-5 lg:px-8">
         <aside className="hidden w-64 shrink-0 lg:block">
           <div className="sticky top-5 space-y-4">

@@ -30,6 +30,8 @@ const expectations: Array<{ path: string; status: number[]; name?: string }> = [
   { path: "/vendor", status: [307, 302], name: "vendor area redirects anonymous visitors" },
   { path: "/admin", status: [307, 302], name: "admin area redirects anonymous visitors" },
   { path: "/admin/emails", status: [307, 302], name: "email console redirects anonymous visitors" },
+  { path: "/admin/announcements", status: [307, 302], name: "announcement console redirects anonymous visitors" },
+  { path: "/vendor/announcements", status: [307, 302], name: "vendor announcement composer redirects anonymous visitors" },
   { path: "/account", status: [307, 302], name: "account area redirects anonymous visitors" },
 ];
 

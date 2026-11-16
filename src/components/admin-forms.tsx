@@ -272,7 +272,8 @@ export interface PlatformSettingsValues {
   sandboxPayments: boolean;
   maintenanceMode: boolean;
   paystackPublicKey: string;
-  paystackSecretKey: string;
+  /** Only whether one is stored — the value never leaves the server. */
+  hasPaystackSecret: boolean;
   emailFrom: string;
 }
 
@@ -309,8 +310,23 @@ export function PlatformSettingsForm({ values }: { values: PlatformSettingsValue
         <Field label="Paystack public key" htmlFor="paystackPublicKey">
           <input id="paystackPublicKey" name="paystackPublicKey" className="input" defaultValue={values.paystackPublicKey} />
         </Field>
-        <Field label="Paystack secret key" htmlFor="paystackSecretKey" hint="Stored server-side only; never sent to the browser.">
-          <input id="paystackSecretKey" name="paystackSecretKey" type="password" className="input" defaultValue={values.paystackSecretKey} />
+        <Field
+          label="Paystack secret key"
+          htmlFor="paystackSecretKey"
+          hint={
+            values.hasPaystackSecret
+              ? "Stored server-side and never displayed. Leave blank to keep it."
+              : "Stored server-side and never displayed."
+          }
+        >
+          <input
+            id="paystackSecretKey"
+            name="paystackSecretKey"
+            type="password"
+            className="input"
+            placeholder={values.hasPaystackSecret ? "•••••••• already stored" : "sk_test_… / sk_live_…"}
+            autoComplete="new-password"
+          />
         </Field>
         <Field label="Email from address" htmlFor="emailFrom">
           <input id="emailFrom" name="emailFrom" className="input" defaultValue={values.emailFrom} />
