@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { getSettings } from "@/lib/settings";
 import { getCategoriesWithCounts } from "@/lib/storefront";
+import { normalisePhone } from "@/lib/utils";
 
 export async function SiteFooter() {
   const [settings, categories] = await Promise.all([getSettings(), getCategoriesWithCounts()]);
@@ -12,9 +13,9 @@ export async function SiteFooter() {
           <Logo height={54} />
           <p className="mt-4 max-w-xs text-sm leading-6 text-ink-500">{settings.tagline}</p>
           <p className="mt-4 text-sm text-ink-500">
-            {settings.support_email}
+            <a className="hover:text-brand-800" href={`mailto:${settings.support_email}`}>{settings.support_email}</a>
             <br />
-            {settings.support_phone}
+            <a className="hover:text-brand-800" href={`tel:${normalisePhone(settings.support_phone)}`}>{settings.support_phone}</a>
           </p>
         </div>
         <div>

@@ -2,6 +2,7 @@ import { ContactForm } from "@/components/contact-form";
 import { Card } from "@/components/ui";
 import { getSettings } from "@/lib/settings";
 import { getCurrentUser } from "@/lib/auth";
+import { normalisePhone } from "@/lib/utils";
 
 export const metadata = { title: "Contact support" };
 
@@ -17,8 +18,14 @@ export default async function ContactPage() {
             will reply within one business day.
           </p>
           <div className="mt-6 space-y-3 text-sm text-ink-600">
-            <p><span className="font-semibold text-ink-900">Email:</span> {settings.support_email}</p>
-            <p><span className="font-semibold text-ink-900">Phone:</span> {settings.support_phone}</p>
+            <p>
+              <span className="font-semibold text-ink-900">Email:</span>{" "}
+              <a className="hover:text-brand-800" href={`mailto:${settings.support_email}`}>{settings.support_email}</a>
+            </p>
+            <p>
+              <span className="font-semibold text-ink-900">Phone:</span>{" "}
+              <a className="hover:text-brand-800" href={`tel:${normalisePhone(settings.support_phone)}`}>{settings.support_phone}</a>
+            </p>
             <p><span className="font-semibold text-ink-900">Hours:</span> Monday – Saturday, 8:00 – 18:00 WAT</p>
           </div>
           <div className="mt-6 rounded-xl border border-ink-100 bg-white p-4 text-sm text-ink-500">

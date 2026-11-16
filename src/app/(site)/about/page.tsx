@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSettings } from "@/lib/settings";
+import { normalisePhone } from "@/lib/utils";
 
 export const metadata = { title: "About" };
 
@@ -30,7 +31,8 @@ export default async function AboutPage() {
       </ul>
       <h2>Contact</h2>
       <p>
-        {settings.support_email} · {settings.support_phone}
+        <a className="underline" href={`mailto:${settings.support_email}`}>{settings.support_email}</a> ·{" "}
+        <a className="underline" href={`tel:${normalisePhone(settings.support_phone)}`}>{settings.support_phone}</a>
       </p>
       <p><Link href="/register" className="font-semibold text-brand-800 underline">Open your storefront today</Link>.</p>
     </div>

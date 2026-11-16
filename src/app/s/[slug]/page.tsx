@@ -4,7 +4,7 @@ import { Clock, Mail, MapPin, Phone, Star, Truck, Package, Store as StoreIcon, C
 import { resolveStore, getStoreProducts, getStoreReviews, storeOpenState } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
 import { storeBase } from "@/lib/storefront-base";
-import { formatMoney, formatDate, truncate } from "@/lib/utils";
+import { formatMoney, formatDate, truncate, normalisePhone } from "@/lib/utils";
 import { Badge, ButtonLink, Card } from "@/components/ui";
 import { ContactForm } from "@/components/contact-form";
 
@@ -186,7 +186,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
           <Card className="card-pad">
             <h2 className="text-sm font-semibold text-ink-900">Store details</h2>
             <ul className="mt-3 space-y-2.5 text-sm text-ink-600">
-              {store.phone ? <li className="flex items-center gap-2"><Phone className="size-4 text-ink-400" /> {store.phone}</li> : null}
+              {store.phone ? <li className="flex items-center gap-2"><Phone className="size-4 text-ink-400" /> <a className="hover:text-brand-800" href={`tel:${normalisePhone(store.phone)}`}>{store.phone}</a></li> : null}
               {store.email ? <li className="flex items-center gap-2 break-all"><Mail className="size-4 text-ink-400" /> {store.email}</li> : null}
               <li className="flex items-start gap-2"><MapPin className="mt-0.5 size-4 text-ink-400" /> {store.address ? `${store.address}, ` : ""}{store.city}, {store.state}</li>
               {features.operatingHours ? <li className="flex items-start gap-2"><CalendarClock className="mt-0.5 size-4 text-ink-400" /> {openState.label}</li> : null}
