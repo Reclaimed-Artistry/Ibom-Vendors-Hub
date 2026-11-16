@@ -17,6 +17,12 @@ export const metadata: Metadata = {
   },
 };
 
+// Every page renders tenant-scoped, per-request data (the storefront host header,
+// the signed-in user, live catalogue rows). Rendering them on demand keeps one
+// tenant's HTML from being cached and served to another, and keeps the build from
+// depending on database availability.
+export const dynamic = "force-dynamic";
+
 export const viewport: Viewport = {
   themeColor: "#065f46",
   width: "device-width",

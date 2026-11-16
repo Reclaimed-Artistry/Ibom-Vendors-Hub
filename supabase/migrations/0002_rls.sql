@@ -22,13 +22,22 @@ begin
 end $$;
 
 -- On managed Postgres (Supabase, RDS) the application connects as a non-superuser
--- such as `postgres`, which must be a member of app_runtime to run SET ROLE.
+-- such as `postgres`, which must be a member of app_runtime *with the SET
+-- option* to run `set local role`. A plain GRANT can land with SET disabled on
+-- managed platforms, so the options are always spelled out (0005 re-runs this
+-- for databases that were migrated earlier).
 do $$
+declare
+  opts text := case
+    when current_setting('server_version_num')::int >= 160000
+      then ' with admin false, inherit true, set true'
+    else ''
+  end;
 begin
-  if exists (select 1 from pg_roles where rolname = 'postgres')
-     and not pg_has_role('postgres', 'app_runtime', 'member') then
-    execute 'grant app_runtime to postgres';
+  if exists (select 1 from pg_roles where rolname = 'postgres') then
+    execute format('grant app_runtime to postgres%s', opts);
   end if;
+  execute format('grant app_runtime to %I%s', current_user, opts);
 end $$;
 
 grant usage on schema public to app_runtime;
