@@ -53,6 +53,15 @@ export async function uploadImage(file: File, folder = "general"): Promise<strin
     return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${objectPath}`;
   }
 
+  // Serverless filesystems are read-only (and wiped between invocations), so a
+  // file written there would 404 the moment the response finished. Refusing is
+  // louder and safer than handing back a URL that cannot resolve.
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    throw new Error(
+      "Image storage is not configured on this deployment. Set NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SUPABASE_STORAGE_BUCKET.",
+    );
+  }
+
   const directory = path.join(process.cwd(), "public", "uploads", safeFolder);
   await mkdir(directory, { recursive: true });
   await writeFile(path.join(directory, filename), bytes);
