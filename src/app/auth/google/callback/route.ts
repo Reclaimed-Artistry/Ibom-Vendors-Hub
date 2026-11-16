@@ -22,7 +22,13 @@ export async function GET(request: Request) {
   const fail = (code: string) => NextResponse.redirect(`${appUrl()}/login?oauth=${code}`);
 
   // Google reports user-side failures (consent denied, etc.) before any code.
-  if (params.get("error")) return fail("cancelled");
+  const googleError = params.get("error");
+  if (googleError) {
+    if (googleError === "access_denied") return fail("cancelled");
+    if (googleError === "redirect_uri_mismatch") return fail("redirect");
+    if (googleError === "invalid_client" || googleError === "unauthorized_client") return fail("client");
+    return fail("failed");
+  }
 
   let identity;
   let pendingNext: string | null = null;
@@ -33,8 +39,10 @@ export async function GET(request: Request) {
   } catch (error) {
     const message = error instanceof GoogleAuthError ? error.message : "Google sign-in failed.";
     console.error("google sign-in failed:", message);
-    const code = message.includes("not configured") ? "not_configured" : message.includes("expired") ? "state" : "failed";
-    return fail(code);
+    if (error instanceof GoogleAuthError) {
+      return fail(error.reason === "expired" ? "state" : error.reason);
+    }
+    return fail("failed");
   }
 
   const existing = await systemDb.maybeOne<{

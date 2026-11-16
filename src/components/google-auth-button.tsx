@@ -11,9 +11,12 @@ import { googleConfigured } from "@/lib/google-auth";
 export async function GoogleAuthButton({
   label = "Continue with Google",
   next,
+  divider = true,
 }: {
   label?: string;
   next?: string;
+  /** The "or use your email" rule only belongs above a password form. */
+  divider?: boolean;
 }) {
   if (!(await googleConfigured())) return null;
   const href = next ? `/auth/google?next=${encodeURIComponent(next)}` : "/auth/google";
@@ -31,11 +34,13 @@ export async function GoogleAuthButton({
         </svg>
         {label}
       </a>
-      <div className="flex items-center gap-3 text-[11px] uppercase tracking-wider text-ink-400">
-        <span className="h-px flex-1 bg-ink-100" />
-        or use your email
-        <span className="h-px flex-1 bg-ink-100" />
-      </div>
+      {divider ? (
+        <div className="flex items-center gap-3 text-[11px] uppercase tracking-wider text-ink-400">
+          <span className="h-px flex-1 bg-ink-100" />
+          or use your email
+          <span className="h-px flex-1 bg-ink-100" />
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -97,7 +97,7 @@ export async function beginGoogleSignIn(next?: string | null) {
   });
 
   const credentials = await googleCredentials();
-  if (!credentials) throw new GoogleAuthError("Google sign-in is not configured on this deployment.");
+  if (!credentials) throw new GoogleAuthError("Google sign-in is not configured on this deployment.", "not_configured");
 
   const params = new URLSearchParams({
     client_id: credentials.clientId,
@@ -112,7 +112,36 @@ export async function beginGoogleSignIn(next?: string | null) {
   return `${AUTH_ENDPOINT}?${params.toString()}`;
 }
 
-export class GoogleAuthError extends Error {}
+/**
+ * A failure the sign-in page can explain in plain language.
+ * `reason` maps to /login?oauth=<reason>.
+ */
+export class GoogleAuthError extends Error {
+  readonly reason: "not_configured" | "state" | "expired" | "client" | "redirect" | "code" | "failed";
+
+  constructor(
+    message: string,
+    reason: GoogleAuthError["reason"] = "failed",
+  ) {
+    super(message);
+    this.reason = reason;
+  }
+}
+
+/** Turns Google's OAuth error codes into something the owner can act on. */
+function reasonForGoogleError(error: string | undefined): GoogleAuthError["reason"] {
+  switch (error) {
+    case "invalid_client":
+    case "unauthorized_client":
+      return "client";
+    case "redirect_uri_mismatch":
+      return "redirect";
+    case "invalid_grant":
+      return "code";
+    default:
+      return "failed";
+  }
+}
 
 function equalState(a: string, b: string) {
   const left = Buffer.from(a);
@@ -136,7 +165,7 @@ export async function completeGoogleSignIn(
   state: string | null,
 ): Promise<{ identity: GoogleIdentity; next: string | null }> {
   const credentials = await googleCredentials();
-  if (!credentials) throw new GoogleAuthError("Google sign-in is not configured on this deployment.");
+  if (!credentials) throw new GoogleAuthError("Google sign-in is not configured on this deployment.", "not_configured");
   if (!code) throw new GoogleAuthError("Google did not return an authorization code.");
 
   const store = await cookies();
@@ -145,7 +174,7 @@ export async function completeGoogleSignIn(
   const [expectedState, ...rest] = cookie.split("|");
   const next = safeNext(rest.join("|") || null);
   if (!state || !expectedState || !equalState(state, expectedState)) {
-    throw new GoogleAuthError("This sign-in attempt expired or was tampered with. Please try again.");
+    throw new GoogleAuthError("This sign-in attempt expired or was tampered with. Please try again.", "expired");
   }
 
   let idToken: string | undefined;
@@ -170,6 +199,7 @@ export async function completeGoogleSignIn(
     if (!response.ok || !json.id_token) {
       throw new GoogleAuthError(
         `Google rejected the sign-in (${json.error ?? response.status}${json.error_description ? `: ${json.error_description}` : ""}).`,
+        reasonForGoogleError(json.error),
       );
     }
     idToken = json.id_token;

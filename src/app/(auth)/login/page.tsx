@@ -18,6 +18,9 @@ const OAUTH_MESSAGES: Record<string, string> = {
   unverified: "Google did not confirm that email address, so no account was created.",
   suspended: "This account is not active. Please contact support.",
   failed: "Google sign-in could not be completed. Try again, or use your password.",
+  client: "Google rejected this site's client secret. Copy the secret from the same OAuth client in Google Cloud Console and save it in Admin → Platform settings.",
+  redirect: "That redirect URI is not authorised on the Google OAuth client. Add the exact callback URL shown in Admin → Platform settings.",
+  code: "That Google sign-in link has already been used or expired. Start again.",
 };
 
 export default async function LoginPage({

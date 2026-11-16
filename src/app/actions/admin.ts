@@ -475,11 +475,24 @@ export async function saveGoogleSignInAction(_prev: AdminState, formData: FormDa
   revalidatePath("/login");
   revalidatePath("/register/customer");
 
-  if (!clientId) return { message: "Google sign-in credentials cleared." };
+  // Report the real outcome, re-read from the row (getSettings is memoised for
+  // this request and would still hold the pre-save values).
+  const saved = await systemDb.maybeOne<{
+    google_client_id: string | null;
+    google_client_secret: string | null;
+    google_signin_enabled: boolean;
+  }>(`select google_client_id, google_client_secret, google_signin_enabled from platform_settings where id = 1`);
+
+  if (!saved?.google_client_id) return { message: "Google sign-in credentials cleared." };
+  if (!saved.google_signin_enabled) {
+    return { message: "Saved, but the button stays hidden while this switch is off." };
+  }
+  if (!saved.google_client_secret && !process.env.GOOGLE_CLIENT_SECRET) {
+    return { error: "Client ID saved, but there is no client secret yet, so the button stays hidden. Add the secret and save again." };
+  }
   return {
-    message: enabled
-      ? "Saved. The Continue with Google button is live on the sign-in and sign-up pages."
-      : "Saved, but the button stays hidden while this switch is off.",
+    message:
+      "Live. “Continue with Google” now appears on the sign-in and sign-up pages — check it end to end in a private window.",
   };
 }
 
