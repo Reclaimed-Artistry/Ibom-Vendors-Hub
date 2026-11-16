@@ -19,12 +19,12 @@ export default async function VendorPayoutsPage() {
       lifetime_earned: number;
       lifetime_withdrawn: number;
     }>(
-      `select available_amount::float8 as available_amount,
-              pending_amount::float8 as pending_amount,
-              lifetime_earned::float8 as lifetime_earned,
-              lifetime_withdrawn::float8 as lifetime_withdrawn
-         from vendor_balances
-        where store_id = $1`,
+      `select coalesce(vb.available_amount, 0)::float8 as available_amount,
+              coalesce(vb.pending_amount, 0)::float8 as pending_amount,
+              coalesce(vb.lifetime_gross, 0)::float8 as lifetime_earned,
+              coalesce((select sum(vp.amount) from vendor_payouts vp where vp.store_id = $1 and vp.status = 'paid'), 0)::float8 as lifetime_withdrawn
+         from (select $1::uuid as store_id) s
+         left join vendor_balances vb on vb.store_id = s.store_id`,
       [ctx.store.id],
     ),
     systemDb.maybeOne<{
@@ -50,7 +50,7 @@ export default async function VendorPayoutsPage() {
       processed_at: string | null;
     }>(
       `select id, amount::float8 as amount, status, reference,
-              bank_name, account_number, account_name, note,
+              bank_name, account_number, account_name, notes as note,
               created_at, processed_at
          from vendor_payouts
         where store_id = $1

@@ -8,9 +8,11 @@ import { systemDb } from "@/lib/db";
 import { formatMoney, formatDateTime } from "@/lib/utils";
 import { Alert, Badge, Card, CardHeader, EmptyState, PageHeader, StatCard, StatusBadge, Tabs } from "@/components/ui";
 import { RefundForm, VerifyPaystackButton } from "@/components/admin-forms";
-import { AdminPayoutSettlementControls } from "@/components/admin-payout-row";
+import { AdminPayoutSettlementControls, AdminRefundDecisionControls } from "@/components/admin-payout-row";
 
 export const metadata: Metadata = { title: "Payments · Admin" };
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function AdminPaymentsPage({
   searchParams,
@@ -38,7 +40,7 @@ export default async function AdminPaymentsPage({
 
   const gateway = gatewayStatus(await getSettings());
 
-  const [rows, stats, refunds, vendorPayouts] = await Promise.all([
+  const [rows, stats, refunds, vendorPayouts, vendorWallets] = await Promise.all([
     systemDb.query<{
       reference: string;
       scope: string;
@@ -78,18 +80,46 @@ export default async function AdminPaymentsPage({
               coalesce(p.bank_name, vp.bank_name) as bank_name,
               coalesce(p.account_number, vp.account_number) as account_number,
               coalesce(p.account_name, vp.account_name) as account_name,
-              p.note, p.created_at, p.processed_at
+              p.notes as note, p.created_at, p.processed_at
          from vendor_payouts p
          join stores s on s.id = p.store_id
          left join vendor_profiles vp on vp.user_id = s.owner_id
         order by case when p.status = 'pending' then 0 else 1 end, p.created_at desc
         limit 40`,
     ),
+    systemDb.query<{
+      store_id: string;
+      store_name: string;
+      store_status: string;
+      pending_amount: number;
+      available_amount: number;
+      lifetime_gross: number;
+      paid_out: number;
+      bank_name: string | null;
+      account_number: string | null;
+      account_name: string | null;
+    }>(
+      `select s.id as store_id,
+              s.name as store_name,
+              s.status as store_status,
+              coalesce(vb.pending_amount, 0)::float8 as pending_amount,
+              coalesce(vb.available_amount, 0)::float8 as available_amount,
+              coalesce(vb.lifetime_gross, 0)::float8 as lifetime_gross,
+              coalesce((select sum(vp2.amount) from vendor_payouts vp2 where vp2.store_id = s.id and vp2.status = 'paid'), 0)::float8 as paid_out,
+              vp.bank_name,
+              vp.account_number,
+              vp.account_name
+         from stores s
+         left join vendor_balances vb on vb.store_id = s.id
+         left join vendor_profiles vp on vp.user_id = s.owner_id
+        order by coalesce(vb.available_amount, 0) desc, coalesce(vb.pending_amount, 0) desc, s.created_at desc
+        limit 40`,
+    ),
   ]);
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Payments" description="Every attempt, with server-side verification. Refunds are recorded in the audit log." />
+      <PageHeader title="Payments" description="Every attempt, with server-side verification, vendor escrow balances, and bank payouts." />
 
       <Alert
         tone={gateway.mode === "paystack" && gateway.warnings.length === 0 ? "success" : gateway.secretConfigured ? "warning" : "info"}
@@ -182,6 +212,56 @@ export default async function AdminPaymentsPage({
         )}
       </Card>
 
+      {/* Vendor Escrow Balances & Saved Bank Accounts */}
+      {vendorWallets.length > 0 ? (
+        <Card>
+          <CardHeader
+            title="Vendor Escrow Wallets & Settlement Bank Accounts"
+            description="Live escrow balances and saved Nigerian bank accounts across registered storefronts."
+          />
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Storefront</th>
+                  <th>Saved Bank Account</th>
+                  <th className="text-right">Pending Escrow</th>
+                  <th className="text-right">Available for Payout</th>
+                  <th className="text-right">Paid Out</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vendorWallets.map((wallet) => (
+                  <tr key={wallet.store_id}>
+                    <td>
+                      <Link href={`/admin/vendors/${wallet.store_id}`} className="font-semibold text-ink-900 hover:text-brand-800">
+                        {wallet.store_name}
+                      </Link>
+                      <div className="mt-0.5"><StatusBadge status={wallet.store_status} /></div>
+                    </td>
+                    <td className="text-xs">
+                      {wallet.bank_name && wallet.account_number ? (
+                        <div>
+                          <p className="font-semibold text-ink-900">
+                            {wallet.bank_name} · <span className="font-mono">{wallet.account_number}</span>
+                          </p>
+                          <p className="text-ink-500">{wallet.account_name}</p>
+                        </div>
+                      ) : (
+                        <span className="text-ink-400">Not added yet</span>
+                      )}
+                    </td>
+                    <td className="text-right text-sm font-medium text-amber-700">{formatMoney(wallet.pending_amount)}</td>
+                    <td className="text-right text-sm font-semibold text-emerald-700">{formatMoney(wallet.available_amount)}</td>
+                    <td className="text-right text-sm text-ink-600">{formatMoney(wallet.paid_out)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : null}
+
       <Tabs
         links={[
           { href: "/admin/payments", label: "All", active: scope === "all" && status === "all" },
@@ -205,7 +285,7 @@ export default async function AdminPaymentsPage({
       </form>
 
       {rows.length === 0 ? (
-        <EmptyState icon={<Wallet className="size-5" />} title="No payments" description="Payments appear here as customers check out." />
+        <EmptyState icon={<Wallet className="size-5" />} title="No payments" description="Payments appear here as customers check out or vendors renew subscriptions." />
       ) : (
         <div className="table-wrap">
           <table className="table">
@@ -256,10 +336,16 @@ export default async function AdminPaymentsPage({
             {refunds.slice(0, 12).map((refund) => (
               <li key={refund.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-2.5 text-sm">
                 <div>
-                  <p className="font-medium text-ink-800">{formatMoney(Number(refund.amount))} · {refund.reason ?? "No reason given"}</p>
+                  <p className="font-medium text-ink-800">
+                    {formatMoney(Number(refund.amount))} · {refund.reason ?? "No reason given"}
+                    {refund.store_name ? <span className="text-ink-500"> · {refund.store_name}</span> : null}
+                  </p>
                   <p className="text-xs text-ink-400">{formatDateTime(refund.created_at)}</p>
                 </div>
-                <Badge tone={refund.status === "processed" ? "success" : refund.status === "rejected" ? "danger" : "warning"}>{refund.status}</Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={refund.status === "processed" ? "success" : refund.status === "rejected" ? "danger" : "warning"}>{refund.status}</Badge>
+                  {refund.status === "requested" ? <AdminRefundDecisionControls refundId={refund.id} /> : null}
+                </div>
               </li>
             ))}
           </ul>

@@ -971,8 +971,8 @@ export async function requestVendorPayoutAction(_prev: VendorState, formData: Fo
 
       const payout = await db.one<{ id: string }>(
         `insert into vendor_payouts
-           (store_id, amount, currency, status, bank_name, account_number, account_name, note)
-         values ($1, $2, 'NGN', 'pending', $3, $4, $5, $6)
+           (store_id, amount, status, method, bank_name, account_number, account_name, notes)
+         values ($1, $2, 'pending', 'bank_transfer', $3, $4, $5, $6)
          returning id`,
         [ctx.store.id, amount, bank.bank_name, bank.account_number, bank.account_name, note],
       );

@@ -18,6 +18,7 @@ import {
   suspendStore,
 } from "@/lib/stores";
 import { checkPaystackCredentials } from "@/lib/payments/gateway";
+import { processRefund } from "@/lib/payments";
 import { adminGrantSubscription } from "@/lib/subscriptions";
 import { formatIssues, categorySchema } from "@/lib/validation";
 
@@ -331,6 +332,17 @@ export async function markPaymentRefundedAction(_prev: AdminState, formData: For
       await db.execute(
         `update orders set payment_status = 'refunded', status = 'cancelled', cancelled_at = now(), cancellation_reason = $2 where id = $1`,
         [payment.order_id, reason || "Refunded by administrator"],
+      );
+    }
+    if (payment.store_id) {
+      await db.execute(
+        `update vendor_balances
+            set lifetime_refunds = lifetime_refunds + $2,
+                available_amount = greatest(available_amount - $2, 0),
+                pending_amount = greatest(pending_amount - $2, 0),
+                updated_at = now()
+          where store_id = $1`,
+        [payment.store_id, payment.amount],
       );
     }
     await logActivity(
@@ -843,7 +855,7 @@ export async function settleVendorPayoutAction(_prev: AdminState, formData: Form
           `update vendor_payouts
               set status = 'paid',
                   reference = coalesce($2, reference),
-                  note = coalesce($3, note),
+                  notes = coalesce($3, notes),
                   processed_by = $4,
                   processed_at = now()
             where id = $1`,
@@ -851,11 +863,12 @@ export async function settleVendorPayoutAction(_prev: AdminState, formData: Form
         );
 
         await db.execute(
-          `update vendor_balances
-              set lifetime_withdrawn = lifetime_withdrawn + $2,
-                  updated_at = now()
-            where store_id = $1`,
-          [payout.store_id, payout.amount],
+          `insert into vendor_balances (store_id, last_payout_at, updated_at)
+           values ($1, now(), now())
+           on conflict (store_id) do update
+             set last_payout_at = now(),
+                 updated_at = now()`,
+          [payout.store_id],
         );
 
         await notify(
@@ -874,7 +887,7 @@ export async function settleVendorPayoutAction(_prev: AdminState, formData: Form
         await db.execute(
           `update vendor_payouts
               set status = 'failed',
-                  note = coalesce($2, note),
+                  notes = coalesce($2, notes),
                   processed_by = $3,
                   processed_at = now()
             where id = $1`,
@@ -882,10 +895,11 @@ export async function settleVendorPayoutAction(_prev: AdminState, formData: Form
         );
 
         await db.execute(
-          `update vendor_balances
-              set available_amount = available_amount + $2,
-                  updated_at = now()
-            where store_id = $1`,
+          `insert into vendor_balances (store_id, available_amount, updated_at)
+           values ($1, $2, now())
+           on conflict (store_id) do update
+             set available_amount = vendor_balances.available_amount + excluded.available_amount,
+                 updated_at = now()`,
           [payout.store_id, payout.amount],
         );
 
@@ -933,3 +947,22 @@ export async function settleVendorPayoutAction(_prev: AdminState, formData: Form
         : "Payout cancelled and funds returned to vendor's available wallet.",
   };
 }
+
+export async function reviewRefundAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const refundId = String(formData.get("refundId") ?? "").trim();
+  const decision = String(formData.get("decision") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim() || undefined;
+  if (!refundId || (decision !== "approve" && decision !== "reject")) {
+    return { error: "Invalid refund decision." };
+  }
+  try {
+    await processRefund(refundId, user.id, decision === "approve", note);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not process refund." };
+  }
+  revalidatePath("/admin/payments");
+  revalidatePath("/admin");
+  return { message: decision === "approve" ? "Refund processed." : "Refund request rejected." };
+}
+
