@@ -197,6 +197,23 @@ runs `next build`. Every deploy is therefore self-migrating and idempotent.
    still rewrites subdomains when a wildcard domain is attached).
 5. Point the Paystack webhook at `https://<your-domain>/api/webhooks/paystack`.
 
+### Google sign-in
+
+`/auth/google` runs a server-side authorization-code flow: it mints a CSRF `state` into an
+HttpOnly cookie, exchanges the code at Google's token endpoint and verifies the returned ID
+token against Google's JWKS (signature, issuer, audience, expiry) before anything is trusted.
+An existing account is matched by verified email — vendors and admins included, so a vendor
+can use Google to reach their dashboard — and a brand-new email creates a **customer**
+account with `email_verified_at` set (vendors still register through `/register` because a
+store needs business details). Suspended accounts are refused. The flow is only rendered when
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set, so no dead button appears otherwise.
+
+To enable it: Google Cloud Console → APIs & Services → Credentials → *Create credentials* →
+*OAuth client ID* → *Web application*, then add
+`https://<your-domain>/auth/google/callback` under **Authorised redirect URIs** (and
+`https://<your-domain>` under **Authorised JavaScript origins**). Put the client ID and secret
+in the Vercel environment. `GOOGLE_REDIRECT_URI` overrides the computed callback URL.
+
 ### Payments
 
 The gateway adapter (`src/lib/payments/gateway.ts`) talks to Paystack's REST API with the

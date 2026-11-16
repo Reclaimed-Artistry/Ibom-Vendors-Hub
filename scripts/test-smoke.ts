@@ -19,6 +19,7 @@ const expectations: Array<{ path: string; status: number[]; name?: string }> = [
   { path: "/register", status: [200] },
   { path: "/register/customer", status: [200] },
   { path: "/forgot-password", status: [200] },
+  { path: "/auth/google", status: [307, 302], name: "google sign-in redirects (consent or login)" },
   { path: "/s/mamaput-kitchen", status: [200] },
   { path: "/s/mamaput-kitchen/products", status: [200] },
   { path: "/s/uyogadgetmart", status: [200], name: "expired storefront shows the offline screen" },

@@ -1,0 +1,118 @@
+import { NextResponse } from "next/server";
+import { appUrl } from "@/lib/domains";
+import { systemDb } from "@/lib/db";
+import { createSessionToken, setSessionCookie } from "@/lib/auth";
+import { completeGoogleSignIn, GoogleAuthError } from "@/lib/google-auth";
+import { logActivity } from "@/lib/audit";
+import { sendEmail } from "@/lib/email";
+import { getSettings } from "@/lib/settings";
+
+export const dynamic = "force-dynamic";
+
+type Role = "super_admin" | "admin" | "vendor" | "customer";
+
+function home(role: Role) {
+  if (role === "super_admin" || role === "admin") return "/admin";
+  if (role === "vendor") return "/vendor";
+  return "/account";
+}
+
+export async function GET(request: Request) {
+  const params = new URL(request.url).searchParams;
+  const fail = (code: string) => NextResponse.redirect(`${appUrl()}/login?oauth=${code}`);
+
+  // Google reports user-side failures (consent denied, etc.) before any code.
+  if (params.get("error")) return fail("cancelled");
+
+  let identity;
+  let pendingNext: string | null = null;
+  try {
+    const result = await completeGoogleSignIn(params.get("code"), params.get("state"));
+    identity = result.identity;
+    pendingNext = result.next;
+  } catch (error) {
+    const message = error instanceof GoogleAuthError ? error.message : "Google sign-in failed.";
+    console.error("google sign-in failed:", message);
+    const code = message.includes("not configured") ? "not_configured" : message.includes("expired") ? "state" : "failed";
+    return fail(code);
+  }
+
+  const existing = await systemDb.maybeOne<{
+    id: string;
+    email: string;
+    full_name: string;
+    role: Role;
+    status: string;
+    avatar_url: string | null;
+  }>(`select id, email, full_name, role, status, avatar_url from users where lower(email) = $1`, [identity.email]);
+
+  let user = existing;
+  let created = false;
+
+  if (existing) {
+    if (existing.status !== "active") return fail("suspended");
+    await systemDb.execute(`update users set last_login_at = now(), avatar_url = coalesce(avatar_url, $2) where id = $1`, [
+      existing.id,
+      identity.picture ?? null,
+    ]);
+    await logActivity({
+      actorId: existing.id,
+      actorRole: existing.role,
+      action: "auth.login",
+      entityType: "user",
+      entityId: existing.id,
+      description: "Signed in with Google",
+      meta: { provider: "google" },
+    });
+  } else {
+    // Google is an identity provider, not a way to skip email verification.
+    if (!identity.emailVerified) return fail("unverified");
+
+    const inserted = await systemDb.maybeOne<{ id: string; email: string; full_name: string; role: Role; status: string; avatar_url: string | null }>(
+      `insert into users (email, password_hash, full_name, role, status, email_verified_at, avatar_url, last_login_at)
+       values ($1, null, $2, 'customer', 'active', now(), $3, now())
+       on conflict (lower(email)) do nothing
+       returning id, email, full_name, role, status, avatar_url`,
+      [identity.email, identity.name, identity.picture ?? null],
+    );
+    if (!inserted) return fail("failed");
+
+    await systemDb.execute(`insert into customer_profiles (user_id) values ($1) on conflict do nothing`, [inserted.id]);
+    await systemDb.execute(`insert into user_roles (user_id, role) values ($1,'customer') on conflict do nothing`, [inserted.id]);
+    await logActivity({
+      actorId: inserted.id,
+      actorRole: "customer",
+      action: "auth.signup",
+      entityType: "user",
+      entityId: inserted.id,
+      description: "Created a customer account with Google",
+      meta: { provider: "google" },
+    });
+
+    const settings = await getSettings();
+    await sendEmail({
+      to: identity.email,
+      template: "customer_welcome",
+      data: { name: identity.name, supportEmail: settings.support_email },
+      dedupeKey: `customer-welcome:${inserted.id}`,
+    }).catch((error) => console.error("welcome email failed", error));
+
+    user = inserted;
+    created = true;
+  }
+
+  if (!user) return fail("failed");
+
+  const token = await createSessionToken({
+    sub: user.id,
+    email: user.email,
+    role: user.role,
+    name: user.full_name,
+  });
+  await setSessionCookie(token);
+
+  // A brand-new account lands on its profile with a welcome flag so the first
+  // screen explains what to complete rather than showing an empty dashboard.
+  const destination = pendingNext ?? (created ? "/account?welcome=google" : home(user.role));
+  return NextResponse.redirect(`${appUrl()}${destination}`);
+}
