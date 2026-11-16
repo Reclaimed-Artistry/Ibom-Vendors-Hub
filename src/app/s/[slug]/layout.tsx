@@ -65,7 +65,11 @@ export default async function StorefrontLayout({
         </div>
         {!live ? (
           <div className="bg-amber-50 px-4 py-2 text-center text-xs font-medium text-amber-900">
-            This storefront is currently offline. You can view the catalogue but new orders are disabled.
+            {store.status === "pending"
+              ? "This storefront is currently undergoing 48-hour merchant verification and will open for orders once approved."
+              : store.status === "rejected"
+                ? "This storefront is currently closed."
+                : "This storefront is currently offline. You can view the catalogue but new orders are disabled."}
           </div>
         ) : null}
       </header>

@@ -126,6 +126,41 @@ function template(name: string, data: EmailData): RenderedEmail {
         ],
         cta: { label: "Open my dashboard", href: url("/vendor") },
       };
+    case "vendor_pending_review":
+      return {
+        subject: `Application received (48h review) — ${data.storeName ?? ""}`.trim(),
+        heading: "Storefront under 48-hour verification",
+        intro: `Hi ${data.name ?? "there"}, thank you for registering ${data.storeName ?? "your storefront"} on Ibom Vendors Hub. Our verification team is reviewing your uploaded Proof of Residence, NIN, and business details within 48 hours. You can already sign in and add products — we will notify you immediately once your store is approved and open to shoppers.`,
+        rows: [
+          ["Storefront", data.storeName ?? ""],
+          ["Reserved URL", data.storeUrl ?? ""],
+          ["Review SLA", `Within 48 hours (by ${data.reviewDeadline ?? "48h"})`],
+        ],
+        cta: { label: "Prepare my products", href: url("/vendor") },
+      };
+    case "store_approved":
+      return {
+        subject: `Approved! ${data.storeName ?? "Your storefront"} is now OPEN 🎉`,
+        heading: "Your storefront is approved & open!",
+        intro: `Congratulations ${data.name ?? "there"}! After reviewing your registration documents, our team has approved ${data.storeName ?? "your storefront"}. Your store is now publicly open and accepting customer orders across Akwa Ibom.`,
+        rows: [
+          ["Live Storefront", data.storeUrl ?? ""],
+          ["Status", "Approved & Open"],
+        ],
+        cta: { label: "View live storefront", href: data.storeUrl ?? url("/vendor") },
+      };
+    case "store_declined":
+      return {
+        subject: `Storefront application update — ${data.storeName ?? ""}`.trim(),
+        heading: "Storefront application declined",
+        intro: `Hi ${data.name ?? "there"}, after reviewing the documents submitted for ${data.storeName ?? "your storefront"}, we could not approve the application yet.`,
+        rows: [
+          ["Storefront", data.storeName ?? ""],
+          ["Reason", data.reason ?? "Verification documents require correction."],
+        ],
+        cta: { label: "Update verification documents", href: url("/vendor/store") },
+        footnote: "Once you upload updated verification documents in your Store Profile, our team will re-review your application within 48 hours.",
+      };
     case "customer_welcome":
       return {
         subject: "Welcome to Ibom Vendors Hub",
@@ -352,14 +387,21 @@ function template(name: string, data: EmailData): RenderedEmail {
       };
     case "admin_new_vendor":
       return {
-        subject: `New vendor registered: ${data.storeName ?? ""}`,
-        heading: "New vendor registration",
-        intro: `${data.storeName ?? "A new vendor"} just registered on the platform.`,
+        subject: `[48h Review Required] New storefront: ${data.storeName ?? ""}`,
+        heading: "New storefront awaiting 48-hour document review",
+        intro: `${data.storeName ?? "A new vendor"} just registered on Ibom Vendors Hub. Review the uploaded Proof of Residence, NIN, CAC details, and business profile within 48 hours to either approve and open the store or decline it.`,
         rows: [
-          ["Owner", data.name ?? ""],
-          ["Email", data.email ?? ""],
+          ["Business / Store", `${data.storeName ?? ""} (${data.storeUrl ?? ""})`],
+          ["Owner Name", String(data.name ?? "")],
+          ["Owner Email", String(data.email ?? "")],
+          ["Owner Phone", String(data.phone ?? "—")],
+          ["Location", String(data.location ?? "Akwa Ibom")],
+          ["NIN", String(data.nin ?? "—")],
+          ["CAC Status", String(data.cacInfo ?? "Not registered")],
+          ["Proof of Residence", String(data.proofType ?? "Uploaded")],
+          ["48-Hour Deadline", String(data.reviewDeadline ?? "Within 48 hours")],
         ],
-        cta: { label: "Review vendor", href: url("/admin/vendors") },
+        cta: { label: "Review documents & decide (48h)", href: String(data.reviewUrl ?? url("/admin/vendors?status=pending")) },
       };
     case "admin_subscription_payment":
       return {

@@ -6,9 +6,8 @@ import { systemDb } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { formatMoney, formatDate, timeAgo } from "@/lib/utils";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, StatCard } from "@/components/ui";
-import { approveStoreAction } from "@/app/actions/admin";
-import { SubmitButton } from "@/components/submit-button";
 import { googleSignInStatus } from "@/lib/google-auth";
+import { ReviewCountdown } from "@/components/review-countdown";
 
 export const metadata: Metadata = { title: "Admin overview · Ibom Vendors Hub" };
 
@@ -44,8 +43,8 @@ export default async function AdminOverviewPage() {
          (select coalesce(sum(p.amount),0)::numeric from payments p where p.scope = 'subscription' and p.status = 'success' and p.paid_at > now() - interval '30 days') as mrr,
          (select count(*)::int from refunds where status = 'requested') as open_refunds`,
     ),
-    systemDb.query<{ id: string; name: string; slug: string; owner_name: string; owner_email: string; category_name: string | null; created_at: string }>(
-      `select s.id, s.name, s.slug, u.full_name as owner_name, u.email as owner_email, c.name as category_name, s.created_at
+    systemDb.query<{ id: string; name: string; slug: string; owner_name: string; owner_email: string; category_name: string | null; created_at: string; review_deadline_at: string | null }>(
+      `select s.id, s.name, s.slug, u.full_name as owner_name, u.email as owner_email, c.name as category_name, s.created_at, s.review_deadline_at
          from stores s join users u on u.id = s.owner_id left join store_categories c on c.id = s.category_id
         where s.status = 'pending' order by s.created_at limit 6`,
     ),
@@ -110,7 +109,11 @@ export default async function AdminOverviewPage() {
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardHeader title="Awaiting approval" description="New storefronts that need a decision." action={<Link href="/admin/vendors?status=pending" className="text-sm font-semibold text-brand-700 hover:underline">All pending</Link>} />
+          <CardHeader
+            title="Awaiting 48-hour document review"
+            description="Review uploaded Proof of Residence, NIN & registration documents before approving or declining."
+            action={<Link href="/admin/messages?status=store_approval" className="text-sm font-semibold text-brand-700 hover:underline">Open review inbox</Link>}
+          />
           {pendingStores.length === 0 ? (
             <EmptyState icon={<Building2 className="size-5" />} title="Nothing waiting" description="Every application has been reviewed." />
           ) : (
@@ -121,13 +124,12 @@ export default async function AdminOverviewPage() {
                     <Link href={`/admin/vendors/${store.id}`} className="font-semibold text-ink-900 hover:text-brand-700">{store.name}</Link>
                     <p className="text-xs text-ink-500">{store.owner_name} · {store.owner_email} · {timeAgo(store.created_at)}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ReviewCountdown deadlineAt={store.review_deadline_at} createdAt={store.created_at} compact />
                     <Badge tone="warning">{store.category_name ?? "Uncategorised"}</Badge>
-                    <form action={approveStoreAction}>
-                      <input type="hidden" name="storeId" value={store.id} />
-                      <SubmitButton className="btn-primary btn-sm" pendingLabel="Approving…">Approve</SubmitButton>
-                    </form>
-                    <Link href={`/admin/vendors/${store.id}`} className="btn btn-ghost btn-sm">Review</Link>
+                    <Link href={`/admin/vendors/${store.id}`} className="btn-primary btn-sm">
+                      Review documents &amp; decide
+                    </Link>
                   </div>
                 </li>
               ))}

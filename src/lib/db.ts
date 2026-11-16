@@ -140,13 +140,17 @@ async function runSystem(text: string, params?: unknown[]): Promise<RawResult> {
       return { rows: res.rows, rowCount: res.rowCount };
     }
     // Nested trusted query inside an actor transaction: temporarily drop the
-    // restricted role, run, then restore it (only used in serialised mode).
+    // restricted role inside a savepoint so RLS never aborts the outer tx.
     await ctx.client.query("savepoint ivh_nested");
     await ctx.client.query("reset role");
     try {
       const res = await ctx.client.query(text, params as any[]);
       await ctx.client.query("release savepoint ivh_nested");
       return { rows: res.rows, rowCount: res.rowCount };
+    } catch (err) {
+      await ctx.client.query("rollback to savepoint ivh_nested");
+      await ctx.client.query("release savepoint ivh_nested");
+      throw err;
     } finally {
       await ctx.client.query("set local role app_runtime");
     }

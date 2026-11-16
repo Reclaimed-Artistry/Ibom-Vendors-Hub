@@ -6,6 +6,7 @@ import { systemDb } from "@/lib/db";
 import { storefrontUrl } from "@/lib/domains";
 import { formatDate } from "@/lib/utils";
 import { Badge, EmptyState, PageHeader, Pagination, Tabs } from "@/components/ui";
+import { ReviewCountdown } from "@/components/review-countdown";
 
 export const metadata: Metadata = { title: "Vendors · Admin" };
 
@@ -47,12 +48,13 @@ export default async function AdminVendorsPage({
       product_count: number;
       order_count: number;
       created_at: string;
+      review_deadline_at: string | null;
     }>(
       `select s.id, s.name, s.slug, s.status, s.visibility, u.full_name as owner_name, u.email as owner_email,
               c.name as category_name, p.name as plan_name, sub.expires_at,
               (select count(*)::int from products pr where pr.store_id = s.id) as product_count,
               (select count(*)::int from orders o where o.store_id = s.id) as order_count,
-              s.created_at
+              s.created_at, s.review_deadline_at
          from stores s
          join users u on u.id = s.owner_id
          left join store_categories c on c.id = s.category_id
@@ -148,6 +150,11 @@ export default async function AdminVendorsPage({
                   <td className="text-center text-sm">{store.order_count}</td>
                   <td>
                     <Badge tone={store.status === "active" ? "success" : store.status === "pending" ? "warning" : store.status === "expired" ? "neutral" : "danger"}>{store.status}</Badge>
+                    {store.status === "pending" ? (
+                      <div className="mt-1">
+                        <ReviewCountdown deadlineAt={store.review_deadline_at} createdAt={store.created_at} compact />
+                      </div>
+                    ) : null}
                     {store.visibility === "unlisted" ? <p className="mt-1 text-[11px] text-ink-400">unlisted</p> : null}
                   </td>
                   <td className="text-xs text-ink-500">{formatDate(store.created_at)}</td>

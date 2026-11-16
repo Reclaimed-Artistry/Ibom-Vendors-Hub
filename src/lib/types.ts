@@ -128,6 +128,8 @@ export interface Store {
   visibility: "public" | "unlisted";
   manual_suspension: boolean;
   suspension_reason: string | null;
+  rejection_reason?: string | null;
+  review_deadline_at?: string | null;
   access_until: string | null;
   operating_hours: Record<string, { open: string; close: string; closed: boolean }>;
   accepts_orders: boolean;

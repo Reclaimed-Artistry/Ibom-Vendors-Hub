@@ -9,24 +9,43 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  if (user.role === "vendor") {
-    const ctx = await getVendorContext();
-    const lockError = vendorSuspensionMessage(ctx);
-    if (lockError) return NextResponse.json({ error: lockError }, { status: 403 });
-  }
-
   const formData = await request.formData();
   const file = formData.get("file");
-  const folder = String(formData.get("folder") ?? "uploads");
-  if (!(file instanceof File)) return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  const rawFolder = String(formData.get("folder") ?? "uploads").trim();
+  if (!(file instanceof File) || file.size === 0) {
+    return NextResponse.json({ error: "No file provided" }, { status: 400 });
+  }
+
+  let targetFolder = rawFolder;
+  if (user.role === "vendor") {
+    const ctx = await getVendorContext();
+    if (ctx.isSubscriptionExpired || ctx.isManuallySuspended) {
+      return NextResponse.json(
+        { error: vendorSuspensionMessage(ctx) ?? "Account suspended." },
+        { status: 403 },
+      );
+    }
+    if (ctx.store.status === "rejected" && rawFolder !== "vendor-kyc") {
+      return NextResponse.json(
+        { error: vendorSuspensionMessage(ctx) ?? "Storefront application declined." },
+        { status: 403 },
+      );
+    }
+    if (rawFolder === "products" || rawFolder === "branding" || rawFolder === "uploads") {
+      targetFolder = `stores/${ctx.store.slug}/${rawFolder}`;
+    }
+  }
 
   try {
     const url =
-      folder === "vendor-kyc"
+      rawFolder === "vendor-kyc"
         ? await uploadVerificationDocument(file, "vendor-kyc")
-        : await uploadImage(file, folder);
+        : await uploadImage(file, targetFolder);
     return NextResponse.json({ url });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Upload failed" }, { status: 400 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Upload failed" },
+      { status: 400 },
+    );
   }
 }

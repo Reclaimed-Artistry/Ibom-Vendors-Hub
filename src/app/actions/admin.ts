@@ -27,13 +27,45 @@ async function admin() {
 /* Stores                                                                     */
 /* -------------------------------------------------------------------------- */
 
+export async function approveStoreDecisionAction(
+  _prev: AdminState,
+  formData: FormData,
+): Promise<AdminState> {
+  const user = await admin();
+  const storeId = String(formData.get("storeId") ?? "").trim();
+  if (!storeId) return { error: "Missing storefront ID." };
+  if (formData.get("documentsReviewed") !== "on") {
+    return {
+      error:
+        "Always review the uploaded Proof of Residence, NIN, and registration documents and tick the confirmation box before approving.",
+    };
+  }
+  try {
+    await approveStore(storeId, user.id);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not approve storefront." };
+  }
+  revalidatePath("/admin");
+  revalidatePath("/admin/vendors");
+  revalidatePath(`/admin/vendors/${storeId}`);
+  revalidatePath("/admin/messages");
+  revalidatePath("/vendor");
+  revalidatePath("/browse");
+  revalidatePath("/");
+  return { message: "Storefront approved, opened publicly, and owner notified." };
+}
+
 export async function approveStoreAction(formData: FormData) {
   const user = await admin();
   const storeId = String(formData.get("storeId") ?? "");
   await approveStore(storeId, user.id);
+  revalidatePath("/admin");
   revalidatePath("/admin/vendors");
   revalidatePath(`/admin/vendors/${storeId}`);
-  revalidatePath("/admin");
+  revalidatePath("/admin/messages");
+  revalidatePath("/vendor");
+  revalidatePath("/browse");
+  revalidatePath("/");
 }
 
 export async function rejectStoreAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
@@ -41,22 +73,17 @@ export async function rejectStoreAction(_prev: AdminState, formData: FormData): 
   const storeId = String(formData.get("storeId") ?? "");
   const reason = String(formData.get("reason") ?? "").trim();
   if (reason.length < 5) return { error: "Give the vendor a clear reason (at least 5 characters)" };
-  await rejectStore(storeId, user.id, reason);
-  const owner = await systemDb.maybeOne<{ email: string; full_name: string; name: string }>(
-    `select u.email, u.full_name, s.name from stores s join users u on u.id = s.owner_id where s.id = $1`,
-    [storeId],
-  );
-  if (owner) {
-    await sendEmail({
-      to: owner.email,
-      template: "store_suspended",
-      data: { name: owner.full_name, storeName: owner.name, reason, supportEmail: (await getSettings()).support_email },
-      dedupeKey: `store-rejected:${storeId}`,
-    });
+  try {
+    await rejectStore(storeId, user.id, reason);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not decline storefront." };
   }
+  revalidatePath("/admin");
   revalidatePath("/admin/vendors");
   revalidatePath(`/admin/vendors/${storeId}`);
-  return { message: "Application rejected and the vendor has been notified." };
+  revalidatePath("/admin/messages");
+  revalidatePath("/vendor");
+  return { message: "Storefront declined and the store owner has been notified." };
 }
 
 export async function suspendStoreAction(_prev: AdminState, formData: FormData): Promise<AdminState> {

@@ -14,10 +14,15 @@ export interface AuditInput {
   meta?: Record<string, unknown>;
 }
 
-/** Trusted audit writer — activity logs are append-only and never user-writable. */
-export async function logActivity(input: AuditInput, db: Db = systemDb) {
+/**
+ * Trusted audit writer — activity logs are append-only and have no INSERT RLS
+ * policy for `app_runtime`, so writes ALWAYS go through `systemDb` (which uses
+ * a nested savepoint + `reset role` if called inside a `withActor` transaction).
+ */
+export async function logActivity(input: AuditInput, _db?: Db) {
+  void _db;
   try {
-    await db.execute(
+    await systemDb.execute(
       `insert into activity_logs
          (actor_id, actor_role, store_id, action, entity_type, entity_id, description, ip, user_agent, meta)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)`,

@@ -144,7 +144,7 @@ export const productSchema = z.object({
   prepTimeMinutes: z.coerce.number().int().min(0).max(1440).optional(),
   portion: z.string().trim().max(60).optional().or(z.literal("")),
   serviceDurationMinutes: z.coerce.number().int().min(0).max(1440).optional(),
-  images: z.array(z.string().trim().max(600)).max(10).default([]),
+  images: z.array(z.string().trim().max(3_200_000)).max(12).default([]),
   attributes: z.record(z.string(), z.string()).default({}),
   specifications: z.record(z.string(), z.string()).default({}),
   variants: z

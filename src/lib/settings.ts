@@ -64,7 +64,13 @@ const cachedSettings = unstable_cache(loadSettings, ["platform-settings"], {
   revalidate: 300,
 });
 
-export const getSettings = cache(cachedSettings);
+export const getSettings = cache(async () => {
+  try {
+    return await cachedSettings();
+  } catch {
+    return loadSettings();
+  }
+});
 
 /**
  * Compact form of the platform name for tight spots like the header CTA:

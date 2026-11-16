@@ -11,6 +11,7 @@ import { uploadImage, uploadVerificationDocument } from "@/lib/storage";
 import { AKWA_IBOM_STATE } from "@/lib/akwa-ibom";
 import { getSettings } from "@/lib/settings";
 import { updateOrderByVendor } from "@/lib/orders";
+import { resubmitStoreForReview } from "@/lib/stores";
 import { purchaseSubscription, getPlans } from "@/lib/subscriptions";
 import { productSchema, storeSettingsSchema, vendorKycSchema, quotationResponseSchema, formatIssues } from "@/lib/validation";
 import { toSlug } from "@/lib/utils";
@@ -76,7 +77,9 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
     sku: formData.get("sku") ?? "",
     trackStock: formData.get("trackStock") === "on" || formData.get("trackStock") === "true",
     stockQuantity: formData.get("stockQuantity") || 0,
-    isAvailable: formData.get("isAvailable") !== "false",
+    isAvailable: formData.has("isAvailablePresent")
+      ? formData.get("isAvailable") === "on" || formData.get("isAvailable") === "true"
+      : formData.get("isAvailable") !== "false",
     isFeatured: formData.get("isFeatured") === "on" || formData.get("isFeatured") === "true",
     condition: formData.get("condition") ?? "",
     brand: formData.get("brand") ?? "",
@@ -129,15 +132,21 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
   try {
     const slug = await ensureUniqueProductSlug(ctx.store.id, data.name, productId ?? undefined);
 
-    const fileEntries = formData.getAll("imageFiles").filter((entry): entry is File => entry instanceof File && entry.size > 0);
-    const uploaded: string[] = [];
-    for (const file of fileEntries.slice(0, 6)) {
+    const preUploadedUrls = (formData.getAll("uploadedImageUrls") as string[])
+      .map((value) => String(value).trim())
+      .filter(Boolean);
+    const fileEntries = formData
+      .getAll("imageFiles")
+      .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+    const uploaded: string[] = [...preUploadedUrls];
+    for (const file of fileEntries.slice(0, Math.max(0, 10 - uploaded.length))) {
       uploaded.push(await uploadImage(file, `stores/${ctx.store.slug}/products`));
     }
     const imageUrls = (formData.getAll("imageUrls") as string[])
-      .map((value) => value.trim())
+      .map((value) => String(value).trim())
       .filter(Boolean)
-      .slice(0, 6);
+      .slice(0, 10);
+    const combinedNewImages = Array.from(new Set([...uploaded, ...imageUrls])).slice(0, 10);
 
     const savedId = await withActor(
       { id: ctx.user.id, role: "vendor", email: ctx.user.email },
@@ -227,7 +236,7 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
             [id],
           );
           let offset = existingCount.count;
-          for (const imageUrl of [...uploaded, ...imageUrls]) {
+          for (const imageUrl of combinedNewImages) {
             await db.execute(
               `insert into product_images (product_id, url, alt, sort_order) values ($1,$2,$3,$4)`,
               [id, imageUrl, data.name, offset],
@@ -235,7 +244,7 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
             offset += 1;
           }
         } else {
-          const allImages = [...uploaded, ...imageUrls];
+          const allImages = [...combinedNewImages];
           if (allImages.length === 0) allImages.push("/images/seed/product-jollof.svg");
           for (const [index, imageUrl] of allImages.entries()) {
             await db.execute(
@@ -262,8 +271,13 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
       },
     );
 
+    revalidatePath("/vendor");
     revalidatePath("/vendor/products");
-    revalidatePath(`/s/${ctx.store.slug}`);
+    revalidatePath(`/vendor/products/${savedId}`);
+    revalidatePath(`/s/${ctx.store.slug}`, "layout");
+    revalidatePath(`/s/${ctx.store.slug}/products`);
+    revalidatePath("/browse");
+    revalidatePath("/");
     redirect(`/vendor/products/${savedId}?saved=1`);
   } catch (error) {
     if (error && typeof error === "object" && "digest" in error) throw error;
@@ -422,8 +436,9 @@ export async function saveStoreSettingsAction(_prev: VendorState, formData: Form
 
 export async function saveVendorKycAction(_prev: VendorState, formData: FormData): Promise<VendorState> {
   const ctx = await getVendorContext();
-  const lockError = vendorSuspensionMessage(ctx);
-  if (lockError) return { error: lockError };
+  if (ctx.isSubscriptionExpired || ctx.isManuallySuspended) {
+    return { error: vendorSuspensionMessage(ctx) ?? "Account suspended." };
+  }
 
   const proofFile = formData.get("proofOfResidenceFile");
   const hasFile = proofFile instanceof File && proofFile.size > 0;
@@ -470,13 +485,25 @@ export async function saveVendorKycAction(_prev: VendorState, formData: FormData
       entityId: ctx.store.id,
       description: `${ctx.store.name} updated identity, proof of residence, and CAC details`,
     });
+
+    if (ctx.store.status === "rejected") {
+      await resubmitStoreForReview(ctx.store.id);
+    }
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Verification details could not be saved" };
   }
 
+  revalidatePath("/vendor");
   revalidatePath("/vendor/store");
+  revalidatePath("/admin");
+  revalidatePath("/admin/messages");
   revalidatePath(`/admin/vendors/${ctx.store.id}`);
-  return { message: "Identity, residence & CAC verification details saved." };
+  return {
+    message:
+      ctx.store.status === "rejected"
+        ? "Verification documents updated and re-submitted for 48-hour admin review."
+        : "Identity, residence & CAC verification details saved.",
+  };
 }
 
 /* -------------------------------------------------------------------------- */

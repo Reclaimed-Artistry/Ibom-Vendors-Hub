@@ -10,9 +10,10 @@ import { storeBase } from "@/lib/storefront-base";
 import { proofOfResidenceLabel } from "@/lib/akwa-ibom";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/utils";
 import { Badge, Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
-import { approveStoreAction, restoreStoreAction, setStoreVisibilityAction, verifyVendorKycAction } from "@/app/actions/admin";
+import { restoreStoreAction, setStoreVisibilityAction, verifyVendorKycAction } from "@/app/actions/admin";
 import { SubmitButton } from "@/components/submit-button";
-import { GrantSubscriptionForm, RejectStoreForm, SuspendStoreForm } from "@/components/admin-forms";
+import { GrantSubscriptionForm, SuspendStoreForm } from "@/components/admin-forms";
+import { KycDocumentReviewPanel } from "@/components/kyc-document-review";
 import type { VendorProfile } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Vendor detail · Admin" };
@@ -31,6 +32,9 @@ export default async function AdminVendorDetailPage({ params }: { params: Promis
     visibility: string;
     suspension_reason: string | null;
     rejection_reason: string | null;
+    review_deadline_at: string | null;
+    logo_url: string | null;
+    cover_url: string | null;
     created_at: string;
     owner_id: string;
     owner_name: string;
@@ -102,6 +106,45 @@ export default async function AdminVendorDetailPage({ params }: { params: Promis
         <StatCard label="Rating" value={Number(stats?.rating ?? 0).toFixed(1)} hint={`${stats?.reviews ?? 0} reviews`} />
         <StatCard label="Subscription" value={subscription ? formatDate(subscription.expires_at) : "None"} hint={subscription?.status ?? "expired"} />
       </div>
+
+      <Card>
+        <CardHeader
+          title={
+            store.status === "pending"
+              ? "48-Hour Storefront Document Review & Approval Decision"
+              : "Registration Documents, Identity & CAC Verification"
+          }
+          description="Always inspect the uploaded Proof of Residence, NIN, CAC status, and business profile before approving a storefront."
+        />
+        <div className="card-pad space-y-4">
+          <KycDocumentReviewPanel
+            snapshot={{
+              storeId: store.id,
+              storeName: store.name,
+              storeSlug: store.slug,
+              storeStatus: store.status,
+              createdAt: store.created_at,
+              reviewDeadlineAt: store.review_deadline_at,
+              ownerName: store.owner_name,
+              ownerEmail: store.owner_email,
+              ownerPhone: store.owner_phone ?? store.phone,
+              categoryName: store.category_name,
+              city: store.city,
+              state: store.state,
+              address: store.address,
+              logoUrl: store.logo_url,
+              coverUrl: store.cover_url,
+              nin: kyc?.nin,
+              proofOfResidenceType: kyc?.proof_of_residence_type,
+              proofOfResidenceUrl: kyc?.proof_of_residence_url,
+              cacRegistered: kyc?.cac_registered,
+              cacNumber: kyc?.cac_number,
+              kycStatus: kyc?.kyc_status,
+            }}
+            showDecisionActions={true}
+          />
+        </div>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
@@ -261,13 +304,9 @@ export default async function AdminVendorDetailPage({ params }: { params: Promis
             <CardHeader title="Moderation" description="Suspension keeps all data intact." />
             <div className="card-pad space-y-4">
               {store.status === "pending" ? (
-                <>
-                  <form action={approveStoreAction}>
-                    <input type="hidden" name="storeId" value={store.id} />
-                    <SubmitButton className="btn-primary w-full" pendingLabel="Approving…">Approve storefront</SubmitButton>
-                  </form>
-                  <RejectStoreForm storeId={store.id} />
-                </>
+                <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                  Review the uploaded Proof of Residence and NIN above, then approve or decline within the 48-hour timer.
+                </p>
               ) : null}
               {store.status === "active" ? <SuspendStoreForm storeId={store.id} /> : null}
               {store.status === "suspended" ? (

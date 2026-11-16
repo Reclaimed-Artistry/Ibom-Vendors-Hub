@@ -13,6 +13,7 @@ import { DashboardNav, LogoutButton, MobileNav, type DashboardNavItem } from "@/
 import { Logo } from "@/components/logo";
 import { VendorAnnouncements } from "@/components/announcement-strip";
 import { SubscriptionCountdown } from "@/components/subscription-countdown";
+import { ReviewCountdown } from "@/components/review-countdown";
 
 export const metadata: Metadata = { title: "Vendor dashboard · Ibom Vendors Hub" };
 
@@ -197,9 +198,31 @@ export default async function VendorLayout({ children }: { children: React.React
               </div>
             ) : null}
             {!isSubscriptionExpired && store.status === "pending" ? (
-              <div className="flex items-start gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
-                <Clock className="mt-0.5 size-4 shrink-0" />
-                <span>Application under review. You can prepare products and settings now — your storefront goes live once an admin approves it.</span>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
+                <p className="flex items-start gap-2.5">
+                  <Clock className="mt-0.5 size-4 shrink-0 text-amber-700" />
+                  <span>
+                    <strong className="font-semibold">Storefront under 48-hour verification review.</strong>{" "}
+                    Our admin team is reviewing your uploaded Proof of Residence, NIN, and registration details. You can
+                    add and publish products right now — we will notify you and open your store publicly as soon as it is approved.
+                  </span>
+                </p>
+                <ReviewCountdown deadlineAt={store.review_deadline_at} createdAt={store.created_at} compact />
+              </div>
+            ) : null}
+            {store.status === "rejected" ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-950">
+                <p className="flex items-start gap-2.5">
+                  <ShieldAlert className="mt-0.5 size-4 shrink-0 text-red-600" />
+                  <span>
+                    <strong className="font-semibold">Storefront application declined</strong>
+                    {store.rejection_reason ? ` — Reason: ${store.rejection_reason}` : "."}{" "}
+                    Update your Proof of Residence or identity details in Store Profile to re-submit for a fresh 48-hour review.
+                  </span>
+                </p>
+                <Link href="/vendor/store" className="btn btn-primary btn-sm shrink-0">
+                  Update verification documents
+                </Link>
               </div>
             ) : null}
             {store.status === "suspended" || store.manual_suspension ? (

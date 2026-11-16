@@ -10,11 +10,16 @@ export interface NotificationInput {
   dedupeKey?: string;
 }
 
-/** Idempotent in-app notification. */
-export async function notify(input: NotificationInput, db: Db = systemDb) {
+/**
+ * Idempotent in-app notification. Always executes via `systemDb` (nested
+ * savepoint + `reset role` when inside `withActor`) because `notifications`
+ * has no INSERT RLS policy for `app_runtime`.
+ */
+export async function notify(input: NotificationInput, _db?: Db) {
+  void _db;
   if (!input.userId) return;
   try {
-    await db.execute(
+    await systemDb.execute(
       `insert into notifications (user_id, store_id, type, title, body, action_url, dedupe_key)
        values ($1,$2,$3,$4,$5,$6,$7)
        on conflict (dedupe_key) do nothing`,
@@ -35,13 +40,22 @@ export async function notify(input: NotificationInput, db: Db = systemDb) {
 
 export async function notifyAdmins(
   input: Omit<NotificationInput, "userId">,
-  db: Db = systemDb,
+  _db?: Db,
 ) {
-  const admins = await db.query<{ id: string }>(
-    `select id from users where role in ('admin','super_admin') and status = 'active'`,
-  );
-  for (const admin of admins) {
-    await notify({ ...input, userId: admin.id, dedupeKey: input.dedupeKey ? `${input.dedupeKey}:${admin.id}` : undefined }, db);
+  void _db;
+  try {
+    const admins = await systemDb.query<{ id: string }>(
+      `select id from users where role in ('admin','super_admin') and status = 'active'`,
+    );
+    for (const admin of admins) {
+      await notify({
+        ...input,
+        userId: admin.id,
+        dedupeKey: input.dedupeKey ? `${input.dedupeKey}:${admin.id}` : undefined,
+      });
+    }
+  } catch (error) {
+    console.error("notifyAdmins failed", error);
   }
 }
 
