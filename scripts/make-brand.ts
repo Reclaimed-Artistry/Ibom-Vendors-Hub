@@ -31,15 +31,26 @@ async function main() {
   await sharp(trimmed).resize({ width: 480 }).png({ compressionLevel: 9 }).toFile(`${OUT}/ibom-vendors-hub-logo-small.png`);
 
   // Square icons: the whole lockup, letterboxed on white — never cropped.
-  for (const [name, size, pad] of [
-    ["src/app/icon.png", 256, 0.1],
-    ["src/app/apple-icon.png", 180, 0.1],
-    ["public/brand/icon-512.png", 512, 0.12],
+  //
+  // The browser icon is a rounded square with transparent corners so it sits
+  // comfortably next to other tabs. apple-icon stays a full bleed square: iOS
+  // applies its own mask and paints any transparency black.
+  const roundedMask = (size: number) =>
+    Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">` +
+        `<rect x="0" y="0" width="${size}" height="${size}" rx="${Math.round(size * 0.225)}" ry="${Math.round(size * 0.225)}" fill="#ffffff"/>` +
+        `</svg>`,
+    );
+
+  for (const [name, size, pad, rounded] of [
+    ["src/app/icon.png", 256, 0.1, true],
+    ["src/app/apple-icon.png", 180, 0.1, false],
+    ["public/brand/icon-512.png", 512, 0.12, true],
   ] as const) {
     const inner = Math.round(size * (1 - pad * 2));
     const scaled = await sharp(trimmed).resize({ width: inner, height: inner, fit: "inside" }).png().toBuffer();
     const scaledMeta = await sharp(scaled).metadata();
-    await sharp({ create: { width: size, height: size, channels: 4, background: "#ffffff" } })
+    let tile = await sharp({ create: { width: size, height: size, channels: 4, background: "#ffffff" } })
       .composite([
         {
           input: scaled,
@@ -47,8 +58,17 @@ async function main() {
           top: Math.round((size - scaledMeta.height!) / 2),
         },
       ])
-      .png({ compressionLevel: 9 })
-      .toFile(name);
+      .png()
+      .toBuffer();
+
+    if (rounded) {
+      tile = await sharp(tile)
+        .composite([{ input: roundedMask(size), blend: "dest-in" }])
+        .png()
+        .toBuffer();
+    }
+
+    await sharp(tile).png({ compressionLevel: 9 }).toFile(name);
   }
 
   // Social card: brand-dark canvas with the complete lockup centred on a white card.
