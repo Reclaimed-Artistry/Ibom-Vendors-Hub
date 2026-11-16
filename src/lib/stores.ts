@@ -1,6 +1,7 @@
 import { isUniqueViolation, systemDb, withSystem } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { isReservedSubdomain, normaliseSubdomain } from "@/lib/domains";
+import { AKWA_IBOM_STATE, isAkwaIbomState } from "@/lib/akwa-ibom";
 import { getSettings } from "@/lib/settings";
 import { logActivity } from "@/lib/audit";
 import { notify, notifyAdmins } from "@/lib/notifications";
@@ -80,6 +81,11 @@ export interface RegisterVendorInput {
   city: string;
   state: string;
   address?: string;
+  nin: string;
+  proofOfResidenceType: string;
+  proofOfResidenceUrl: string;
+  cacRegistered: "yes" | "no" | boolean;
+  cacNumber?: string;
   logoUrl?: string;
   coverUrl?: string;
 }
@@ -95,6 +101,15 @@ export interface RegisterVendorResult {
 }
 
 export async function registerVendor(input: RegisterVendorInput): Promise<RegisterVendorResult> {
+  if (!isAkwaIbomState(input.state)) {
+    throw new Error("Every vendor on Ibom Vendors Hub must be located in Akwa Ibom State.");
+  }
+  const cacRegistered = input.cacRegistered === true || input.cacRegistered === "yes";
+  const cacNumber = cacRegistered ? (input.cacNumber ?? "").trim().toUpperCase() : null;
+  if (cacRegistered && !cacNumber) {
+    throw new Error("Enter your CAC registration number.");
+  }
+
   const settings = await getSettings();
   const email = input.email.trim().toLowerCase();
   const category = await systemDb.maybeOne<{ id: string; slug: string; name: string }>(
@@ -135,7 +150,19 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
       [email, passwordHash, input.ownerName.trim(), input.phone.trim()],
     );
 
-    await db.execute(`insert into vendor_profiles (user_id, position) values ($1, 'Owner')`, [user.id]);
+    await db.execute(
+      `insert into vendor_profiles
+         (user_id, position, nin, proof_of_residence_type, proof_of_residence_url, cac_registered, cac_number, kyc_status)
+       values ($1, 'Owner', $2, $3, $4, $5, $6, 'submitted')`,
+      [
+        user.id,
+        input.nin.trim(),
+        input.proofOfResidenceType.trim(),
+        input.proofOfResidenceUrl,
+        cacRegistered,
+        cacNumber,
+      ],
+    );
     await db.execute(
       `insert into user_roles (user_id, role) values ($1,'vendor') on conflict do nothing`,
       [user.id],
@@ -161,7 +188,7 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
         email,
         input.phone.trim(),
         input.city.trim(),
-        input.state.trim(),
+        AKWA_IBOM_STATE,
         input.address?.trim() || null,
         settings.country,
         status,

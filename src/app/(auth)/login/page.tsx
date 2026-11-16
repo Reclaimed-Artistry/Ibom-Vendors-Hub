@@ -7,8 +7,6 @@ import { redirect } from "next/navigation";
 
 export const metadata = { title: "Sign in" };
 
-// Seeded demo logins only make sense against a database that still holds the seed
-// data, so the hint is opt-in through DEMO_MODE=1 (never set in production).
 const demoMode = process.env.DEMO_MODE === "1";
 
 const OAUTH_MESSAGES: Record<string, string> = {
@@ -30,12 +28,37 @@ export default async function LoginPage({
 }) {
   const params = await searchParams;
   const user = await getCurrentUser();
-  if (user) redirect(user.role === "vendor" ? "/vendor" : user.role === "customer" ? "/account" : "/admin");
+  if (user) {
+    if (params.next && params.next.startsWith("/")) redirect(params.next);
+    redirect(user.role === "vendor" ? "/vendor" : user.role === "customer" ? "/account" : "/admin");
+  }
+
+  const isCheckoutRedirect = params.next?.startsWith("/checkout");
 
   return (
     <div>
-      <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
-      <p className="mt-1.5 text-sm text-ink-500">Sign in to manage your store or track your orders.</p>
+      <h1 className="text-2xl font-bold tracking-tight">
+        {isCheckoutRedirect ? "Sign in to continue to checkout" : "Welcome back"}
+      </h1>
+      <p className="mt-1.5 text-sm text-ink-500">
+        {isCheckoutRedirect
+          ? "Customers must sign in before checking out so your order, Delivery PIN, and verified purchase reviews stay tied to your account."
+          : "Sign in to manage your store or track your orders."}
+      </p>
+      {isCheckoutRedirect ? (
+        <div className="mt-5">
+          <Alert tone="info">
+            Your cart items are saved on this device. Sign in below or{" "}
+            <Link
+              href={`/register?role=customer&next=${encodeURIComponent(params.next ?? "/checkout")}`}
+              className="font-semibold underline"
+            >
+              create a customer account
+            </Link>{" "}
+            to complete your order.
+          </Alert>
+        </div>
+      ) : null}
       {params.reset ? <div className="mt-5"><Alert tone="success">Password updated. Sign in with your new password.</Alert></div> : null}
       {params.oauth ? <div className="mt-5"><Alert tone="warning">{OAUTH_MESSAGES[params.oauth] ?? OAUTH_MESSAGES.failed}</Alert></div> : null}
       <div className="mt-6 space-y-5">
@@ -51,7 +74,28 @@ export default async function LoginPage({
         </div>
       ) : null}
       <p className="mt-6 text-sm text-ink-500">
-        New to Ibom Vendors Hub? <Link href="/register" className="font-semibold text-brand-800 hover:text-brand-900">Open a storefront</Link>
+        {isCheckoutRedirect ? (
+          <>
+            Don&apos;t have an account yet?{" "}
+            <Link
+              href={`/register?role=customer&next=${encodeURIComponent(params.next ?? "/checkout")}`}
+              className="font-semibold text-brand-800 hover:text-brand-900"
+            >
+              Create a customer account
+            </Link>
+          </>
+        ) : (
+          <>
+            New to Ibom Vendors Hub?{" "}
+            <Link href="/register" className="font-semibold text-brand-800 hover:text-brand-900">
+              Open a storefront
+            </Link>{" "}
+            or{" "}
+            <Link href="/register?role=customer" className="font-semibold text-brand-800 hover:text-brand-900">
+              sign up as a customer
+            </Link>
+          </>
+        )}
       </p>
     </div>
   );

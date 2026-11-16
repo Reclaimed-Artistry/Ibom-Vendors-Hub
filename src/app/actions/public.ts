@@ -5,7 +5,11 @@ import { getCurrentUser } from "@/lib/auth";
 import { systemDb, withActor, withSystem } from "@/lib/db";
 import { getSettings, paystackSecret, url } from "@/lib/settings";
 import { initializeTransaction } from "@/lib/payments/gateway";
-import { createCheckout } from "@/lib/orders";
+import {
+  confirmOrderDeliveryByCustomer,
+  createCheckout,
+  reportOrderIssueByCustomer,
+} from "@/lib/orders";
 import { sendEmail } from "@/lib/email";
 import { notify, notifyAdmins } from "@/lib/notifications";
 import { logActivity } from "@/lib/audit";
@@ -22,6 +26,14 @@ export interface PublicState {
 /* Checkout                                                                   */
 /* -------------------------------------------------------------------------- */
 export async function submitCheckoutAction(_prev: PublicState, formData: FormData): Promise<PublicState> {
+  const user = await getCurrentUser();
+  if (!user) {
+    return {
+      error: "Please sign in to your account before checking out.",
+      redirectUrl: "/login?next=%2Fcheckout",
+    };
+  }
+
   const rawItems = String(formData.get("items") ?? "[]");
   let items: unknown = [];
   try {
@@ -33,24 +45,29 @@ export async function submitCheckoutAction(_prev: PublicState, formData: FormDat
   const parsed = checkoutSchema.safeParse({
     items,
     customerName: formData.get("customerName"),
-    customerEmail: formData.get("customerEmail"),
+    customerEmail: formData.get("customerEmail") || user.email,
     customerPhone: formData.get("customerPhone"),
+    bioAddress: formData.get("bioAddress") ?? "",
     fulfilmentType: formData.get("fulfilmentType") || "delivery",
     address: formData.get("address") ?? "",
     city: formData.get("city") ?? "",
     state: formData.get("state") ?? "",
+    pickupLocation: formData.get("pickupLocation") ?? "",
     deliveryNotes: formData.get("deliveryNotes") ?? "",
     customerNotes: formData.get("customerNotes") ?? "",
     scheduledFor: formData.get("scheduledFor") ?? "",
   });
 
   if (!parsed.success) {
-    return { error: "Please check the delivery details", fieldErrors: formatIssues(parsed.error) };
+    return { error: "Please check your bio and fulfilment details", fieldErrors: formatIssues(parsed.error) };
   }
 
-  const user = await getCurrentUser();
   try {
-    const result = await createCheckout(parsed.data, user ? { id: user.id, email: user.email, fullName: user.fullName } : null);
+    const result = await createCheckout(parsed.data, {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+    });
     return { redirectUrl: result.authorizationUrl };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Checkout failed. Please try again." };
@@ -400,7 +417,7 @@ export async function submitBookingAction(_prev: PublicState, formData: FormData
 /* -------------------------------------------------------------------------- */
 export async function submitReviewAction(_prev: PublicState, formData: FormData): Promise<PublicState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Sign in to leave a review" };
+  if (!user) return { error: "Sign in to leave a review — only logged-in verified buyers can review purchases." };
 
   const parsed = reviewSchema.safeParse({
     orderId: formData.get("orderId"),
@@ -413,11 +430,45 @@ export async function submitReviewAction(_prev: PublicState, formData: FormData)
     return { error: "Please fix the highlighted fields", fieldErrors: formatIssues(parsed.error) };
   }
 
-  const order = await systemDb.maybeOne<{ id: string; store_id: string; customer_email: string; status: string }>(
-    `select id, store_id, customer_email, status from orders where id = $1`,
+  const order = await systemDb.maybeOne<{
+    id: string;
+    store_id: string;
+    customer_id: string | null;
+    customer_email: string;
+    status: string;
+    store_slug: string;
+  }>(
+    `select o.id, o.store_id, o.customer_id, o.customer_email, o.status, s.slug as store_slug
+       from orders o join stores s on s.id = o.store_id
+      where o.id = $1`,
     [parsed.data.orderId],
   );
   if (!order) return { error: "Order not found" };
+
+  const ownsOrder =
+    order.customer_id === user.id || order.customer_email.toLowerCase() === user.email.toLowerCase();
+  if (!ownsOrder) {
+    return { error: "You can only review purchases made on your own account." };
+  }
+  if (!["delivered", "completed"].includes(order.status)) {
+    return { error: "Reviews unlock after your order has been delivered and confirmed." };
+  }
+
+  const productId = parsed.data.productId && parsed.data.productId !== "" ? parsed.data.productId : null;
+  let productSlug: string | null = null;
+  if (productId) {
+    const purchasedItem = await systemDb.maybeOne<{ slug: string }>(
+      `select p.slug
+         from order_items oi join products p on p.id = oi.product_id
+        where oi.order_id = $1 and oi.product_id = $2
+        limit 1`,
+      [order.id, productId],
+    );
+    if (!purchasedItem) {
+      return { error: "That item was not part of this order." };
+    }
+    productSlug = purchasedItem.slug;
+  }
 
   try {
     await withActor({ id: user.id, role: "customer", email: user.email }, async (db) => {
@@ -427,7 +478,7 @@ export async function submitReviewAction(_prev: PublicState, formData: FormData)
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,'published',true)`,
         [
           order.store_id,
-          parsed.data.productId && parsed.data.productId !== "" ? parsed.data.productId : null,
+          productId,
           order.id,
           user.id,
           user.fullName,
@@ -440,9 +491,9 @@ export async function submitReviewAction(_prev: PublicState, formData: FormData)
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
-    if (message.includes("duplicate key")) return { error: "You have already reviewed this order." };
+    if (message.includes("duplicate key")) return { error: "You have already reviewed this purchase." };
     if (message.includes("row-level security")) {
-      return { error: "Only customers with a completed order can review this purchase." };
+      return { error: "Only signed-in customers with a completed purchase can review this item." };
     }
     return { error: "Review could not be saved. Please try again." };
   }
@@ -456,12 +507,62 @@ export async function submitReviewAction(_prev: PublicState, formData: FormData)
       to: owner.email,
       template: "review_received",
       data: { storeName: owner.name, name: user.fullName, amount: parsed.data.rating, message: parsed.data.comment },
-      dedupeKey: `review-received:${order.id}:${parsed.data.productId ?? "store"}`,
+      dedupeKey: `review-received:${order.id}:${productId ?? "store"}`,
     });
   }
 
   revalidatePath(`/account/orders/${order.id}`);
-  return { message: "Thank you! Your review is published." };
+  revalidatePath(`/account/reviews`);
+  revalidatePath(`/s/${order.store_slug}`);
+  revalidatePath(`/s/${order.store_slug}/reviews`);
+  if (productSlug) revalidatePath(`/s/${order.store_slug}/products/${productSlug}`);
+  return { message: "Thank you! Your verified purchase review is now live." };
+}
+
+export async function confirmOrderDeliveryAction(_prev: PublicState, formData: FormData): Promise<PublicState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Please sign in to confirm delivery." };
+
+  const orderId = String(formData.get("orderId") ?? "");
+  const note = String(formData.get("note") ?? "");
+  try {
+    await confirmOrderDeliveryByCustomer({
+      orderId,
+      actor: { id: user.id, email: user.email, fullName: user.fullName },
+      note,
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not confirm delivery." };
+  }
+
+  revalidatePath(`/account/orders/${orderId}`);
+  revalidatePath(`/vendor/orders/${orderId}`);
+  revalidatePath(`/account/orders`);
+  revalidatePath(`/account/reviews`);
+  return { message: "Delivery confirmed! Vendor payout has been released and you can now leave a review below." };
+}
+
+export async function reportOrderDeliveryIssueAction(_prev: PublicState, formData: FormData): Promise<PublicState> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Please sign in to report an order issue." };
+
+  const orderId = String(formData.get("orderId") ?? "");
+  const reason = String(formData.get("reason") ?? "");
+  const details = String(formData.get("details") ?? "");
+  try {
+    await reportOrderIssueByCustomer({
+      orderId,
+      actor: { id: user.id, email: user.email, fullName: user.fullName },
+      reason,
+      details,
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not submit delivery dispute." };
+  }
+
+  revalidatePath(`/account/orders/${orderId}`);
+  revalidatePath(`/vendor/orders/${orderId}`);
+  return { message: "Delivery dispute recorded. Payout is held while our team and the vendor investigate." };
 }
 
 /* -------------------------------------------------------------------------- */

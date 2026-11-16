@@ -305,11 +305,12 @@ export async function getStoreReviews(storeId: string, limit = 6, productId?: st
       customer_name: string;
       created_at: string;
       vendor_response: string | null;
+      verified_purchase: boolean;
       product_id: string | null;
       product_name?: string | null;
     }>(
       `select r.id, r.rating, r.title, r.comment, r.customer_name, r.created_at,
-              r.vendor_response, r.product_id, p.name as product_name
+              r.vendor_response, r.verified_purchase, r.product_id, p.name as product_name
          from reviews r left join products p on p.id = r.product_id
         where r.store_id = $1 and r.status = 'published'
           and ($3::uuid is null or r.product_id = $3::uuid)

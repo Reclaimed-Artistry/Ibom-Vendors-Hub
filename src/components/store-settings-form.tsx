@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Check } from "lucide-react";
+import { Check, ExternalLink, FileCheck2, ShieldCheck } from "lucide-react";
+import { saveStoreSettingsAction, saveVendorKycAction, type VendorState } from "@/app/actions/vendor";
 import { requestSubdomainChangeAction, type ActionState } from "@/app/actions/auth";
-import { saveStoreSettingsAction, type VendorState } from "@/app/actions/vendor";
-import { Alert, Field } from "@/components/ui";
+import { AKWA_IBOM_LGAS, AKWA_IBOM_STATE, PROOF_OF_RESIDENCE_TYPES } from "@/lib/akwa-ibom";
+import { Alert, Badge, Field } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 
 const DAYS: Array<{ key: string; label: string }> = [
@@ -41,36 +42,56 @@ export interface StoreSettingsValues {
   coverUrl: string;
 }
 
+export interface VendorKycValues {
+  nin: string;
+  proofOfResidenceType: string;
+  proofOfResidenceUrl: string;
+  cacRegistered: boolean;
+  cacNumber: string;
+  kycStatus: "pending" | "submitted" | "verified" | "rejected";
+  kycNote: string | null;
+}
+
 export function StoreSettingsForm({ values }: { values: StoreSettingsValues }) {
   const [state, formAction] = useActionState<VendorState, FormData>(saveStoreSettingsAction, {});
+
+  const currentCity = values.city || "Uyo";
+  const cityOptions = AKWA_IBOM_LGAS.includes(currentCity as (typeof AKWA_IBOM_LGAS)[number])
+    ? AKWA_IBOM_LGAS
+    : ([currentCity, ...AKWA_IBOM_LGAS] as const);
+
   return (
     <form action={formAction} className="space-y-4">
-      {state.error ? <Alert tone="danger" title="Could not save">{state.error}</Alert> : null}
-      {state.message ? <Alert tone="success" title="Saved">{state.message}</Alert> : null}
+      {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
+      {state.message ? <Alert tone="success">{state.message}</Alert> : null}
+
+      <input type="hidden" name="logoUrl" value={values.logoUrl} />
+      <input type="hidden" name="coverUrl" value={values.coverUrl} />
 
       <section className="card card-pad space-y-4">
-        <h2 className="text-base font-semibold text-ink-900">Storefront identity</h2>
+        <div>
+          <h2 className="text-base font-semibold text-ink-900">Brand &amp; story</h2>
+          <p className="text-sm text-ink-500">Displayed on your storefront header and on marketplace cards.</p>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Store name" htmlFor="store-name" required error={state.fieldErrors?.name}>
-            <input id="store-name" name="name" className="input" defaultValue={values.name} required maxLength={80} />
+          <Field label="Business name" htmlFor="store-name" required error={state.fieldErrors?.name}>
+            <input id="store-name" name="name" className="input" defaultValue={values.name} required maxLength={120} />
           </Field>
-          <Field label="Tagline" htmlFor="store-tagline">
-            <input id="store-tagline" name="tagline" className="input" defaultValue={values.tagline} maxLength={120} placeholder="One line customers remember" />
+          <Field label="Short tagline" htmlFor="store-tagline" hint="One crisp line under your name." error={state.fieldErrors?.tagline}>
+            <input id="store-tagline" name="tagline" className="input" defaultValue={values.tagline} maxLength={160} placeholder="Fresh bakes from Uyo every morning" />
           </Field>
         </div>
-        <Field label="About your store" htmlFor="store-description">
-          <textarea id="store-description" name="description" className="textarea min-h-32" defaultValue={values.description} maxLength={3000} />
+        <Field label="About your business" htmlFor="store-description" error={state.fieldErrors?.description}>
+          <textarea id="store-description" name="description" rows={4} className="textarea" defaultValue={values.description} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Logo" htmlFor="logoFile" hint="Square image works best.">
-            <input id="logoFile" name="logoFile" type="file" accept="image/png,image/jpeg,image/webp" className="input py-2" />
+          <Field label="Logo (square works best)" htmlFor="logoFile">
+            <input id="logoFile" name="logoFile" type="file" accept="image/png,image/jpeg,image/webp" className="input py-2 text-xs" />
           </Field>
-          <Field label="Cover photo" htmlFor="coverFile" hint="Wide image, at least 1200px.">
-            <input id="coverFile" name="coverFile" type="file" accept="image/png,image/jpeg,image/webp" className="input py-2" />
+          <Field label="Cover banner (wide)" htmlFor="coverFile">
+            <input id="coverFile" name="coverFile" type="file" accept="image/png,image/jpeg,image/webp" className="input py-2 text-xs" />
           </Field>
         </div>
-        <input type="hidden" name="logoUrl" value={values.logoUrl} />
-        <input type="hidden" name="coverUrl" value={values.coverUrl} />
         {values.logoUrl || values.coverUrl ? (
           <div className="flex gap-3">
             {values.logoUrl ? (
@@ -86,49 +107,76 @@ export function StoreSettingsForm({ values }: { values: StoreSettingsValues }) {
       </section>
 
       <section className="card card-pad space-y-4">
-        <h2 className="text-base font-semibold text-ink-900">Contact &amp; location</h2>
+        <div>
+          <h2 className="text-base font-semibold text-ink-900">Akwa Ibom location &amp; contact</h2>
+          <p className="text-sm text-ink-500">
+            All storefronts on Ibom Vendors Hub operate in <strong>Akwa Ibom State</strong>. Customers who select pickup at checkout see your street address below.
+          </p>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Public email" htmlFor="store-email">
+          <Field label="Public email" htmlFor="store-email" error={state.fieldErrors?.email}>
             <input id="store-email" name="email" type="email" className="input" defaultValue={values.email} />
           </Field>
-          <Field label="Phone" htmlFor="store-phone">
-            <input id="store-phone" name="phone" className="input" defaultValue={values.phone} />
+          <Field label="Phone" htmlFor="store-phone" error={state.fieldErrors?.phone}>
+            <input id="store-phone" name="phone" className="input" defaultValue={values.phone} placeholder="+234 800 000 0000" />
           </Field>
-          <Field label="WhatsApp" htmlFor="store-whatsapp">
-            <input id="store-whatsapp" name="whatsapp" className="input" defaultValue={values.whatsapp} placeholder="+234…" />
+          <Field label="WhatsApp number" htmlFor="store-whatsapp" error={state.fieldErrors?.whatsapp}>
+            <input id="store-whatsapp" name="whatsapp" className="input" defaultValue={values.whatsapp} placeholder="+234 800 000 0000" />
           </Field>
-          <Field label="Website" htmlFor="store-website">
-            <input id="store-website" name="website" className="input" defaultValue={values.website} placeholder="https://" />
+          <Field label="Website or social link" htmlFor="store-website" error={state.fieldErrors?.website}>
+            <input id="store-website" name="website" className="input" defaultValue={values.website} placeholder="https://instagram.com/yourstore" />
           </Field>
         </div>
-        <Field label="Street address" htmlFor="store-address">
-          <input id="store-address" name="address" className="input" defaultValue={values.address} />
+        <Field
+          label="Physical business / pickup street address (Akwa Ibom)"
+          htmlFor="store-address"
+          required
+          error={state.fieldErrors?.address}
+          hint="Shown to customers when they choose 'Pick up from vendor's location'"
+        >
+          <input id="store-address" name="address" className="input" defaultValue={values.address} required />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="City" htmlFor="store-city">
-            <input id="store-city" name="city" className="input" defaultValue={values.city} />
+          <Field label="LGA / Town in Akwa Ibom" htmlFor="store-city" required error={state.fieldErrors?.city}>
+            <select id="store-city" name="city" className="select" defaultValue={currentCity} required>
+              {cityOptions.map((lga) => (
+                <option key={lga} value={lga}>{lga}</option>
+              ))}
+            </select>
           </Field>
-          <Field label="State" htmlFor="store-state">
-            <input id="store-state" name="state" className="input" defaultValue={values.state} />
+          <Field label="State" htmlFor="store-state" hint="Locked to Akwa Ibom State" required error={state.fieldErrors?.state}>
+            <input
+              id="store-state"
+              name="state"
+              className="input bg-ink-50 font-semibold text-ink-800 cursor-not-allowed"
+              value={AKWA_IBOM_STATE}
+              readOnly
+            />
           </Field>
         </div>
       </section>
 
       <section className="card card-pad space-y-4">
-        <h2 className="text-base font-semibold text-ink-900">Orders &amp; fulfilment</h2>
-        <div className="flex flex-wrap gap-5 text-sm text-ink-700">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" name="acceptsOrders" defaultChecked={values.acceptsOrders} className="size-4 rounded border-ink-300" /> Accept new orders
+        <div>
+          <h2 className="text-base font-semibold text-ink-900">Ordering &amp; fulfilment</h2>
+          <p className="text-sm text-ink-500">Control whether customers can use a dispatch rider, pick up from your location, or both.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="flex items-start gap-2.5 rounded-xl border border-ink-200 p-3 text-sm">
+            <input type="checkbox" name="acceptsOrders" defaultChecked={values.acceptsOrders} className="mt-1 size-4 rounded border-ink-300" />
+            <span><span className="block font-medium text-ink-900">Accept online orders</span><span className="text-xs text-ink-500">Turn off to pause checkout temporarily.</span></span>
           </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" name="acceptsDelivery" defaultChecked={values.acceptsDelivery} className="size-4 rounded border-ink-300" /> Offer delivery
+          <label className="flex items-start gap-2.5 rounded-xl border border-ink-200 p-3 text-sm">
+            <input type="checkbox" name="acceptsDelivery" defaultChecked={values.acceptsDelivery} className="mt-1 size-4 rounded border-ink-300" />
+            <span><span className="block font-medium text-ink-900">Offer dispatch delivery</span><span className="text-xs text-ink-500">Dispatch fee added at checkout.</span></span>
           </label>
-          <label className="flex items-center gap-2">
-            <input type="checkbox" name="acceptsPickup" defaultChecked={values.acceptsPickup} className="size-4 rounded border-ink-300" /> Offer pickup
+          <label className="flex items-start gap-2.5 rounded-xl border border-ink-200 p-3 text-sm">
+            <input type="checkbox" name="acceptsPickup" defaultChecked={values.acceptsPickup} className="mt-1 size-4 rounded border-ink-300" />
+            <span><span className="block font-medium text-ink-900">Customer pickup at store</span><span className="text-xs text-ink-500">Free pickup at your Akwa Ibom address.</span></span>
           </label>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Delivery fee (₦)" htmlFor="store-delivery-fee">
+          <Field label="Dispatch delivery fee (₦)" htmlFor="store-delivery-fee">
             <input id="store-delivery-fee" name="deliveryFee" type="number" min="0" step="0.01" className="input" defaultValue={values.deliveryFee} />
           </Field>
           <Field label="Minimum order (₦)" htmlFor="store-minimum">
@@ -138,7 +186,7 @@ export function StoreSettingsForm({ values }: { values: StoreSettingsValues }) {
             <input id="store-prep" name="prepTimeMinutes" type="number" min="0" className="input" defaultValue={values.prepTimeMinutes} />
           </Field>
         </div>
-        <Field label="Delivery areas" htmlFor="store-areas" hint="Comma separated, e.g. Uyo, Ikot Ekpene, Aba.">
+        <Field label="Dispatch coverage areas in Akwa Ibom" htmlFor="store-areas" hint="Comma separated, e.g. Uyo, Ikot Ekpene, Eket, Abak, Oron.">
           <input id="store-areas" name="deliveryAreas" className="input" defaultValue={values.deliveryAreas} />
         </Field>
       </section>
@@ -172,6 +220,186 @@ export function StoreSettingsForm({ values }: { values: StoreSettingsValues }) {
   );
 }
 
+export function VendorKycForm({ kyc }: { kyc: VendorKycValues }) {
+  const [state, formAction] = useActionState<VendorState, FormData>(saveVendorKycAction, {});
+  const [cacRegistered, setCacRegistered] = useState<"yes" | "no">(kyc.cacRegistered ? "yes" : "no");
+  const [selectedFile, setSelectedFile] = useState<string>("");
+
+  return (
+    <form action={formAction} className="card card-pad space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex items-start gap-2.5">
+          <ShieldCheck className="mt-0.5 size-5 shrink-0 text-brand-700" />
+          <div>
+            <h2 className="text-base font-semibold text-ink-900">Identity, Residence &amp; CAC Verification</h2>
+            <p className="text-sm text-ink-500">
+              NIN, Proof of Residence in Akwa Ibom, and optional CAC registration details on file with Ibom Vendors Hub.
+            </p>
+          </div>
+        </div>
+        <Badge
+          tone={
+            kyc.kycStatus === "verified"
+              ? "success"
+              : kyc.kycStatus === "rejected"
+                ? "danger"
+                : "info"
+          }
+        >
+          KYC: {kyc.kycStatus}
+        </Badge>
+      </div>
+
+      {kyc.kycNote ? <Alert tone="warning" title="Verification note">{kyc.kycNote}</Alert> : null}
+      {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
+      {state.message ? <Alert tone="success">{state.message}</Alert> : null}
+
+      <input type="hidden" name="proofOfResidenceUrl" value={kyc.proofOfResidenceUrl} />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label="National Identification Number (NIN)"
+          htmlFor="kyc-nin"
+          error={state.fieldErrors?.nin}
+          hint="11-digit NIN"
+          required
+        >
+          <input
+            id="kyc-nin"
+            name="nin"
+            defaultValue={kyc.nin}
+            inputMode="numeric"
+            pattern="\d{11}"
+            maxLength={11}
+            className="input font-mono tracking-wider"
+            required
+            placeholder="12345678901"
+          />
+        </Field>
+
+        <Field
+          label="Proof of residence type"
+          htmlFor="kyc-proof-type"
+          error={state.fieldErrors?.proofOfResidenceType}
+          required
+        >
+          <select
+            id="kyc-proof-type"
+            name="proofOfResidenceType"
+            className="select"
+            defaultValue={kyc.proofOfResidenceType || "utility_bill"}
+            required
+          >
+            {PROOF_OF_RESIDENCE_TYPES.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      <Field
+        label={kyc.proofOfResidenceUrl ? "Replace proof of residence document (optional)" : "Upload proof of residence document"}
+        htmlFor="kyc-proof-file"
+        error={state.fieldErrors?.proofOfResidenceUrl}
+        hint={selectedFile ? `Selected: ${selectedFile}` : "JPG, PNG, WEBP or PDF (max 6MB)"}
+        required={!kyc.proofOfResidenceUrl}
+      >
+        <input
+          id="kyc-proof-file"
+          name="proofOfResidenceFile"
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          required={!kyc.proofOfResidenceUrl}
+          onChange={(e) => setSelectedFile(e.target.files?.[0]?.name ?? "")}
+          className="input py-1.5 text-xs"
+        />
+      </Field>
+
+      {kyc.proofOfResidenceUrl ? (
+        <div className="flex items-center justify-between rounded-xl border border-ink-100 bg-ink-50/70 px-3.5 py-2 text-xs text-ink-700">
+          <span className="flex items-center gap-1.5 font-medium">
+            <FileCheck2 className="size-4 text-brand-700" /> Proof of residence document on file
+          </span>
+          <a
+            href={kyc.proofOfResidenceUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 font-semibold text-brand-800 hover:underline"
+          >
+            View document <ExternalLink className="size-3.5" />
+          </a>
+        </div>
+      ) : null}
+
+      <div className="space-y-2.5">
+        <p className="text-sm font-medium text-ink-800">Is your business registered with CAC?</p>
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          <label
+            className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 text-sm transition ${
+              cacRegistered === "yes" ? "border-brand-600 bg-brand-50/40 ring-1 ring-brand-600" : "border-ink-200 bg-white"
+            }`}
+          >
+            <input
+              type="radio"
+              name="cacRegistered"
+              value="yes"
+              checked={cacRegistered === "yes"}
+              onChange={() => setCacRegistered("yes")}
+              className="mt-0.5"
+            />
+            <div>
+              <p className="font-semibold text-ink-900">Yes, registered with CAC</p>
+              <p className="text-xs text-ink-500">Provide your RC, BN, or IT number</p>
+            </div>
+          </label>
+          <label
+            className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 text-sm transition ${
+              cacRegistered === "no" ? "border-brand-600 bg-brand-50/40 ring-1 ring-brand-600" : "border-ink-200 bg-white"
+            }`}
+          >
+            <input
+              type="radio"
+              name="cacRegistered"
+              value="no"
+              checked={cacRegistered === "no"}
+              onChange={() => setCacRegistered("no")}
+              className="mt-0.5"
+            />
+            <div>
+              <p className="font-semibold text-ink-900">No, not registered yet</p>
+              <p className="text-xs text-ink-500">Continue operating with NIN &amp; Proof of Residence</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {cacRegistered === "yes" ? (
+        <Field
+          label="CAC registration number"
+          htmlFor="kyc-cac-number"
+          error={state.fieldErrors?.cacNumber}
+          required
+        >
+          <input
+            id="kyc-cac-number"
+            name="cacNumber"
+            defaultValue={kyc.cacNumber}
+            className="input font-mono uppercase"
+            required
+            placeholder="e.g. BN-3482910 or RC-1928374"
+          />
+        </Field>
+      ) : null}
+
+      <div className="flex justify-end">
+        <SubmitButton className="btn-primary" pendingLabel="Saving verification…">
+          Save verification details
+        </SubmitButton>
+      </div>
+    </form>
+  );
+}
+
 function SubdomainSubmit() {
   const { pending } = useFormStatus();
   return (
@@ -193,8 +421,8 @@ export function SubdomainRequestForm({ currentSlug, suggested }: { currentSlug: 
       <Field label="Requested address" htmlFor="requested-subdomain" hint="Letters, numbers and hyphens only. Admin approval is required.">
         <input id="requested-subdomain" name="subdomain" className="input" placeholder={suggested} maxLength={40} required />
       </Field>
-      <Field label="Why do you need this change?" htmlFor="subdomain-reason">
-        <textarea id="subdomain-reason" name="reason" className="textarea" maxLength={500} />
+      <Field label="Reason for changing" htmlFor="subdomain-reason">
+        <textarea id="subdomain-reason" name="reason" rows={2} className="textarea" placeholder="Rebrand, typo fix, etc." required />
       </Field>
       <SubdomainSubmit />
     </form>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AKWA_IBOM_STATE, isAkwaIbomState, PROOF_OF_RESIDENCE_TYPES } from "@/lib/akwa-ibom";
 
 const email = z
   .string()
@@ -21,27 +22,79 @@ const password = z
   .regex(/[A-Za-z]/, "Include at least one letter")
   .regex(/\d/, "Include at least one number");
 
+const ninSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{11}$/, "Enter a valid 11-digit National Identification Number (NIN)");
+
+const proofTypes = PROOF_OF_RESIDENCE_TYPES.map((item) => item.value) as [string, ...string[]];
+
+const akwaIbomStateSchema = z
+  .string()
+  .trim()
+  .refine((value) => isAkwaIbomState(value), "Only businesses located in Akwa Ibom State can register as vendors")
+  .transform(() => AKWA_IBOM_STATE);
+
 export const loginSchema = z.object({
   email,
   password: z.string().min(1, "Enter your password"),
   next: z.string().optional(),
 });
 
-export const vendorRegisterSchema = z.object({
-  businessName: z.string().trim().min(3, "Business name is required").max(120),
-  ownerName: z.string().trim().min(3, "Your full name is required").max(120),
-  email,
-  phone,
-  password,
-  categorySlug: z.string().min(1, "Choose a business category"),
-  description: z.string().trim().min(20, "Tell customers about your business (at least 20 characters)").max(4000),
-  city: z.string().trim().min(2, "City is required").max(80),
-  state: z.string().trim().min(2, "State is required").max(80),
-  address: z.string().trim().max(240).optional().or(z.literal("")),
-  logoUrl: z.string().trim().max(500).optional().or(z.literal("")),
-  coverUrl: z.string().trim().max(500).optional().or(z.literal("")),
-  acceptTerms: z.literal("on", { message: "You must accept the terms" }),
-});
+export const vendorRegisterSchema = z
+  .object({
+    businessName: z.string().trim().min(3, "Business name is required").max(120),
+    ownerName: z.string().trim().min(3, "Your full name is required").max(120),
+    email,
+    phone,
+    password,
+    categorySlug: z.string().min(1, "Choose a business category"),
+    description: z.string().trim().min(20, "Tell customers about your business (at least 20 characters)").max(4000),
+    city: z.string().trim().min(2, "Select your Local Government Area / town in Akwa Ibom").max(80),
+    state: akwaIbomStateSchema,
+    address: z.string().trim().min(5, "Enter your physical business / pickup address in Akwa Ibom").max(240),
+    nin: ninSchema,
+    proofOfResidenceType: z.enum(proofTypes, { message: "Select a proof of residence document type" }),
+    proofOfResidenceUrl: z.string().trim().min(1, "Upload your proof of residence document").max(3_200_000),
+    cacRegistered: z.enum(["yes", "no"], { message: "Indicate whether your business is registered with CAC" }),
+    cacNumber: z.string().trim().max(40).optional().or(z.literal("")),
+    logoUrl: z.string().trim().max(500).optional().or(z.literal("")),
+    coverUrl: z.string().trim().max(500).optional().or(z.literal("")),
+    acceptTerms: z.literal("on", { message: "You must accept the terms" }),
+  })
+  .superRefine((data, ctx) => {
+    if (data.cacRegistered === "yes") {
+      const cleaned = (data.cacNumber ?? "").trim();
+      if (!/^(RC|BN|IT)?[-\s]?[0-9]{4,12}$/i.test(cleaned)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["cacNumber"],
+          message: "Enter a valid CAC registration number (e.g. BN-1234567 or RC-1234567)",
+        });
+      }
+    }
+  });
+
+export const vendorKycSchema = z
+  .object({
+    nin: ninSchema,
+    proofOfResidenceType: z.enum(proofTypes, { message: "Select a proof of residence document type" }),
+    proofOfResidenceUrl: z.string().trim().min(1, "Upload your proof of residence document").max(3_200_000),
+    cacRegistered: z.enum(["yes", "no"], { message: "Indicate whether your business is registered with CAC" }),
+    cacNumber: z.string().trim().max(40).optional().or(z.literal("")),
+  })
+  .superRefine((data, ctx) => {
+    if (data.cacRegistered === "yes") {
+      const cleaned = (data.cacNumber ?? "").trim();
+      if (!/^(RC|BN|IT)?[-\s]?[0-9]{4,12}$/i.test(cleaned)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["cacNumber"],
+          message: "Enter a valid CAC registration number (e.g. BN-1234567 or RC-1234567)",
+        });
+      }
+    }
+  });
 
 export const customerRegisterSchema = z.object({
   fullName: z.string().trim().min(3, "Your name is required").max(120),
@@ -121,9 +174,9 @@ export const storeSettingsSchema = z.object({
   phone: phone.optional().or(z.literal("")),
   whatsapp: z.string().trim().max(24).optional().or(z.literal("")),
   website: z.string().trim().max(200).optional().or(z.literal("")),
-  address: z.string().trim().max(240).optional().or(z.literal("")),
-  city: z.string().trim().max(80).optional().or(z.literal("")),
-  state: z.string().trim().max(80).optional().or(z.literal("")),
+  address: z.string().trim().min(5, "Enter your physical business / pickup address in Akwa Ibom").max(240),
+  city: z.string().trim().min(2, "Select your LGA / town in Akwa Ibom").max(80),
+  state: akwaIbomStateSchema,
   acceptsDelivery: z.coerce.boolean().default(true),
   acceptsPickup: z.coerce.boolean().default(true),
   acceptsOrders: z.coerce.boolean().default(true),
@@ -153,20 +206,56 @@ export const cartItemSchema = z.object({
   measurements: z.record(z.string(), z.string()).optional(),
 });
 
-export const checkoutSchema = z.object({
-  items: z.array(cartItemSchema).min(1, "Your cart is empty").max(40),
-  customerName: z.string().trim().min(2, "Enter your name").max(120),
-  customerEmail: email,
-  customerPhone: phone,
-  fulfilmentType: z.enum(["delivery", "pickup"]).default("delivery"),
-  address: z.string().trim().max(400).optional().or(z.literal("")),
-  city: z.string().trim().max(80).optional().or(z.literal("")),
-  state: z.string().trim().max(80).optional().or(z.literal("")),
-  deliveryNotes: z.string().trim().max(400).optional().or(z.literal("")),
-  customerNotes: z.string().trim().max(800).optional().or(z.literal("")),
-  scheduledFor: z.string().trim().max(40).optional().or(z.literal("")),
-  referenceImages: z.array(z.string().max(600)).max(3).optional().default([]),
-});
+export const checkoutSchema = z
+  .object({
+    items: z.array(cartItemSchema).min(1, "Your cart is empty").max(40),
+    customerName: z.string().trim().min(2, "Enter your full name").max(120),
+    customerEmail: email,
+    customerPhone: phone,
+    bioAddress: z.string().trim().min(5, "Enter your residential / contact street address").max(400),
+    fulfilmentType: z.enum(["delivery", "pickup"]).default("delivery"),
+    address: z.string().trim().max(400).optional().or(z.literal("")),
+    city: z.string().trim().max(80).optional().or(z.literal("")),
+    state: z.string().trim().max(80).optional().or(z.literal("")),
+    pickupLocation: z.string().trim().max(400).optional().or(z.literal("")),
+    deliveryNotes: z.string().trim().max(400).optional().or(z.literal("")),
+    customerNotes: z.string().trim().max(800).optional().or(z.literal("")),
+    scheduledFor: z.string().trim().max(40).optional().or(z.literal("")),
+    referenceImages: z.array(z.string().max(600)).max(3).optional().default([]),
+  })
+  .superRefine((data, ctx) => {
+    if (data.fulfilmentType === "delivery") {
+      if (!data.address || data.address.trim().length < 5) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["address"],
+          message: "Enter the street address where dispatch should deliver",
+        });
+      }
+      if (!data.city || data.city.trim().length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["city"],
+          message: "Enter your delivery location / town / LGA",
+        });
+      }
+      if (!data.state || data.state.trim().length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["state"],
+          message: "Enter your delivery state",
+        });
+      }
+    } else if (data.fulfilmentType === "pickup") {
+      if (!data.pickupLocation || data.pickupLocation.trim().length < 3) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["pickupLocation"],
+          message: "Confirm the vendor pickup location",
+        });
+      }
+    }
+  });
 
 export const reviewSchema = z.object({
   orderId: z.string().uuid(),

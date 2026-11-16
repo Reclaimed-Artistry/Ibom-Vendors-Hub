@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Send } from "lucide-react";
+import { KeyRound, Send } from "lucide-react";
 import {
   bookingAction,
   createProductCategoryAction,
@@ -40,23 +40,76 @@ export function OrderUpdateForm({
   children?: ReactNode;
 }) {
   const [state, formAction] = useActionState<VendorState, FormData>(vendorOrderAction, {});
+  const [selectedAction, setSelectedAction] = useState(actions[0]?.key ?? "");
+
+  useEffect(() => {
+    if (actions.length > 0 && !actions.some((a) => a.key === selectedAction)) {
+      setSelectedAction(actions[0].key);
+    }
+  }, [actions, selectedAction]);
+
+  const requiresPin = selectedAction === "deliver" || selectedAction === "complete";
+  const isDispatch = selectedAction === "dispatch";
+
   return (
     <form action={formAction} className="space-y-3">
       <input type="hidden" name="orderId" value={orderId} />
       {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
       {state.message ? <Alert tone="success">{state.message}</Alert> : null}
       <Field label="Next step" htmlFor={`action-${orderId}`} required>
-        <select id={`action-${orderId}`} name="action" className="select" required defaultValue={actions[0]?.key ?? ""}>
+        <select
+          id={`action-${orderId}`}
+          name="action"
+          className="select"
+          required
+          value={selectedAction}
+          onChange={(e) => setSelectedAction(e.target.value)}
+        >
           {actions.map((action) => (
             <option key={action.key} value={action.key}>{action.label}</option>
           ))}
         </select>
       </Field>
+
+      {requiresPin ? (
+        <div className="space-y-2 rounded-xl border border-brand-200 bg-brand-50/60 p-3">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-brand-900">
+            <KeyRound className="size-4 text-brand-700" /> Customer 6-digit Delivery / Pickup PIN required
+          </p>
+          <p className="text-[11px] text-brand-800/90">
+            Ask the customer for the 6-digit PIN shown on their order page when handing over the product. Entering a valid PIN completes delivery and releases your settlement funds.
+          </p>
+          <input
+            name="deliveryPin"
+            inputMode="numeric"
+            pattern="\d{6}"
+            maxLength={6}
+            required
+            className="input bg-white font-mono text-lg tracking-[0.25em]"
+            placeholder="000000"
+            aria-label="Customer 6-digit Delivery PIN"
+          />
+        </div>
+      ) : null}
+
+      {isDispatch ? (
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-ink-100 bg-ink-50/50 p-3">
+          <Field label="Dispatch rider name" htmlFor={`riderName-${orderId}`}>
+            <input id={`riderName-${orderId}`} name="dispatchRiderName" className="input bg-white" placeholder="e.g. Aniekan Okon" />
+          </Field>
+          <Field label="Rider phone" htmlFor={`riderPhone-${orderId}`}>
+            <input id={`riderPhone-${orderId}`} name="dispatchRiderPhone" className="input bg-white" placeholder="0803 000 0000" />
+          </Field>
+        </div>
+      ) : null}
+
       {children}
       <Field label="Note to customer (optional)" htmlFor={`note-${orderId}`}>
         <textarea id={`note-${orderId}`} name="note" className="textarea" placeholder="Included in the customer's order timeline." />
       </Field>
-      <SubmitButton className="btn-primary w-full" pendingLabel="Updating…">Update order</SubmitButton>
+      <SubmitButton className="btn-primary w-full" pendingLabel="Updating…">
+        {requiresPin ? "Verify PIN & complete order" : "Update order"}
+      </SubmitButton>
     </form>
   );
 }

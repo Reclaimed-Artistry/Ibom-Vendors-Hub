@@ -18,7 +18,8 @@ import { logActivity } from "@/lib/audit";
 import { sendEmail } from "@/lib/email";
 import { getSettings, url } from "@/lib/settings";
 import { registerCustomer, registerVendor } from "@/lib/stores";
-import { uploadImage } from "@/lib/storage";
+import { uploadImage, uploadVerificationDocument } from "@/lib/storage";
+import { AKWA_IBOM_STATE } from "@/lib/akwa-ibom";
 import {
   customerRegisterSchema,
   forgotPasswordSchema,
@@ -102,6 +103,10 @@ export async function logoutAction() {
 }
 
 export async function registerVendorAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const proofFile = formData.get("proofOfResidenceFile");
+  let initialProofUrl = String(formData.get("proofOfResidenceUrl") ?? "").trim();
+  const hasProofFile = proofFile instanceof File && proofFile.size > 0;
+
   const raw = {
     businessName: formData.get("businessName"),
     ownerName: formData.get("ownerName"),
@@ -111,8 +116,13 @@ export async function registerVendorAction(_prev: ActionState, formData: FormDat
     categorySlug: formData.get("categorySlug"),
     description: formData.get("description"),
     city: formData.get("city"),
-    state: formData.get("state"),
+    state: formData.get("state") ?? AKWA_IBOM_STATE,
     address: formData.get("address") ?? "",
+    nin: formData.get("nin") ?? "",
+    proofOfResidenceType: formData.get("proofOfResidenceType") ?? "",
+    proofOfResidenceUrl: initialProofUrl || (hasProofFile ? "pending-upload" : ""),
+    cacRegistered: formData.get("cacRegistered") ?? "",
+    cacNumber: formData.get("cacNumber") ?? "",
     logoUrl: formData.get("logoUrl") ?? "",
     coverUrl: formData.get("coverUrl") ?? "",
     acceptTerms: formData.get("acceptTerms") ?? "",
@@ -123,6 +133,9 @@ export async function registerVendorAction(_prev: ActionState, formData: FormDat
   }
 
   try {
+    if (hasProofFile) {
+      initialProofUrl = await uploadVerificationDocument(proofFile, "vendor-kyc");
+    }
     const logo = formData.get("logoFile");
     const cover = formData.get("coverFile");
     let logoUrl = parsed.data.logoUrl ?? "";
@@ -130,7 +143,12 @@ export async function registerVendorAction(_prev: ActionState, formData: FormDat
     if (logo instanceof File && logo.size > 0) logoUrl = await uploadImage(logo, "stores/logos");
     if (cover instanceof File && cover.size > 0) coverUrl = await uploadImage(cover, "stores/covers");
 
-    const result = await registerVendor({ ...parsed.data, logoUrl, coverUrl });
+    const result = await registerVendor({
+      ...parsed.data,
+      proofOfResidenceUrl: initialProofUrl,
+      logoUrl,
+      coverUrl,
+    });
 
     const token = await createSessionToken({
       sub: result.userId,
@@ -149,6 +167,7 @@ export async function registerVendorAction(_prev: ActionState, formData: FormDat
 }
 
 export async function registerCustomerAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const nextRaw = String(formData.get("next") ?? "").trim();
   const parsed = customerRegisterSchema.safeParse({
     fullName: formData.get("fullName"),
     email: formData.get("email"),
@@ -168,6 +187,9 @@ export async function registerCustomerAction(_prev: ActionState, formData: FormD
       name: parsed.data.fullName,
     });
     await setSessionCookie(token);
+    if (nextRaw && nextRaw.startsWith("/")) {
+      redirect(nextRaw);
+    }
     const verify = devLinks() ? `?verify=${result.verificationToken}` : "";
     redirect(`/account${verify}`);
   } catch (error) {

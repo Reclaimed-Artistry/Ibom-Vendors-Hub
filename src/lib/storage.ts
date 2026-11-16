@@ -3,27 +3,32 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const MAX_BYTES = 6 * 1024 * 1024;
-const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
+const ALLOWED_IMAGES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
+const ALLOWED_DOCS = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 
-/**
- * Image storage abstraction.
- *
- * When Supabase Storage credentials are present the file is uploaded to the
- * configured bucket (works on serverless hosts such as Vercel). Otherwise files
- * are written to /public/uploads, which is ideal for local development.
- */
-export async function uploadImage(file: File, folder = "general"): Promise<string> {
+async function storeBytes(
+  file: File,
+  folder: string,
+  allowedTypes: string[],
+  allowDataUriFallback = false,
+): Promise<string> {
   if (!file || typeof file === "string" || file.size === 0) {
     throw new Error("No file received");
   }
-  if (!ALLOWED.includes(file.type)) {
-    throw new Error("Only JPEG, PNG, WEBP, GIF or SVG images are allowed");
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error(
+      allowedTypes.includes("application/pdf")
+        ? "Only JPEG, PNG, WEBP images or PDF documents are allowed"
+        : "Only JPEG, PNG, WEBP, GIF or SVG images are allowed",
+    );
   }
   if (file.size > MAX_BYTES) {
-    throw new Error("Images must be smaller than 6MB");
+    throw new Error("File must be smaller than 6MB");
   }
 
-  const extension = (file.name.split(".").pop() ?? "jpg").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || "jpg";
+  const defaultExt = file.type === "application/pdf" ? "pdf" : "jpg";
+  const extension =
+    (file.name.split(".").pop() ?? defaultExt).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || defaultExt;
   const safeFolder = folder.replace(/[^a-z0-9-]/gi, "").slice(0, 40) || "general";
   const filename = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}.${extension}`;
   const objectPath = `${safeFolder}/${filename}`;
@@ -53,12 +58,12 @@ export async function uploadImage(file: File, folder = "general"): Promise<strin
     return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${objectPath}`;
   }
 
-  // Serverless filesystems are read-only (and wiped between invocations), so a
-  // file written there would 404 the moment the response finished. Refusing is
-  // louder and safer than handing back a URL that cannot resolve.
   if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    if (allowDataUriFallback && file.size <= 2 * 1024 * 1024) {
+      return `data:${file.type};base64,${bytes.toString("base64")}`;
+    }
     throw new Error(
-      "Image storage is not configured on this deployment. Set NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SUPABASE_STORAGE_BUCKET.",
+      "Storage is not configured on this deployment (or file exceeds 2MB inline limit). Set NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SUPABASE_STORAGE_BUCKET.",
     );
   }
 
@@ -66,4 +71,18 @@ export async function uploadImage(file: File, folder = "general"): Promise<strin
   await mkdir(directory, { recursive: true });
   await writeFile(path.join(directory, filename), bytes);
   return `/uploads/${objectPath}`;
+}
+
+/**
+ * Image storage abstraction.
+ */
+export async function uploadImage(file: File, folder = "general"): Promise<string> {
+  return storeBytes(file, folder, ALLOWED_IMAGES, false);
+}
+
+/**
+ * Verification document upload (Proof of Residence: JPG, PNG, WEBP, or PDF).
+ */
+export async function uploadVerificationDocument(file: File, folder = "vendor-kyc"): Promise<string> {
+  return storeBytes(file, folder, ALLOWED_DOCS, true);
 }

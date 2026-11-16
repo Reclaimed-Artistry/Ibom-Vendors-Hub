@@ -7,7 +7,9 @@ import { storeBase } from "@/lib/storefront-base";
 import { formatMoney, formatDate } from "@/lib/utils";
 import { Badge, ButtonLink, Card } from "@/components/ui";
 import { AddToCart } from "@/components/add-to-cart";
+import { ReviewForm } from "@/components/review-form";
 import { getCurrentUser } from "@/lib/auth";
+import { systemDb } from "@/lib/db";
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string; productSlug: string }> }) {
   const { slug, productSlug } = await params;
@@ -19,9 +21,40 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const [settings, base, reviews, user] = await Promise.all([
     getSettings(),
     storeBase(slug),
-    getStoreReviews(store.id, 4, product.id),
+    getStoreReviews(store.id, 8, product.id),
     getCurrentUser(),
   ]);
+
+  let eligibleOrderId: string | null = null;
+  let alreadyReviewedByUser = false;
+  if (user) {
+    const [unreviewedOrder, existingReview] = await Promise.all([
+      systemDb.maybeOne<{ id: string }>(
+        `select o.id
+           from orders o
+           join order_items oi on oi.order_id = o.id
+          where o.store_id = $1
+            and oi.product_id = $2
+            and (o.customer_id = $3 or lower(o.customer_email) = lower($4))
+            and o.status in ('delivered', 'completed')
+            and not exists (
+              select 1 from reviews r where r.order_id = o.id and r.product_id = $2
+            )
+          order by o.created_at desc
+          limit 1`,
+        [store.id, product.id, user.id, user.email],
+      ),
+      systemDb.maybeOne<{ id: string }>(
+        `select id from reviews
+          where product_id = $1
+            and (customer_id = $2 or lower(customer_email) = lower($3))
+          limit 1`,
+        [product.id, user.id, user.email],
+      ),
+    ]);
+    eligibleOrderId = unreviewedOrder?.id ?? null;
+    alreadyReviewedByUser = Boolean(existingReview);
+  }
   const features = (category?.features ?? {}) as Record<string, boolean>;
   const money = (value: number) => formatMoney(value, product.currency, settings.currency_symbol);
   const image = product.images?.[0]?.url ?? "/images/seed/product-jollof.svg";
@@ -166,19 +199,56 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             ) : null}
           </Card>
 
-          <Card className="card-pad">
-            <h2 className="text-base font-semibold text-ink-900">Reviews for this item</h2>
-            {reviews.length === 0 ? (
-              <p className="mt-2 text-sm text-ink-500">No reviews yet. Only customers with a completed order can review.</p>
+          <Card id="review" className="card-pad space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-semibold text-ink-900">Verified customer reviews</h2>
+              <span className="text-xs text-ink-400">Logged-in buyers only</span>
+            </div>
+
+            {user ? (
+              eligibleOrderId ? (
+                <ReviewForm
+                  orderId={eligibleOrderId}
+                  productId={product.id}
+                  itemLabel={product.name}
+                />
+              ) : alreadyReviewedByUser ? (
+                <p className="flex items-center gap-2 rounded-xl border border-brand-200 bg-brand-50/60 px-3.5 py-2.5 text-xs font-medium text-brand-900">
+                  <CheckCircle2 className="size-4 text-brand-700" /> You have already reviewed this verified purchase.
+                </p>
+              ) : (
+                <p className="rounded-xl border border-ink-100 bg-ink-50/70 px-3.5 py-2.5 text-xs text-ink-600">
+                  Reviews unlock automatically once you purchase and confirm delivery of this item.
+                </p>
+              )
             ) : (
-              <ul className="mt-3 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ink-100 bg-ink-50/70 px-3.5 py-2.5 text-xs text-ink-600">
+                <span>Sign in to leave a review — only signed-in customers with a completed purchase can review.</span>
+                <Link
+                  href={`/login?next=${encodeURIComponent(`/s/${slug}/products/${productSlug}#review`)}`}
+                  className="font-semibold text-brand-800 hover:underline"
+                >
+                  Sign in →
+                </Link>
+              </div>
+            )}
+
+            {reviews.length === 0 ? (
+              <p className="text-sm text-ink-500">No reviews yet. Be the first verified buyer to share feedback.</p>
+            ) : (
+              <ul className="space-y-4">
                 {reviews.map((review) => (
                   <li key={review.id} className="border-b border-ink-100 pb-4 last:border-0 last:pb-0">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold text-ink-900">{review.customer_name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-ink-900">{review.customer_name}</p>
+                        {review.verified_purchase ? (
+                          <Badge tone="success">Verified purchase</Badge>
+                        ) : null}
+                      </div>
                       <span className="text-xs text-gold-600">{"★".repeat(review.rating)}</span>
                     </div>
-                    {review.title ? <p className="text-sm font-medium text-ink-800">{review.title}</p> : null}
+                    {review.title ? <p className="mt-0.5 text-sm font-medium text-ink-800">{review.title}</p> : null}
                     <p className="mt-1 text-sm leading-6 text-ink-600">{review.comment}</p>
                     <p className="mt-1 text-[11px] text-ink-400">{formatDate(review.created_at)}</p>
                   </li>
@@ -194,25 +264,34 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               <img src={store.logo_url ?? ""} alt="" className="size-12 rounded-xl border border-ink-100 object-cover" />
               <div>
                 <p className="text-sm font-semibold text-ink-900">{store.name}</p>
-                <p className="text-xs text-ink-400">{store.city}, {store.state}</p>
+                <p className="text-xs text-ink-400">{store.city}, {store.state ?? "Akwa Ibom"}</p>
               </div>
             </div>
-            <p className="mt-3 text-xs leading-6 text-ink-500">Sold and fulfilled by {store.name} on Ibom Vendors Hub.</p>
+            {store.address ? (
+              <p className="mt-2 text-xs text-ink-600">
+                <strong>Pickup location:</strong> {store.address}, {store.city}, Akwa Ibom
+              </p>
+            ) : null}
+            <p className="mt-2 text-xs leading-6 text-ink-500">Sold and fulfilled by {store.name} in Akwa Ibom State.</p>
             <ButtonLink href={base || "/"} variant="secondary" className="mt-3 w-full">Visit storefront</ButtonLink>
           </Card>
           {!user ? (
             <Card className="card-pad">
-              <p className="text-sm font-semibold text-ink-900">Buying for the first time?</p>
-              <p className="mt-1 text-xs leading-6 text-ink-500">You can check out as a guest. Create an account to track orders and leave reviews.</p>
-              <ButtonLink href="/register/customer" variant="ghost" className="mt-2 w-full">Create an account</ButtonLink>
+              <p className="text-sm font-semibold text-ink-900">Sign in to check out</p>
+              <p className="mt-1 text-xs leading-6 text-ink-500">
+                Customer sign-in is required at checkout so you can choose dispatch or vendor shop pickup, receive your 6-digit Delivery PIN, and leave verified reviews.
+              </p>
+              <ButtonLink href={`/login?next=${encodeURIComponent(`/s/${slug}/products/${productSlug}`)}`} variant="ghost" className="mt-2 w-full">
+                Sign in or create account
+              </ButtonLink>
             </Card>
           ) : null}
           <Card className="card-pad">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-ink-900"><CheckCircle2 className="size-4 text-brand-600" /> Buyer protection</h3>
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-ink-900"><CheckCircle2 className="size-4 text-brand-600" /> Delivery-verified buyer protection</h3>
             <ul className="mt-2 space-y-1.5 text-xs leading-5 text-ink-500">
-              <li>Payments are verified server-side before orders are accepted.</li>
-              <li>Track every stage of production and delivery.</li>
-              <li>Report a problem within 7 days of delivery.</li>
+              <li>Choose dispatch delivery or free pickup at the vendor&apos;s Akwa Ibom location.</li>
+              <li>Vendor payout is held until you share your secret 6-digit Delivery PIN or confirm receipt.</li>
+              <li>Only verified Akwa Ibom merchants (NIN &amp; Proof of Residence checked).</li>
             </ul>
           </Card>
         </div>

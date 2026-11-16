@@ -41,6 +41,10 @@ interface ProductRow {
   access_until: string | null;
   owner_id: string;
   store_email: string | null;
+  store_address: string | null;
+  store_city: string | null;
+  store_state: string | null;
+  store_phone: string | null;
   category_id: string | null;
 }
 
@@ -62,6 +66,9 @@ export async function createCheckout(
   input: CheckoutInput,
   customer: { id: string; email: string; fullName: string } | null,
 ): Promise<CheckoutResult> {
+  if (!customer?.id) {
+    throw new Error("Please sign in to your account before checking out.");
+  }
   const settings = await getSettings();
   if (!settings.payments_enabled) throw new Error("Payments are temporarily disabled by the platform.");
 
@@ -75,7 +82,8 @@ export async function createCheckout(
               s.name as store_name, s.slug as store_slug, s.status as store_status,
               s.manual_suspension, s.visibility, s.accepts_orders, s.accepts_delivery,
               s.accepts_pickup, s.delivery_fee, s.minimum_order, s.access_until, s.owner_id,
-              s.email as store_email, s.category_id,
+              s.email as store_email, s.address as store_address, s.city as store_city,
+              s.state as store_state, s.phone as store_phone, s.category_id,
               exists (select 1 from subscriptions su where su.store_id = s.id
                 and su.status in ('active','trialing') and su.expires_at > now()) as subscription_active
          from products p join stores s on s.id = p.store_id
@@ -237,18 +245,29 @@ export async function createCheckout(
       const commission = Number((group.subtotal * (Number(settings.commission_rate) / 100)).toFixed(2));
       const payable = Number((total - commission).toFixed(2));
 
+      const vendorPickupAddress = [
+        store.store_name,
+        store.store_address,
+        store.store_city,
+        store.store_state ?? "Akwa Ibom",
+      ]
+        .filter(Boolean)
+        .join(", ");
+      const resolvedPickupLocation =
+        fulfilment === "pickup" ? input.pickupLocation?.trim() || vendorPickupAddress : null;
+
       const order = await db.one<{ id: string; reference: string }>(
         `insert into orders
            (checkout_reference, store_id, customer_id, customer_name, customer_email, customer_phone,
             status, payment_status, fulfilment_type, currency, subtotal, delivery_fee, total,
-            platform_commission, vendor_payable, delivery_address, delivery_notes, customer_notes,
-            scheduled_for)
-         values ($1,$2,$3,$4,$5,$6,'placed','pending',$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,$16,$17)
+            platform_commission, vendor_payable, delivery_address, pickup_location, delivery_notes,
+            customer_notes, scheduled_for)
+         values ($1,$2,$3,$4,$5,$6,'placed','pending',$7,$8,$9,$10,$11,$12,$13,$14::jsonb,$15,$16,$17,$18)
          returning id, reference`,
         [
           checkoutReference,
           store.store_id,
-          customer?.id ?? null,
+          customer.id,
           input.customerName.trim(),
           input.customerEmail.trim().toLowerCase(),
           input.customerPhone.trim(),
@@ -264,12 +283,21 @@ export async function createCheckout(
               ? {
                   address: input.address ?? "",
                   city: input.city ?? "",
-                  state: input.state ?? "",
-                  recipient: input.customerName,
-                  phone: input.customerPhone,
+                  state: input.state ?? "Akwa Ibom",
+                  bio_address: input.bioAddress ?? "",
+                  recipient: input.customerName.trim(),
+                  phone: input.customerPhone.trim(),
+                  email: input.customerEmail.trim().toLowerCase(),
                 }
-              : {},
+              : {
+                  bio_address: input.bioAddress ?? "",
+                  pickup_location: resolvedPickupLocation ?? vendorPickupAddress,
+                  recipient: input.customerName.trim(),
+                  phone: input.customerPhone.trim(),
+                  email: input.customerEmail.trim().toLowerCase(),
+                },
           ),
+          resolvedPickupLocation,
           input.deliveryNotes || null,
           input.customerNotes || null,
           input.scheduledFor ? new Date(input.scheduledFor).toISOString() : null,
@@ -316,6 +344,36 @@ export async function createCheckout(
       });
       grandTotal = Number((grandTotal + total).toFixed(2));
     }
+
+    // Keep the signed-in customer's bio details in sync for future checkouts
+    await db.execute(
+      `update users
+          set full_name = coalesce(nullif($2, ''), full_name),
+              phone = coalesce(nullif($3, ''), phone)
+        where id = $1`,
+      [customer.id, input.customerName.trim(), input.customerPhone.trim()],
+    );
+    await db.execute(
+      `insert into customer_profiles (user_id, default_address, city, state)
+       values ($1, $2::jsonb, $3, $4)
+       on conflict (user_id) do update set
+         default_address = excluded.default_address,
+         city = coalesce(nullif(excluded.city, ''), customer_profiles.city),
+         state = coalesce(nullif(excluded.state, ''), customer_profiles.state)`,
+      [
+        customer.id,
+        JSON.stringify({
+          address: input.address || input.bioAddress,
+          bio_address: input.bioAddress,
+          city: input.city || "Uyo",
+          state: input.state || "Akwa Ibom",
+          phone: input.customerPhone.trim(),
+          recipient: input.customerName.trim(),
+        }),
+        input.city || null,
+        input.state || "Akwa Ibom",
+      ],
+    );
 
     const paymentReference = (
       await db.one<{ ref: string }>(`select next_payment_reference('PAY') as ref`)
@@ -540,8 +598,21 @@ export async function markOrdersPaid(
 /* -------------------------------------------------------------------------- */
 
 export async function getOrderForActor(orderId: string, actor: { id: string; role: string; email: string }) {
-  const order = await systemDb.maybeOne<Order & { store_name: string; store_slug: string; store_logo: string | null; owner_email: string | null; category_id: string | null }>(
+  const order = await systemDb.maybeOne<
+    Order & {
+      store_name: string;
+      store_slug: string;
+      store_logo: string | null;
+      store_address: string | null;
+      store_city: string | null;
+      store_state: string | null;
+      store_phone: string | null;
+      owner_email: string | null;
+      category_id: string | null;
+    }
+  >(
     `select o.*, s.name as store_name, s.slug as store_slug, s.logo_url as store_logo,
+            s.address as store_address, s.city as store_city, s.state as store_state, s.phone as store_phone,
             u.email as owner_email, s.category_id
        from orders o
        join stores s on s.id = o.store_id
@@ -555,6 +626,11 @@ export async function getOrderForActor(orderId: string, actor: { id: string; rol
     order.customer_id === actor.id || order.customer_email.toLowerCase() === actor.email.toLowerCase();
   const isAdmin = actor.role === "admin" || actor.role === "super_admin";
   if (!isOwner && !isCustomer && !isAdmin) return null;
+
+  // Never expose the customer's secret delivery PIN to the vendor.
+  if (isOwner && !isCustomer && !isAdmin) {
+    delete order.delivery_pin;
+  }
 
   const items = await systemDb.query<OrderItem>(`select * from order_items where order_id = $1`, [orderId]);
   const history = await systemDb.query<Order["history"] extends Array<infer T> ? T : never>(
@@ -617,11 +693,14 @@ export async function updateOrderByVendor(input: {
   productionProgress?: number;
   trackingCarrier?: string;
   trackingNumber?: string;
+  dispatchRiderName?: string;
+  dispatchRiderPhone?: string;
+  deliveryPin?: string;
 }) {
   const ctx = await getVendorContext();
   const lockError = vendorSuspensionMessage(ctx);
   if (lockError) throw new Error(lockError);
-  const order = await systemDb.maybeOne<Order>(
+  const order = await systemDb.maybeOne<Order & { delivery_pin: string }>(
     `select * from orders where id = $1 and store_id = $2`,
     [input.orderId, ctx.store.id],
   );
@@ -671,11 +750,21 @@ export async function updateOrderByVendor(input: {
       target = "dispatched";
       break;
     case "deliver":
-      target = "delivered";
+    case "complete": {
+      if (order.dispute_status === "open") {
+        throw new Error(
+          "This order has an open customer delivery dispute. Completion and payout release are paused until resolved.",
+        );
+      }
+      const submittedPin = (input.deliveryPin ?? "").trim();
+      if (!submittedPin || submittedPin !== String(order.delivery_pin ?? "").trim()) {
+        throw new Error(
+          "Enter the valid 6-digit Delivery / Pickup PIN from the customer to verify handover (or ask the customer to click 'Confirm Order Received' in their account).",
+        );
+      }
+      target = resolve("completed", "delivered");
       break;
-    case "complete":
-      target = "completed";
-      break;
+    }
     case "cancel":
       if (["delivered", "completed", "cancelled"].includes(order.status)) throw new Error("This order cannot be cancelled");
       target = "cancelled";
@@ -739,6 +828,21 @@ export async function updateOrderByVendor(input: {
   if (input.trackingNumber !== undefined) {
     params.push(input.trackingNumber || null);
     updates.push(`tracking_number = $${params.length}`);
+  }
+  if (input.dispatchRiderName !== undefined) {
+    params.push(input.dispatchRiderName || null);
+    updates.push(`dispatch_rider_name = $${params.length}`);
+  }
+  if (input.dispatchRiderPhone !== undefined) {
+    params.push(input.dispatchRiderPhone || null);
+    updates.push(`dispatch_rider_phone = $${params.length}`);
+  }
+  if (input.action === "deliver" || input.action === "complete") {
+    updates.push(`delivered_at = coalesce(delivered_at, now())`);
+    updates.push(`completed_at = coalesce(completed_at, now())`);
+    updates.push(`delivery_confirmed_at = now()`);
+    updates.push(`delivery_confirmed_by = 'pin'`);
+    updates.push(`payout_released = true`);
   }
   if (input.action === "production_start" && order.production_started_at == null) {
     updates.push(`production_started_at = now()`);
@@ -805,7 +909,7 @@ export async function updateOrderByVendor(input: {
       }
     }
 
-    if (["delivered", "completed"].includes(target ?? "")) {
+    if (["delivered", "completed"].includes(target ?? "") && !order.payout_released) {
       await db.execute(
         `update vendor_balances set
            available_amount = available_amount + $2,
@@ -923,3 +1027,179 @@ export function orderStatusTone(status: string) {
   if (["in_production", "preparing", "dispatched", "in_service", "production_completed", "ready_for_pickup", "ready_for_dispatch", "awaiting_production"].includes(status)) return "info";
   return "warning";
 }
+
+/* -------------------------------------------------------------------------- */
+/* Customer delivery confirmation & dispute reporting                         */
+/* -------------------------------------------------------------------------- */
+
+export async function confirmOrderDeliveryByCustomer(input: {
+  orderId: string;
+  actor: { id: string; email: string; fullName: string };
+  note?: string;
+}) {
+  const order = await systemDb.maybeOne<Order & { store_name: string; owner_id: string }>(
+    `select o.*, s.name as store_name, s.owner_id
+       from orders o join stores s on s.id = o.store_id
+      where o.id = $1`,
+    [input.orderId],
+  );
+  if (!order) throw new Error("Order not found");
+  const isCustomer =
+    order.customer_id === input.actor.id ||
+    order.customer_email.toLowerCase() === input.actor.email.toLowerCase();
+  if (!isCustomer) throw new Error("You can only confirm orders placed on your account.");
+  if (order.payment_status !== "paid") {
+    throw new Error("Payment must be confirmed before confirming order receipt.");
+  }
+  if (["cancelled", "rejected", "refunded", "expired"].includes(order.status)) {
+    throw new Error("This order can no longer be confirmed.");
+  }
+  if (order.delivery_confirmed_at && ["delivered", "completed"].includes(order.status)) {
+    return { ok: true, alreadyConfirmed: true };
+  }
+
+  await withSystem(async (db) => {
+    await db.execute(
+      `update orders
+          set status = 'completed',
+              delivered_at = coalesce(delivered_at, now()),
+              completed_at = coalesce(completed_at, now()),
+              delivery_confirmed_at = now(),
+              delivery_confirmed_by = 'customer',
+              payout_released = true,
+              dispute_status = case when dispute_status = 'open' then 'resolved' else dispute_status end
+        where id = $1`,
+      [order.id],
+    );
+
+    if (!order.payout_released) {
+      await db.execute(
+        `update vendor_balances set
+           available_amount = available_amount + $2,
+           pending_amount = greatest(pending_amount - $2, 0),
+           updated_at = now()
+         where store_id = $1`,
+        [order.store_id, order.vendor_payable],
+      );
+    }
+
+    await db.execute(
+      `insert into order_status_history (order_id, from_status, to_status, actor_id, actor_role, note)
+       values ($1, $2, 'completed', $3, 'customer', $4)`,
+      [
+        order.id,
+        order.status,
+        input.actor.id,
+        input.note?.trim() || "Customer confirmed receipt of product",
+      ],
+    );
+
+    await logActivity(
+      {
+        actorId: input.actor.id,
+        actorRole: "customer",
+        storeId: order.store_id,
+        action: "order.customer_confirmed_delivery",
+        entityType: "order",
+        entityId: order.id,
+        description: `${input.actor.fullName} confirmed receipt of order ${order.reference}`,
+      },
+      db,
+    );
+
+    await notify(
+      {
+        userId: order.owner_id,
+        storeId: order.store_id,
+        type: "order_delivered_confirmed",
+        title: `Delivery confirmed — ${order.reference}`,
+        body: `${order.customer_name} confirmed receiving their order. Settlement funds have been released to your available balance.`,
+        actionUrl: `/vendor/orders/${order.id}`,
+        dedupeKey: `customer-confirmed:${order.id}`,
+      },
+      db,
+    );
+  });
+
+  return { ok: true };
+}
+
+export async function reportOrderIssueByCustomer(input: {
+  orderId: string;
+  actor: { id: string; email: string; fullName: string };
+  reason: string;
+  details?: string;
+}) {
+  const reason = input.reason.trim();
+  if (reason.length < 5) throw new Error("Describe the delivery issue (at least 5 characters).");
+
+  const order = await systemDb.maybeOne<Order & { store_name: string; owner_id: string }>(
+    `select o.*, s.name as store_name, s.owner_id
+       from orders o join stores s on s.id = o.store_id
+      where o.id = $1`,
+    [input.orderId],
+  );
+  if (!order) throw new Error("Order not found");
+  const isCustomer =
+    order.customer_id === input.actor.id ||
+    order.customer_email.toLowerCase() === input.actor.email.toLowerCase();
+  if (!isCustomer) throw new Error("You can only report issues on your own orders.");
+  if (["delivered", "completed"].includes(order.status) && order.payout_released) {
+    // Still allow filing a report for admin review even post-delivery
+  }
+
+  await withSystem(async (db) => {
+    await db.execute(
+      `update orders set dispute_status = 'open', dispute_reason = $2 where id = $1`,
+      [order.id, reason],
+    );
+
+    await db.execute(
+      `insert into reports (reporter_user_id, reporter_email, store_id, order_id, type, reason, details, status)
+       values ($1, $2, $3, $4, 'order', $5, $6, 'open')`,
+      [input.actor.id, input.actor.email, order.store_id, order.id, reason, input.details?.trim() || null],
+    );
+
+    await db.execute(
+      `insert into customer_messages (store_id, order_id, customer_id, sender_name, sender_email, sender_role, category, subject, body)
+       values ($1, $2, $3, $4, $5, 'customer', 'dispute', $6, $7)`,
+      [
+        order.store_id,
+        order.id,
+        input.actor.id,
+        input.actor.fullName,
+        input.actor.email,
+        `Delivery dispute on order ${order.reference}: ${reason.slice(0, 80)}`,
+        input.details?.trim() ? `${reason}\n\n${input.details.trim()}` : reason,
+      ],
+    );
+
+    await notify(
+      {
+        userId: order.owner_id,
+        storeId: order.store_id,
+        type: "order_dispute",
+        title: `Delivery issue reported — ${order.reference}`,
+        body: `${order.customer_name} reported: ${reason.slice(0, 120)}`,
+        actionUrl: `/vendor/orders/${order.id}`,
+        dedupeKey: `order-dispute-vendor:${order.id}:${Date.now()}`,
+      },
+      db,
+    );
+
+    await notifyAdmins(
+      {
+        storeId: order.store_id,
+        type: "order_dispute",
+        title: `Customer delivery dispute — ${order.reference}`,
+        body: `${order.customer_name} (${order.store_name}): ${reason.slice(0, 120)}`,
+        actionUrl: `/admin/reports`,
+        dedupeKey: `order-dispute-admin:${order.id}:${Date.now()}`,
+      },
+      db,
+    );
+  });
+
+  return { ok: true };
+}
+

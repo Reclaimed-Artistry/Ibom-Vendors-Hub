@@ -1,5 +1,19 @@
 export type UserRole = "super_admin" | "admin" | "vendor" | "customer";
 
+export interface VendorProfile {
+  user_id: string;
+  position: string | null;
+  bio: string | null;
+  nin: string | null;
+  proof_of_residence_url: string | null;
+  proof_of_residence_type: string | null;
+  cac_registered: boolean;
+  cac_number: string | null;
+  kyc_status: "pending" | "submitted" | "verified" | "rejected";
+  kyc_note: string | null;
+  verified_at: string | null;
+}
+
 export interface SessionUser {
   id: string;
   email: string;
@@ -253,6 +267,15 @@ export interface Order {
   production_progress: number;
   tracking_number: string | null;
   tracking_carrier: string | null;
+  delivery_pin?: string;
+  delivery_confirmed_at: string | null;
+  delivery_confirmed_by: "pin" | "customer" | "admin" | null;
+  dispatch_rider_name: string | null;
+  dispatch_rider_phone: string | null;
+  pickup_location: string | null;
+  payout_released: boolean;
+  dispute_status: "none" | "open" | "resolved" | "refunded";
+  dispute_reason: string | null;
   stock_committed: boolean;
   created_at: string;
   updated_at: string;

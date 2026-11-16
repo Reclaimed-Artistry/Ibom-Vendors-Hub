@@ -1,17 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink, Mail, MapPin, Phone, Store } from "lucide-react";
+import { ExternalLink, FileCheck2, Mail, MapPin, Phone, ShieldCheck, Store } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { getPlans, getStoreSubscription } from "@/lib/subscriptions";
 import { storefrontUrl } from "@/lib/domains";
 import { storeBase } from "@/lib/storefront-base";
+import { proofOfResidenceLabel } from "@/lib/akwa-ibom";
 import { formatMoney, formatDate, formatDateTime } from "@/lib/utils";
 import { Badge, Card, CardHeader, PageHeader, StatCard } from "@/components/ui";
-import { approveStoreAction, restoreStoreAction, setStoreVisibilityAction } from "@/app/actions/admin";
+import { approveStoreAction, restoreStoreAction, setStoreVisibilityAction, verifyVendorKycAction } from "@/app/actions/admin";
 import { SubmitButton } from "@/components/submit-button";
 import { GrantSubscriptionForm, RejectStoreForm, SuspendStoreForm } from "@/components/admin-forms";
+import type { VendorProfile } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Vendor detail · Admin" };
 
@@ -48,7 +50,7 @@ export default async function AdminVendorDetailPage({ params }: { params: Promis
   );
   if (!store) notFound();
 
-  const [subscription, plans, stats, orders, products, logs, base] = await Promise.all([
+  const [subscription, plans, stats, orders, products, logs, base, kyc] = await Promise.all([
     getStoreSubscription(store.id),
     getPlans(true),
     systemDb.maybeOne<{ orders: number; revenue: number; products: number; reviews: number; rating: number }>(
@@ -72,6 +74,10 @@ export default async function AdminVendorDetailPage({ params }: { params: Promis
       [store.id],
     ),
     storeBase(store.slug),
+    systemDb.maybeOne<VendorProfile>(
+      `select * from vendor_profiles where user_id = $1`,
+      [store.owner_id],
+    ),
   ]);
 
   return (
@@ -112,6 +118,95 @@ export default async function AdminVendorDetailPage({ params }: { params: Promis
             {store.description ? <p className="card-pad pt-0 text-sm text-ink-600">{store.description}</p> : null}
             {store.suspension_reason ? <p className="mx-5 mb-4 rounded-lg bg-red-50 p-2 text-sm text-red-800">Suspended: {store.suspension_reason}</p> : null}
             {store.rejection_reason ? <p className="mx-5 mb-4 rounded-lg bg-amber-50 p-2 text-sm text-amber-800">Rejected: {store.rejection_reason}</p> : null}
+          </Card>
+
+          <Card>
+            <CardHeader
+              title="Identity, Residence & CAC Verification"
+              description="Akwa Ibom merchant KYC records submitted by the business owner."
+            />
+            <div className="card-pad space-y-4 text-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  tone={
+                    kyc?.kyc_status === "verified"
+                      ? "success"
+                      : kyc?.kyc_status === "rejected"
+                        ? "danger"
+                        : "info"
+                  }
+                >
+                  KYC: {kyc?.kyc_status ?? "pending"}
+                </Badge>
+                <Badge tone="info">State: {store.state ?? "Akwa Ibom"}</Badge>
+                <Badge tone={kyc?.cac_registered ? "success" : "neutral"}>
+                  {kyc?.cac_registered ? `CAC Registered (${kyc.cac_number ?? "—"})` : "CAC: Not registered"}
+                </Badge>
+              </div>
+
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
+                  <dt className="text-xs font-medium text-ink-500">National Identification Number (NIN)</dt>
+                  <dd className="mt-1 font-mono text-sm font-semibold text-ink-900">{kyc?.nin || "Not submitted"}</dd>
+                </div>
+                <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3">
+                  <dt className="text-xs font-medium text-ink-500">CAC Registration</dt>
+                  <dd className="mt-1 font-semibold text-ink-900">
+                    {kyc?.cac_registered ? (
+                      <span className="font-mono">{kyc.cac_number}</span>
+                    ) : (
+                      <span className="text-ink-600">No — operating as unregistered business</span>
+                    )}
+                  </dd>
+                </div>
+                <div className="rounded-xl border border-ink-100 bg-ink-50/50 p-3 sm:col-span-2">
+                  <dt className="text-xs font-medium text-ink-500">Proof of Residence ({proofOfResidenceLabel(kyc?.proof_of_residence_type)})</dt>
+                  <dd className="mt-1.5 flex items-center justify-between gap-2">
+                    {kyc?.proof_of_residence_url ? (
+                      <>
+                        <span className="inline-flex items-center gap-1.5 text-ink-800">
+                          <FileCheck2 className="size-4 text-brand-700" /> Document uploaded
+                        </span>
+                        <a
+                          href={kyc.proof_of_residence_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 font-semibold text-brand-800 hover:underline"
+                        >
+                          Inspect proof of residence <ExternalLink className="size-3.5" />
+                        </a>
+                      </>
+                    ) : (
+                      <span className="text-ink-500">No proof of residence uploaded yet</span>
+                    )}
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {kyc?.kyc_status !== "verified" ? (
+                  <form action={verifyVendorKycAction}>
+                    <input type="hidden" name="storeId" value={store.id} />
+                    <input type="hidden" name="decision" value="verified" />
+                    <SubmitButton className="btn-primary btn-sm" pendingLabel="Verifying…">
+                      <ShieldCheck className="size-3.5" /> Mark KYC verified
+                    </SubmitButton>
+                  </form>
+                ) : null}
+                <form action={verifyVendorKycAction} className="flex flex-1 items-center gap-2">
+                  <input type="hidden" name="storeId" value={store.id} />
+                  <input type="hidden" name="decision" value="rejected" />
+                  <input
+                    name="note"
+                    className="input py-1.5 text-xs"
+                    placeholder="Optional note if requesting KYC re-upload…"
+                  />
+                  <SubmitButton className="btn-secondary btn-sm shrink-0" pendingLabel="Sending…">
+                    Request re-upload
+                  </SubmitButton>
+                </form>
+              </div>
+            </div>
           </Card>
 
           <div className="grid gap-4 sm:grid-cols-2">

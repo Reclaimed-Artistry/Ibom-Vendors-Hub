@@ -87,6 +87,61 @@ export async function setStoreVisibilityAction(formData: FormData) {
   revalidatePath(`/admin/vendors/${storeId}`);
 }
 
+export async function verifyVendorKycAction(formData: FormData) {
+  const user = await admin();
+  const storeId = String(formData.get("storeId") ?? "");
+  const decision = formData.get("decision") === "rejected" ? "rejected" : "verified";
+  const note = String(formData.get("note") ?? "").trim() || null;
+
+  const store = await systemDb.maybeOne<{ id: string; owner_id: string; name: string }>(
+    `select id, owner_id, name from stores where id = $1`,
+    [storeId],
+  );
+  if (!store) return;
+
+  await withSystem(async (db) => {
+    await db.execute(
+      `insert into vendor_profiles (user_id, position, kyc_status, kyc_note, verified_at)
+       values ($1, 'Owner', $2, $3, case when $2 = 'verified' then now() else null end)
+       on conflict (user_id) do update set
+         kyc_status = excluded.kyc_status,
+         kyc_note = excluded.kyc_note,
+         verified_at = case when excluded.kyc_status = 'verified' then now() else null end`,
+      [store.owner_id, decision, note],
+    );
+    await logActivity(
+      {
+        actorId: user.id,
+        actorRole: user.role,
+        storeId: store.id,
+        action: `vendor.kyc_${decision}`,
+        entityType: "store",
+        entityId: store.id,
+        description: `KYC marked ${decision} for ${store.name}`,
+      },
+      db,
+    );
+    await notify(
+      {
+        userId: store.owner_id,
+        storeId: store.id,
+        type: "kyc_update",
+        title: decision === "verified" ? "KYC verification approved" : "KYC verification needs attention",
+        body:
+          decision === "verified"
+            ? "Your NIN, Proof of Residence, and business details have been verified."
+            : note || "Please review and update your NIN / Proof of Residence in Store Profile.",
+        actionUrl: "/vendor/store",
+        dedupeKey: `kyc-${decision}:${store.id}:${Date.now()}`,
+      },
+      db,
+    );
+  });
+
+  revalidatePath(`/admin/vendors/${storeId}`);
+  revalidatePath("/vendor/store");
+}
+
 export async function grantSubscriptionAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const user = await admin();
   const storeId = String(formData.get("storeId") ?? "");

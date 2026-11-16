@@ -704,13 +704,25 @@ async function seed() {
   const productIdBySlug: Record<string, string> = {};
   const ownerEmailByStore: Record<string, string> = {};
 
-  for (const vendor of vendors) {
+  for (const [vendorIndex, vendor] of vendors.entries()) {
     const user = await one<{ id: string }>(
       `insert into users (email, password_hash, full_name, phone, role, email_verified_at)
        values ($1,$2,$3,$4,'vendor', now()) returning id`,
       [vendor.email, vendorHash, vendor.ownerName, vendor.phone],
     );
-    await q(`insert into vendor_profiles (user_id, position, verified_at) values ($1,'Owner', now())`, [user.id]);
+    const cacRegistered = vendorIndex % 2 === 0;
+    await q(
+      `insert into vendor_profiles
+         (user_id, position, nin, proof_of_residence_type, proof_of_residence_url, cac_registered, cac_number, kyc_status, verified_at)
+       values ($1, 'Owner', $2, 'utility_bill', $3, $4, $5, 'verified', now())`,
+      [
+        user.id,
+        `5904827160${vendorIndex}`,
+        `${IMG}/cover-${vendor.slug}.svg`,
+        cacRegistered,
+        cacRegistered ? `BN-384920${vendorIndex}` : null,
+      ],
+    );
     await q(`insert into user_roles (user_id, role) values ($1,'vendor') on conflict do nothing`, [user.id]);
 
     const store = await one<{ id: string }>(

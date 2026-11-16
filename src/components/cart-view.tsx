@@ -99,7 +99,10 @@ export function CartView() {
             <span>{formatMoney(subtotal)}<span className="text-xs font-normal text-ink-400"> + delivery</span></span>
           </div>
           <Link href="/checkout" className="btn-primary mt-5 w-full">Continue to checkout</Link>
-          <Link href="/browse" className="mt-2 block text-center text-xs font-medium text-ink-500 hover:text-ink-800">Keep shopping</Link>
+          <p className="mt-2 text-center text-[11px] text-ink-500">
+            Sign-in required at checkout · Choose dispatch delivery or vendor shop pickup
+          </p>
+          <Link href="/browse" className="mt-1.5 block text-center text-xs font-medium text-ink-500 hover:text-ink-800">Keep shopping</Link>
         </Card>
       </div>
     </div>

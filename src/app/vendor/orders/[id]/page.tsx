@@ -38,17 +38,15 @@ function availableActions(status: string, paid: boolean): Array<{ key: string; l
   }
   if (["production_completed", "ready_for_dispatch", "ready_for_pickup"].includes(status)) {
     actions.push({ key: "dispatch", label: "Mark dispatched" });
-    actions.push({ key: "deliver", label: "Mark delivered" });
-    actions.push({ key: "complete", label: "Mark completed" });
+    actions.push({ key: "complete", label: "Verify Delivery PIN & complete" });
     return actions;
   }
   if (status === "dispatched") {
-    actions.push({ key: "deliver", label: "Mark delivered" });
-    actions.push({ key: "complete", label: "Mark completed" });
+    actions.push({ key: "complete", label: "Verify Delivery PIN & complete" });
     return actions;
   }
   if (status === "delivered" || status === "in_service") {
-    actions.push({ key: "complete", label: "Mark completed" });
+    actions.push({ key: "complete", label: "Verify Delivery PIN & complete" });
     return actions;
   }
   return actions;
@@ -179,12 +177,31 @@ export default async function VendorOrderDetailPage({ params }: { params: Promis
                   <span>{Object.values(order.delivery_address).filter(Boolean).join(", ")}</span>
                 </p>
               ) : null}
+              {order.pickup_location ? (
+                <p className="rounded-lg bg-brand-50/70 p-2 text-xs text-brand-900">
+                  <strong>Pickup location:</strong> {order.pickup_location}
+                </p>
+              ) : null}
               {order.delivery_notes ? <p className="rounded-lg bg-ink-50 p-2 text-xs text-ink-600">{order.delivery_notes}</p> : null}
+              {order.dispute_status === "open" ? (
+                <Alert tone="danger" title="Customer reported a delivery dispute">
+                  {order.dispute_reason ?? "Please contact the customer and resolve handover."}
+                </Alert>
+              ) : null}
+              {order.delivery_confirmed_at ? (
+                <Alert tone="success" title="Delivery verified">
+                  Confirmed {order.delivery_confirmed_by === "pin" ? "via 6-digit PIN" : "by customer"} · Payout released.
+                </Alert>
+              ) : null}
               {order.scheduled_for ? (
                 <p className="flex items-center gap-2 text-ink-600"><Clock className="size-4 text-ink-400" /> Scheduled {formatDateTime(order.scheduled_for)}</p>
               ) : null}
               {["dispatched", "delivered", "completed"].includes(order.status) ? (
-                <p className="flex items-center gap-2 text-ink-600"><Truck className="size-4 text-ink-400" /> {order.tracking_carrier ?? "Self delivery"} {order.tracking_number ? `· ${order.tracking_number}` : ""}</p>
+                <p className="flex items-center gap-2 text-ink-600">
+                  <Truck className="size-4 text-ink-400" />
+                  {order.dispatch_rider_name ? `${order.dispatch_rider_name}${order.dispatch_rider_phone ? ` (${order.dispatch_rider_phone})` : ""} · ` : ""}
+                  {order.tracking_carrier ?? "Dispatch"} {order.tracking_number ? `· ${order.tracking_number}` : ""}
+                </p>
               ) : null}
             </div>
           </Card>

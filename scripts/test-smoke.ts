@@ -10,7 +10,7 @@ const expectations: Array<{ path: string; status: number[]; name?: string }> = [
   { path: "/stores", status: [200] },
   { path: "/track", status: [200] },
   { path: "/cart", status: [200] },
-  { path: "/checkout", status: [200] },
+  { path: "/checkout", status: [307, 302], name: "checkout requires customer sign-in" },
   { path: "/about", status: [200] },
   { path: "/contact", status: [200] },
   { path: "/terms", status: [200] },

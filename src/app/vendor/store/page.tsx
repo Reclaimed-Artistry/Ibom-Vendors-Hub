@@ -7,18 +7,29 @@ import { storeBase } from "@/lib/storefront-base";
 import { storefrontUrl } from "@/lib/domains";
 import { formatDate } from "@/lib/utils";
 import { Alert, Badge, Card, CardHeader, PageHeader } from "@/components/ui";
-import { StoreSettingsForm, SubdomainRequestForm, type StoreSettingsValues } from "@/components/store-settings-form";
+import {
+  StoreSettingsForm,
+  SubdomainRequestForm,
+  VendorKycForm,
+  type StoreSettingsValues,
+  type VendorKycValues,
+} from "@/components/store-settings-form";
+import type { VendorProfile } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Store profile · Vendor dashboard" };
 
 export default async function VendorStorePage() {
-  const { store, category } = await requireActiveVendorContext();
-  const [base, pending] = await Promise.all([
+  const { user, store, category } = await requireActiveVendorContext();
+  const [base, pending, profile] = await Promise.all([
     storeBase(store.slug),
     systemDb.maybeOne<{ requested_subdomain: string; status: string; created_at: string; admin_note: string | null }>(
       `select requested_subdomain, status, created_at, admin_note from subdomain_change_requests
         where store_id = $1 order by created_at desc limit 1`,
       [store.id],
+    ),
+    systemDb.maybeOne<VendorProfile>(
+      `select * from vendor_profiles where user_id = $1`,
+      [user.id],
     ),
   ]);
 
@@ -31,8 +42,8 @@ export default async function VendorStorePage() {
     whatsapp: store.whatsapp ?? "",
     website: store.website ?? "",
     address: store.address ?? "",
-    city: store.city ?? "",
-    state: store.state ?? "",
+    city: store.city ?? "Uyo",
+    state: "Akwa Ibom",
     acceptsDelivery: store.accepts_delivery,
     acceptsPickup: store.accepts_pickup,
     acceptsOrders: store.accepts_orders,
@@ -45,11 +56,21 @@ export default async function VendorStorePage() {
     coverUrl: store.cover_url ?? "",
   };
 
+  const kycValues: VendorKycValues = {
+    nin: profile?.nin ?? "",
+    proofOfResidenceType: profile?.proof_of_residence_type ?? "utility_bill",
+    proofOfResidenceUrl: profile?.proof_of_residence_url ?? "",
+    cacRegistered: Boolean(profile?.cac_registered),
+    cacNumber: profile?.cac_number ?? "",
+    kycStatus: profile?.kyc_status ?? "pending",
+    kycNote: profile?.kyc_note ?? null,
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Store profile"
-        description="This is what customers see on your storefront, in search and on your store card."
+        title="Store profile & KYC"
+        description="Manage your Akwa Ibom storefront details, pickup address, and identity / CAC verification."
         actions={
           <Link href={base} target="_blank" className="btn btn-secondary btn-sm">
             View storefront <ExternalLink className="size-3.5" />
@@ -58,8 +79,9 @@ export default async function VendorStorePage() {
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+        <div className="space-y-4 lg:col-span-2">
           <StoreSettingsForm values={values} />
+          <VendorKycForm kyc={kycValues} />
         </div>
 
         <div className="space-y-4">

@@ -18,6 +18,12 @@ export function middleware(request: NextRequest) {
   const subdomain = subdomainFromHost(host);
 
   if (!subdomain || isReservedSubdomain(subdomain)) {
+    if (pathname === "/checkout" && !request.cookies.get("ivh_session")?.value) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      loginUrl.search = `?next=${encodeURIComponent(pathname + search)}`;
+      return NextResponse.redirect(loginUrl);
+    }
     const headers = new Headers(request.headers);
     headers.set("x-ivh-pathname", pathname);
     const response = NextResponse.next({ request: { headers } });

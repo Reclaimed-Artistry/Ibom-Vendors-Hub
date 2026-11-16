@@ -7,11 +7,12 @@ import { systemDb, withActor } from "@/lib/db";
 import { logActivity } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
 import { sendEmail } from "@/lib/email";
-import { uploadImage } from "@/lib/storage";
+import { uploadImage, uploadVerificationDocument } from "@/lib/storage";
+import { AKWA_IBOM_STATE } from "@/lib/akwa-ibom";
 import { getSettings } from "@/lib/settings";
 import { updateOrderByVendor } from "@/lib/orders";
 import { purchaseSubscription, getPlans } from "@/lib/subscriptions";
-import { productSchema, storeSettingsSchema, quotationResponseSchema, formatIssues } from "@/lib/validation";
+import { productSchema, storeSettingsSchema, vendorKycSchema, quotationResponseSchema, formatIssues } from "@/lib/validation";
 import { toSlug } from "@/lib/utils";
 
 export interface VendorState {
@@ -342,7 +343,7 @@ export async function saveStoreSettingsAction(_prev: VendorState, formData: Form
     website: formData.get("website") ?? "",
     address: formData.get("address") ?? "",
     city: formData.get("city") ?? "",
-    state: formData.get("state") ?? "",
+    state: formData.get("state") ?? AKWA_IBOM_STATE,
     acceptsDelivery: formData.get("acceptsDelivery") === "on",
     acceptsPickup: formData.get("acceptsPickup") === "on",
     acceptsOrders: formData.get("acceptsOrders") === "on",
@@ -419,6 +420,65 @@ export async function saveStoreSettingsAction(_prev: VendorState, formData: Form
   return { message: "Store settings saved." };
 }
 
+export async function saveVendorKycAction(_prev: VendorState, formData: FormData): Promise<VendorState> {
+  const ctx = await getVendorContext();
+  const lockError = vendorSuspensionMessage(ctx);
+  if (lockError) return { error: lockError };
+
+  const proofFile = formData.get("proofOfResidenceFile");
+  const hasFile = proofFile instanceof File && proofFile.size > 0;
+  let proofUrl = String(formData.get("proofOfResidenceUrl") ?? "").trim();
+
+  const parsed = vendorKycSchema.safeParse({
+    nin: formData.get("nin") ?? "",
+    proofOfResidenceType: formData.get("proofOfResidenceType") ?? "",
+    proofOfResidenceUrl: proofUrl || (hasFile ? "pending-upload" : ""),
+    cacRegistered: formData.get("cacRegistered") ?? "no",
+    cacNumber: formData.get("cacNumber") ?? "",
+  });
+  if (!parsed.success) {
+    return { error: "Please fix the highlighted KYC fields", fieldErrors: formatIssues(parsed.error) };
+  }
+
+  try {
+    if (hasFile) {
+      proofUrl = await uploadVerificationDocument(proofFile, "vendor-kyc");
+    }
+    const cacRegistered = parsed.data.cacRegistered === "yes";
+    const cacNumber = cacRegistered ? (parsed.data.cacNumber ?? "").trim().toUpperCase() : null;
+
+    await systemDb.execute(
+      `insert into vendor_profiles
+         (user_id, position, nin, proof_of_residence_type, proof_of_residence_url, cac_registered, cac_number, kyc_status)
+       values ($1, 'Owner', $2, $3, $4, $5, $6, 'submitted')
+       on conflict (user_id) do update set
+         nin = excluded.nin,
+         proof_of_residence_type = excluded.proof_of_residence_type,
+         proof_of_residence_url = excluded.proof_of_residence_url,
+         cac_registered = excluded.cac_registered,
+         cac_number = excluded.cac_number,
+         kyc_status = case when vendor_profiles.kyc_status = 'verified' then 'verified' else 'submitted' end`,
+      [ctx.user.id, parsed.data.nin, parsed.data.proofOfResidenceType, proofUrl, cacRegistered, cacNumber],
+    );
+
+    await logActivity({
+      actorId: ctx.user.id,
+      actorRole: "vendor",
+      storeId: ctx.store.id,
+      action: "vendor.kyc_updated",
+      entityType: "store",
+      entityId: ctx.store.id,
+      description: `${ctx.store.name} updated identity, proof of residence, and CAC details`,
+    });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Verification details could not be saved" };
+  }
+
+  revalidatePath("/vendor/store");
+  revalidatePath(`/admin/vendors/${ctx.store.id}`);
+  return { message: "Identity, residence & CAC verification details saved." };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Orders                                                                     */
 /* -------------------------------------------------------------------------- */
@@ -437,14 +497,23 @@ export async function vendorOrderAction(_prev: VendorState, formData: FormData):
       productionProgress: formData.get("productionProgress") ? Number(formData.get("productionProgress")) : undefined,
       trackingCarrier: String(formData.get("trackingCarrier") ?? "") || undefined,
       trackingNumber: String(formData.get("trackingNumber") ?? "") || undefined,
+      dispatchRiderName: String(formData.get("dispatchRiderName") ?? "") || undefined,
+      dispatchRiderPhone: String(formData.get("dispatchRiderPhone") ?? "") || undefined,
+      deliveryPin: String(formData.get("deliveryPin") ?? "") || undefined,
     });
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Order could not be updated" };
   }
   revalidatePath(`/vendor/orders/${orderId}`);
+  revalidatePath(`/account/orders/${orderId}`);
   revalidatePath("/vendor/orders");
   revalidatePath("/vendor");
-  return { message: "Order updated and the customer has been notified." };
+  return {
+    message:
+      action === "deliver" || action === "complete"
+        ? "Customer Delivery PIN verified — order completed and payout released to your available balance."
+        : "Order updated and the customer has been notified.",
+  };
 }
 
 /* -------------------------------------------------------------------------- */

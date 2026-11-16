@@ -325,6 +325,120 @@ async function main() {
     void beforeHistoryCount;
   }
 
+  /* 9. Akwa Ibom locality, Vendor KYC, Delivery PIN & Verified Reviews ----- */
+  const activeStore = await systemDb.one<{ id: string; owner_id: string; state: string }>(
+    `select id, owner_id, state from stores where slug = 'mamaput-kitchen'`,
+  );
+  check("every seeded vendor store is in Akwa Ibom State", activeStore.state === "Akwa Ibom", activeStore.state);
+
+  let nonAkwaIbomBlocked = false;
+  try {
+    await systemDb.execute(`update stores set state = 'Lagos' where id = $1`, [activeStore.id]);
+  } catch {
+    nonAkwaIbomBlocked = true;
+  }
+  check("database rejects vendor stores outside Akwa Ibom State", nonAkwaIbomBlocked);
+
+  let cacWithoutNumberBlocked = false;
+  try {
+    await systemDb.execute(
+      `update vendor_profiles set cac_registered = true, cac_number = null where user_id = $1`,
+      [activeStore.owner_id],
+    );
+  } catch {
+    cacWithoutNumberBlocked = true;
+  }
+  check("database requires CAC number when cac_registered = true", cacWithoutNumberBlocked);
+
+  await systemDb.execute(
+    `update vendor_profiles set cac_registered = false, cac_number = null where user_id = $1`,
+    [activeStore.owner_id],
+  );
+  const kycNoCac = await systemDb.one<{ cac_registered: boolean; nin: string | null }>(
+    `select cac_registered, nin from vendor_profiles where user_id = $1`,
+    [activeStore.owner_id],
+  );
+  check("vendor without CAC registration can proceed with NIN + Proof of Residence", kycNoCac.cac_registered === false && Boolean(kycNoCac.nin));
+  await systemDb.execute(
+    `update vendor_profiles set cac_registered = true, cac_number = 'BN-3849200' where user_id = $1`,
+    [activeStore.owner_id],
+  );
+
+  const sampleOrder = await systemDb.one<{ delivery_pin: string; payout_released: boolean; status: string }>(
+    `select delivery_pin, payout_released, status from orders order by created_at desc limit 1`,
+  );
+  check(
+    "every order has a secret 6-digit delivery verification PIN",
+    /^\d{6}$/.test(sampleOrder.delivery_pin),
+    sampleOrder.delivery_pin,
+  );
+
+  // Anonymous visitor cannot insert reviews
+  let anonReviewBlocked = false;
+  try {
+    await withPublic(async (db) => {
+      await db.execute(
+        `insert into reviews (store_id, customer_name, customer_email, rating, comment, status)
+         values ($1, 'Guest', 'guest@example.com', 5, 'Trying to review anonymously', 'published')`,
+        [activeStore.id],
+      );
+    });
+  } catch {
+    anonReviewBlocked = true;
+  }
+  check("anonymous visitors cannot insert reviews", anonReviewBlocked);
+
+  // Logged-in customer WITH a completed/delivered order CAN publish a verified review and trigger rating_avg refresh
+  const customerUser = await systemDb.one<{ id: string; email: string; full_name: string }>(
+    `select id, email, full_name from users where email = 'customer@ibomvendorshub.com'`,
+  );
+  const deliveredOrderItem = await systemDb.maybeOne<{
+    order_id: string;
+    store_id: string;
+    product_id: string;
+  }>(
+    `select o.id as order_id, o.store_id, oi.product_id
+       from orders o
+       join order_items oi on oi.order_id = o.id
+      where o.customer_id = $1
+        and o.status in ('delivered', 'completed')
+        and oi.product_id is not null
+        and not exists (
+          select 1 from reviews r where r.order_id = o.id and r.product_id = oi.product_id
+        )
+      limit 1`,
+    [customerUser.id],
+  );
+  if (deliveredOrderItem) {
+    await withActor({ id: customerUser.id, role: "customer", email: customerUser.email }, async (db) => {
+      await db.execute(
+        `insert into reviews (store_id, product_id, order_id, customer_id, customer_name, customer_email, rating, title, comment, status, verified_purchase)
+         values ($1, $2, $3, $4, $5, $6, 5, 'Authentic taste', 'Delivered hot and verified with PIN.', 'published', true)`,
+        [
+          deliveredOrderItem.store_id,
+          deliveredOrderItem.product_id,
+          deliveredOrderItem.order_id,
+          customerUser.id,
+          customerUser.full_name,
+          customerUser.email,
+        ],
+      );
+    });
+    const refreshedProduct = await systemDb.one<{ rating_count: number; rating_avg: string }>(
+      `select rating_count, rating_avg::text from products where id = $1`,
+      [deliveredOrderItem.product_id],
+    );
+    check(
+      "logged-in customer review updates product rating aggregates via SECURITY DEFINER trigger",
+      refreshedProduct.rating_count >= 1 && Number(refreshedProduct.rating_avg) > 0,
+      refreshedProduct,
+    );
+    await systemDb.execute(
+      `delete from reviews where order_id = $1 and product_id = $2 and title = 'Authentic taste'`,
+      [deliveredOrderItem.order_id, deliveredOrderItem.product_id],
+    );
+  }
+
   console.log(`\n${checks - failures}/${checks} checks passed`);
   if (failures > 0) process.exitCode = 1;
   process.exit(failures > 0 ? 1 : 0);
