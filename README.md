@@ -241,6 +241,28 @@ environment-driven deployments, and `GOOGLE_REDIRECT_URI` overrides the computed
 (useful for vendor subdomains, which all share the platform's callback). `/api/health` reports
 `signIn.google` as `live`, `unconfigured` or `off`.
 
+### Image storage
+
+Uploads (store logos, covers, product photos) go to Supabase Storage through the service
+role, so they survive a serverless deploy: `NEXT_PUBLIC_SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_STORAGE_BUCKET` (default `storefronts`). The bucket
+must exist and be public for reads — `insert into storage.buckets (id, name, public) values
+('storefronts','storefronts',true)`. Without those variables the uploader writes to
+`public/uploads`, which only works locally: on a serverless host (Vercel sets `VERCEL` or
+`AWS_LAMBDA_FUNCTION_NAME`) it now refuses with a clear error rather than returning a URL to a
+file that will disappear.
+
+### Known external setup
+
+These are owner-side steps that no code change can complete:
+
+| Item | Effect until done |
+| --- | --- |
+| Google OAuth client ID + secret (Admin → Platform settings) | the "Continue with Google" button stays hidden |
+| Resend domain verification for `ibomvendorshub.com` | transactional email fails (visible in Admin → Emails) |
+| Paystack live keys | checkout runs in test mode |
+| A real domain on Vercel | storefront subdomains can't resolve; `/s/<slug>` works in the meantime |
+
 ### Payments
 
 The gateway adapter (`src/lib/payments/gateway.ts`) talks to Paystack's REST API with the
