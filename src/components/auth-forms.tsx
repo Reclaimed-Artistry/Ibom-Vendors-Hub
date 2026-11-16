@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
-import { CheckCircle2, Eye, EyeOff, FileCheck2, Landmark, Loader2, Lock, MapPin, ShieldCheck } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Eye, EyeOff, FileCheck2, Landmark, Loader2, Lock, MapPin, ShieldCheck } from "lucide-react";
 import {
   ActionState,
   forgotPasswordAction,
@@ -13,6 +13,7 @@ import {
   verifyEmailAction,
 } from "@/app/actions/auth";
 import { AKWA_IBOM_LGAS, AKWA_IBOM_STATE, NIGERIAN_BANKS, PROOF_OF_RESIDENCE_TYPES } from "@/lib/akwa-ibom";
+import { getCategoryBookingProfile, isArtisanCategorySlug } from "@/lib/artisan-bookings";
 import { Alert, Field } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import type { StoreCategory } from "@/lib/types";
@@ -291,7 +292,7 @@ export function VendorRegisterForm({
         </Field>
       </div>
 
-      <Field label="Business category" htmlFor="categorySlug" error={state?.fieldErrors?.categorySlug} required>
+      <Field label="Business or artisan category" htmlFor="categorySlug" error={state?.fieldErrors?.categorySlug} required>
         <select
           id="categorySlug"
           name="categorySlug"
@@ -300,12 +301,53 @@ export function VendorRegisterForm({
           value={categorySlug}
           onChange={(e) => setCategorySlug(e.target.value)}
         >
-          <option value="" disabled>Choose what best describes your business…</option>
-          {categories.map((cat) => (
-            <option key={cat.slug} value={cat.slug}>{cat.name}</option>
-          ))}
+          <option value="" disabled>Choose what best describes your business or trade…</option>
+          <optgroup label="Nigerian Artisans & Technical Trades">
+            {categories.filter((cat) => isArtisanCategorySlug(cat.slug)).map((cat) => (
+              <option key={cat.slug} value={cat.slug}>{cat.name}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Retail, Food, Fashion & Professional Services">
+            {categories.filter((cat) => !isArtisanCategorySlug(cat.slug)).map((cat) => (
+              <option key={cat.slug} value={cat.slug}>{cat.name}</option>
+            ))}
+          </optgroup>
         </select>
       </Field>
+
+      {isArtisanCategorySlug(categorySlug) ? (() => {
+        const artisanProfile = getCategoryBookingProfile(categorySlug);
+        return (
+          <div className="rounded-xl border border-brand-200 bg-brand-50/70 p-4">
+            <div className="flex items-start gap-2.5">
+              <ClipboardCheck className="mt-0.5 size-4 shrink-0 text-brand-700" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <p className="text-xs font-bold uppercase tracking-wider text-brand-900">
+                  Built-in {artisanProfile.requirementsTitle}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {artisanProfile.tradesCovered.map((trade) => (
+                    <span key={trade} className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-medium text-brand-900 ring-1 ring-brand-200">
+                      {trade}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-xs text-brand-800">
+                  Your storefront will automatically display and collect these service booking requirements from customers:
+                </p>
+                <ul className="space-y-1 text-xs leading-5 text-ink-800">
+                  {artisanProfile.requirements.map((req, idx) => (
+                    <li key={idx} className="flex items-start gap-1.5">
+                      <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-brand-700" />
+                      <span>{req}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        );
+      })() : null}
 
       <Field
         label="About your business"

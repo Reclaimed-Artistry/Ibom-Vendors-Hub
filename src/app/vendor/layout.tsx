@@ -53,7 +53,7 @@ export default async function VendorLayout({ children }: { children: React.React
           `select
              (select count(*)::int from orders where store_id = $1 and status not in ('completed','cancelled','rejected')) as orders,
              (select count(*)::int from service_quotations where store_id = $1 and status in ('requested','quoted')) as quotations,
-             (select count(*)::int from service_bookings where store_id = $1 and status in ('pending','confirmed')) as bookings,
+             (select count(*)::int from service_bookings where store_id = $1 and status in ('requested','confirmed','rescheduled')) as bookings,
              (select count(*)::int from customer_messages where store_id = $1 and status in ('new','open')) as messages,
              (select count(*)::int from reviews where store_id = $1 and vendor_response is null) as reviews`,
           [store.id],

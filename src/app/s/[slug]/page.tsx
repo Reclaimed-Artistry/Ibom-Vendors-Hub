@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock, Mail, MapPin, Phone, Star, Truck, Package, Store as StoreIcon, CalendarClock, FileText } from "lucide-react";
+import { Clock, Mail, MapPin, Phone, Star, Truck, Package, Store as StoreIcon, CalendarClock, FileText, ClipboardCheck, CheckCircle2 } from "lucide-react";
 import { resolveStore, getStoreProducts, getStoreReviews, storeOpenState } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
 import { storeBase } from "@/lib/storefront-base";
 import { formatMoney, formatDate, truncate, normalisePhone } from "@/lib/utils";
 import { Badge, ButtonLink, Card } from "@/components/ui";
 import { ContactForm } from "@/components/contact-form";
+import { getCategoryBookingProfile } from "@/lib/artisan-bookings";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -100,6 +101,32 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
               {features.appointments ? <Badge tone="neutral">Appointments</Badge> : null}
             </div>
           ) : null}
+
+          {(() => {
+            const bookingProfile = getCategoryBookingProfile(category?.slug);
+            if (!bookingProfile.isArtisan) return null;
+            return (
+              <Card className="border-brand-200 bg-brand-50/60 p-5">
+                <div className="flex items-start gap-3">
+                  <ClipboardCheck className="mt-0.5 size-5 shrink-0 text-brand-700" />
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-sm font-bold text-ink-900">{bookingProfile.requirementsTitle}</h2>
+                    <p className="mt-1 text-xs text-ink-600">
+                      Before booking a site visit, repair or installation with {store.name}, please note:
+                    </p>
+                    <ul className="mt-2.5 grid gap-1.5 text-xs leading-5 text-ink-800 sm:grid-cols-2">
+                      {bookingProfile.requirements.map((req, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-brand-700" />
+                          <span>{req}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </Card>
+            );
+          })()}
 
           <section>
             <div className="flex items-center justify-between gap-3">

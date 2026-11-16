@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Clock, Package, ShieldCheck, Star, Truck } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Clock, Package, ShieldCheck, Star, Truck } from "lucide-react";
 import { getStoreProduct, getStoreReviews, resolveStore } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
 import { storeBase } from "@/lib/storefront-base";
@@ -10,6 +10,7 @@ import { AddToCart } from "@/components/add-to-cart";
 import { ReviewForm } from "@/components/review-form";
 import { getCurrentUser } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
+import { getCategoryBookingProfile } from "@/lib/artisan-bookings";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -145,20 +146,70 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           </div>
 
           <div className="mt-6">
-            {live ? (
-              <AddToCart product={product} store={store} currencySymbol={settings.currency_symbol} />
-            ) : (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                This storefront is offline, so new orders are disabled. Please check back later.
-              </div>
-            )}
-          </div>
+            {(() => {
+              const bookingProfile = getCategoryBookingProfile(category?.slug);
+              const showBooking = product.kind === "service" || Boolean(features.serviceBooking);
+              const showCart = features.cart !== false;
+              const showQuote = Boolean(features.quotations) && product.pricing_type !== "quotation";
 
-          {product.kind === "service" && live ? (
-            <div className="mt-3">
-              <ButtonLink href={`${base}/book/${product.slug}`} variant="secondary" className="w-full">Book this service</ButtonLink>
-            </div>
-          ) : null}
+              if (!live) {
+                return (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    This storefront is offline, so new orders and bookings are disabled. Please check back later.
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-4">
+                  {showBooking ? (
+                    <div className="rounded-xl border border-brand-200 bg-brand-50/70 p-4">
+                      <div className="flex items-start gap-2.5">
+                        <ClipboardCheck className="mt-0.5 size-4 shrink-0 text-brand-700" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold uppercase tracking-wider text-brand-900">
+                            {bookingProfile.requirementsTitle}
+                          </p>
+                          <ul className="mt-2 space-y-1.5 text-xs leading-5 text-ink-800">
+                            {bookingProfile.requirements.map((req, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-brand-700" />
+                                <span>{req}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {showCart ? (
+                    <AddToCart product={product} store={store} currencySymbol={settings.currency_symbol} />
+                  ) : product.pricing_type === "quotation" ? (
+                    <ButtonLink href={`${base}/quote/${product.slug}`} className="w-full">
+                      Request written quotation / BOQ
+                    </ButtonLink>
+                  ) : null}
+
+                  {showBooking ? (
+                    <ButtonLink
+                      href={`${base}/book/${product.slug}`}
+                      variant={showCart || product.pricing_type === "quotation" ? "secondary" : "primary"}
+                      className="w-full"
+                    >
+                      {bookingProfile.ctaLabel}
+                    </ButtonLink>
+                  ) : null}
+
+                  {showQuote && !showCart ? (
+                    <ButtonLink href={`${base}/quote/${product.slug}`} variant="secondary" className="w-full">
+                      Request written quotation / BOQ
+                    </ButtonLink>
+                  ) : null}
+                </div>
+              );
+            })()}
+          </div>
         </div>
       </div>
 

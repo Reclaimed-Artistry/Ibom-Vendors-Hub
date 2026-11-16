@@ -14,6 +14,7 @@ import { sendEmail } from "@/lib/email";
 import { notify, notifyAdmins } from "@/lib/notifications";
 import { logActivity } from "@/lib/audit";
 import { formatIssues, bookingSchema, checkoutSchema, messageSchema, quotationRequestSchema, reviewSchema } from "@/lib/validation";
+import { getCategoryBookingProfile } from "@/lib/artisan-bookings";
 
 export interface PublicState {
   error?: string;
@@ -357,17 +358,50 @@ export async function submitBookingAction(_prev: PublicState, formData: FormData
     customerPhone: formData.get("customerPhone"),
     date: formData.get("date"),
     time: formData.get("time"),
+    location: formData.get("location") ?? "",
+    visitType: formData.get("visitType") ?? "",
+    materialsOption: formData.get("materialsOption") ?? "",
+    requirementsAccepted: formData.get("requirementsAccepted") === "on" || formData.get("requirementsAccepted") === "true",
     notes: formData.get("notes") ?? "",
   });
   if (!parsed.success) {
     return { error: "Please fix the highlighted fields", fieldErrors: formatIssues(parsed.error) };
   }
 
-  const store = await systemDb.maybeOne<{ id: string; owner_id: string; name: string }>(
-    `select id, owner_id, name from stores where id = $1 and status = 'active'`,
+  const store = await systemDb.maybeOne<{
+    id: string;
+    owner_id: string;
+    name: string;
+    category_slug: string | null;
+  }>(
+    `select s.id, s.owner_id, s.name, c.slug as category_slug
+       from stores s
+       left join store_categories c on c.id = s.category_id
+      where s.id = $1 and s.status = 'active'`,
     [storeId],
   );
   if (!store) return { error: "This store is not accepting bookings right now." };
+
+  const profile = getCategoryBookingProfile(store.category_slug);
+  const fieldErrors: Record<string, string> = {};
+
+  if (profile.requiresSiteAddress && (!parsed.data.location || parsed.data.location.trim().length < 5)) {
+    fieldErrors.location = "Please enter the job site address, area/LGA and nearest landmark";
+  }
+
+  const extraAnswers: Array<{ key: string; label: string; value: string }> = [];
+  for (const field of profile.extraFields) {
+    const rawVal = String(formData.get(`extra_${field.key}`) ?? "").trim();
+    if (field.required && !rawVal) {
+      fieldErrors[`extra_${field.key}`] = `${field.label} is required for this service`;
+    } else if (rawVal) {
+      extraAnswers.push({ key: field.key, label: field.label, value: rawVal.slice(0, 300) });
+    }
+  }
+
+  if (Object.keys(fieldErrors).length > 0) {
+    return { error: "Please complete all required service booking details", fieldErrors };
+  }
 
   const product = await systemDb.maybeOne<{ id: string; name: string; service_duration_minutes: number | null }>(
     `select id, name, service_duration_minutes from products where id = $1 and store_id = $2`,
@@ -375,13 +409,21 @@ export async function submitBookingAction(_prev: PublicState, formData: FormData
   );
   if (!product) return { error: "That service is no longer available." };
 
+  const bookingDetails = {
+    categorySlug: store.category_slug,
+    visitType: parsed.data.visitType || null,
+    materialsOption: parsed.data.materialsOption || null,
+    requirementsAccepted: true,
+    fields: extraAnswers,
+  };
+
   const user = await getCurrentUser();
   await withSystem(async (db) => {
     const booking = await db.one<{ id: string }>(
       `insert into service_bookings
          (store_id, product_id, customer_id, customer_name, customer_email, customer_phone,
-          scheduled_date, scheduled_time, duration_minutes, notes, status)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'requested') returning id`,
+          scheduled_date, scheduled_time, duration_minutes, location, notes, booking_details, status)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,'requested') returning id`,
       [
         store.id,
         product.id,
@@ -392,7 +434,9 @@ export async function submitBookingAction(_prev: PublicState, formData: FormData
         parsed.data.date,
         parsed.data.time,
         product.service_duration_minutes,
+        parsed.data.location || null,
         parsed.data.notes || null,
+        JSON.stringify(bookingDetails),
       ],
     );
     await notify(
@@ -400,8 +444,8 @@ export async function submitBookingAction(_prev: PublicState, formData: FormData
         userId: store.owner_id,
         storeId: store.id,
         type: "booking_requested",
-        title: "New appointment request",
-        body: `${parsed.data.customerName} — ${product.name} on ${parsed.data.date} at ${parsed.data.time}`,
+        title: profile.isArtisan ? "New artisan service booking" : "New appointment request",
+        body: `${parsed.data.customerName} — ${product.name} on ${parsed.data.date} at ${parsed.data.time}${parsed.data.location ? ` (${parsed.data.location})` : ""}`,
         actionUrl: "/vendor/bookings",
         dedupeKey: `booking:${booking.id}`,
       },

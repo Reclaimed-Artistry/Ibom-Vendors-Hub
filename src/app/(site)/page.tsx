@@ -1,5 +1,24 @@
 import Link from "next/link";
-import { ArrowRight, BadgeCheck, Clock, MapPin, Package, ShieldCheck, ShoppingBag, Star, Store, Truck, Utensils } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Clock,
+  Droplets,
+  Hammer,
+  HardHat,
+  MapPin,
+  Package,
+  Paintbrush,
+  Scissors,
+  ShieldCheck,
+  ShoppingBag,
+  Star,
+  Store,
+  Truck,
+  Utensils,
+  Wrench,
+  Zap,
+} from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { getCategoriesWithCounts, getMarketplaceHighlights, searchMarketplace } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
@@ -11,6 +30,13 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   footprints: Package,
   cpu: Package,
   sparkles: Star,
+  hammer: Hammer,
+  zap: Zap,
+  droplets: Droplets,
+  paintbrush: Paintbrush,
+  "hard-hat": HardHat,
+  wrench: Wrench,
+  scissors: Scissors,
   briefcase: Store,
   "shopping-bag": ShoppingBag,
 };

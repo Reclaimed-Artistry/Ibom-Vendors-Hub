@@ -8,7 +8,7 @@ import { QuoteForm } from "@/components/storefront-forms";
 
 export default async function ProductQuotePage({ params }: { params: Promise<{ slug: string; productSlug: string }> }) {
   const { slug, productSlug } = await params;
-  const { store, live } = await resolveStore(slug);
+  const { store, category, live } = await resolveStore(slug);
   if (!store) notFound();
   const product = await getStoreProduct(store.id, productSlug);
   if (!product) notFound();
@@ -39,6 +39,7 @@ export default async function ProductQuotePage({ params }: { params: Promise<{ s
             storeId={store.id}
             products={[{ id: product.id, name: product.name }]}
             selectedProductId={product.id}
+            categorySlug={category?.slug}
             defaultName={user?.fullName}
             defaultEmail={user?.email}
           />

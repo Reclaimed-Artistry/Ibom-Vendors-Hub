@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Search, SlidersHorizontal } from "lucide-react";
 import { getCategoriesWithCounts, searchMarketplace } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
 import { formatMoney } from "@/lib/utils";
 import { Badge, EmptyState, Pagination } from "@/components/ui";
+import { getCategoryBookingProfile, isArtisanCategorySlug } from "@/lib/artisan-bookings";
 
 export const metadata = { title: "Browse the marketplace" };
 export const dynamic = "force-dynamic";
@@ -75,6 +76,45 @@ export default async function BrowsePage({
           </Link>
         ))}
       </div>
+
+      {isArtisanCategorySlug(sp.category) ? (() => {
+        const artisanProfile = getCategoryBookingProfile(sp.category);
+        return (
+          <div className="mt-6 rounded-2xl border border-brand-200 bg-brand-50/70 p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <ClipboardCheck className="mt-0.5 size-5 shrink-0 text-brand-700" />
+                <div className="min-w-0 flex-1 space-y-2.5">
+                  <div>
+                    <h2 className="text-sm font-bold text-ink-900">{artisanProfile.requirementsTitle}</h2>
+                    <p className="mt-0.5 text-xs text-ink-600">
+                      Every artisan in this category collects these service &amp; site readiness details during booking:
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {artisanProfile.tradesCovered.map((trade) => (
+                      <span key={trade} className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-medium text-brand-900 ring-1 ring-brand-200">
+                        {trade}
+                      </span>
+                    ))}
+                  </div>
+                  <ul className="grid gap-1.5 text-xs leading-5 text-ink-800 sm:grid-cols-2">
+                    {artisanProfile.requirements.map((req, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-brand-700" />
+                        <span>{req}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <Link href="/register" className="btn-secondary btn-sm shrink-0">
+                Work in this trade? Open storefront →
+              </Link>
+            </div>
+          </div>
+        );
+      })() : null}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ink-100 bg-white px-4 py-3">
         <div className="flex items-center gap-2 text-sm text-ink-500">

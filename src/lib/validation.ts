@@ -324,6 +324,12 @@ export const bookingSchema = z.object({
   customerPhone: phone,
   date: z.string().min(8, "Choose a date"),
   time: z.string().min(3, "Choose a time"),
+  location: z.string().trim().max(300).optional().or(z.literal("")),
+  visitType: z.string().trim().max(150).optional().or(z.literal("")),
+  materialsOption: z.string().trim().max(200).optional().or(z.literal("")),
+  requirementsAccepted: z.boolean().refine((val) => val === true, {
+    message: "Please confirm you have read the booking requirements for this service",
+  }),
   notes: z.string().trim().max(1000).optional().or(z.literal("")),
 });
 
