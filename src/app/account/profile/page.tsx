@@ -9,7 +9,7 @@ import { LogoutButton } from "@/components/dashboard-nav";
 export const metadata: Metadata = { title: "Profile & security · Ibom Vendors Hub" };
 
 export default async function AccountProfilePage() {
-  const user = await requireUser(["customer"]);
+  const user = await requireUser(["customer", "vendor", "admin", "super_admin"]);
   const row = await systemDb.maybeOne<{ phone: string | null; created_at: string; status: string }>(
     `select phone, created_at, status from users where id = $1`,
     [user.id],

@@ -11,7 +11,7 @@ import { DashboardNav, LogoutButton, MobileNav, type DashboardNavItem } from "@/
 export const metadata: Metadata = { title: "My account · Ibom Vendors Hub" };
 
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireUser(["customer"]);
+  const user = await requireUser(["customer", "vendor", "admin", "super_admin"]);
   const unread = await systemDb.maybeOne<{ count: number }>(
     `select count(*)::int as count from notifications where user_id = $1 and read_at is null`,
     [user.id],
@@ -48,6 +48,14 @@ export default async function AccountLayout({ children }: { children: React.Reac
                 <DashboardNav items={nav} />
                 <div className="mt-1 border-t border-ink-100 pt-1"><LogoutButton /></div>
               </div>
+              {user.role === "vendor" ? (
+                <Link
+                  href="/vendor"
+                  className="flex items-center justify-between rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm font-semibold text-brand-900 shadow-sm hover:border-brand-400"
+                >
+                  Vendor Dashboard <ArrowRight className="size-4" />
+                </Link>
+              ) : null}
               <Link href="/browse" className="flex items-center justify-between rounded-2xl border border-ink-100 bg-white p-4 text-sm font-semibold text-brand-700 shadow-sm hover:border-brand-300">
                 Continue shopping <ArrowRight className="size-4" />
               </Link>

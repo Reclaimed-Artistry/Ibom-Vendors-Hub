@@ -13,7 +13,7 @@ export default async function AccountOrdersPage({
 }: {
   searchParams: Promise<{ filter?: string }>;
 }) {
-  const user = await requireUser(["customer"]);
+  const user = await requireUser(["customer", "vendor", "admin", "super_admin"]);
   const { filter = "all" } = await searchParams;
 
   const params: unknown[] = [user.email];

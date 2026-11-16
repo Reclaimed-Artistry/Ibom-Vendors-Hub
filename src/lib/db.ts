@@ -186,6 +186,10 @@ async function runTransaction<T>(
           "select set_config('app.user_id', $1, true), set_config('app.user_email', $2, true), set_config('app.user_role', $3, true)",
           [actor?.id ?? "", actor?.email ?? "", actor?.role ?? "anon"],
         );
+      } else {
+        await client.query(
+          "select set_config('app.user_id', '', true), set_config('app.user_email', '', true), set_config('app.user_role', 'system', true)",
+        );
       }
       const db = makeDb(clientRunner(client));
       return await txStore.run({ client, role: mode }, async () => {

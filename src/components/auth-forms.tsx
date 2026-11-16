@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
-import { CheckCircle2, FileCheck2, MapPin, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, FileCheck2, Loader2, MapPin, ShieldCheck } from "lucide-react";
 import {
   ActionState,
   forgotPasswordAction,
@@ -26,17 +26,91 @@ function Feedback({ state }: { state: ActionState }) {
   return null;
 }
 
+/** Compress large camera photos (> 1.2 MB) in-browser so uploads are fast and stay well below serverless limits. */
+async function compressImageIfNeeded(file: File): Promise<File> {
+  if (!file.type.startsWith("image/") || file.type === "image/svg+xml" || file.size <= 1_200_000) {
+    return file;
+  }
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxDim = 1800;
+    const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.84),
+    );
+    if (!blob || blob.size >= file.size) return file;
+    const baseName = file.name.replace(/\.[^.]+$/, "") || "upload";
+    return new File([blob], `${baseName}.jpg`, { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
+
+async function preUploadFile(file: File, kind: "kyc" | "logo" | "cover"): Promise<string> {
+  const prepared = await compressImageIfNeeded(file);
+  const body = new FormData();
+  body.set("file", prepared);
+  body.set("kind", kind);
+  const res = await fetch("/api/register-upload", { method: "POST", body });
+  const data = (await res.json()) as { url?: string; error?: string };
+  if (!res.ok || !data.url) {
+    throw new Error(data.error || "Could not upload file");
+  }
+  return data.url;
+}
+
 export function LoginForm({ next }: { next?: string }) {
   const [state, action] = useActionState<ActionState, FormData>(loginAction as Action, initial);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <form action={action} className="space-y-4">
       <Feedback state={state} />
       {next ? <input type="hidden" name="next" value={next} /> : null}
       <Field label="Email address" htmlFor="email" error={state?.fieldErrors?.email} required>
-        <input id="email" name="email" type="email" className="input" required autoComplete="email" placeholder="you@business.com" />
+        <input
+          id="email"
+          name="email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="input"
+          required
+          autoComplete="email"
+          placeholder="you@business.com"
+        />
       </Field>
       <Field label="Password" htmlFor="password" error={state?.fieldErrors?.password} required>
-        <input id="password" name="password" type="password" className="input" required autoComplete="current-password" />
+        <div className="relative">
+          <input
+            id="password"
+            name="password"
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="input pr-10"
+            required
+            autoComplete="current-password"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-ink-400 hover:text-ink-700"
+          >
+            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          </button>
+        </div>
       </Field>
       <div className="flex items-center justify-between text-sm">
         <Link href="/forgot-password" className="font-medium text-brand-800 hover:text-brand-900">
@@ -48,40 +122,91 @@ export function LoginForm({ next }: { next?: string }) {
   );
 }
 
+export interface VendorInitialUser {
+  fullName?: string;
+  email?: string;
+  phone?: string | null;
+}
+
 export function VendorRegisterForm({
   categories,
   rootDomain,
+  initialUser,
 }: {
   categories: StoreCategory[];
   rootDomain: string;
+  initialUser?: VendorInitialUser;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(registerVendorAction as Action, initial);
   const [businessName, setBusinessName] = useState("");
+  const [ownerName, setOwnerName] = useState(initialUser?.fullName ?? "");
+  const [phone, setPhone] = useState(initialUser?.phone ?? "");
+  const [email, setEmail] = useState(initialUser?.email ?? "");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [categorySlug, setCategorySlug] = useState("");
+  const [description, setDescription] = useState("");
+  const [city, setCity] = useState("Uyo");
+  const [address, setAddress] = useState("");
+  const [nin, setNin] = useState("");
+  const [proofOfResidenceType, setProofOfResidenceType] = useState("utility_bill");
   const [cacRegistered, setCacRegistered] = useState<"yes" | "no">("no");
-  const [proofFileName, setProofFileName] = useState<string>("");
-  const [check, setCheck] = useState<{ available: boolean; slug: string; reason?: string } | null>(null);
+  const [cacNumber, setCacNumber] = useState("");
+  const [acceptTerms, setAcceptTerms] = useState(false);
+
+  const [proofFileName, setProofFileName] = useState("");
+  const [proofOfResidenceUrl, setProofOfResidenceUrl] = useState("");
+  const [proofUploading, setProofUploading] = useState(false);
+  const [proofUploadError, setProofUploadError] = useState("");
+
+  const [logoUrl, setLogoUrl] = useState("");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [coverUrl, setCoverUrl] = useState("");
+  const [coverUploading, setCoverUploading] = useState(false);
+
+  const [check, setCheck] = useState<{
+    available: boolean;
+    slug: string;
+    suggestedSlug?: string;
+    reason?: string;
+  } | null>(null);
 
   useEffect(() => {
     const trimmed = businessName.trim();
-    if (trimmed.length < 3) {
+    if (trimmed.length < 2) {
       setCheck(null);
       return;
     }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/subdomain-check?name=${encodeURIComponent(trimmed)}`);
+        const res = await fetch(
+          `/api/subdomain-check?name=${encodeURIComponent(trimmed)}&city=${encodeURIComponent(city)}`,
+        );
+        if (!res.ok) return;
         const data = await res.json();
         setCheck(data);
       } catch {
         setCheck(null);
       }
-    }, 280);
+    }, 260);
     return () => clearTimeout(timer);
-  }, [businessName]);
+  }, [businessName, city]);
+
+  const anyUploading = proofUploading || logoUploading || coverUploading;
 
   return (
     <form action={action} className="space-y-4">
       <Feedback state={state} />
+
+      <input type="hidden" name="proofOfResidenceUrl" value={proofOfResidenceUrl} />
+      <input type="hidden" name="logoUrl" value={logoUrl} />
+      <input type="hidden" name="coverUrl" value={coverUrl} />
+
+      {initialUser?.email ? (
+        <Alert tone="info">
+          Signed in as <strong>{initialUser.email}</strong>. Completing this form opens your Akwa Ibom storefront and sets your vendor sign-in password.
+        </Alert>
+      ) : null}
 
       <div className="flex items-start gap-2.5 rounded-xl border border-brand-200 bg-brand-50/70 px-3.5 py-2.5 text-xs text-brand-900">
         <MapPin className="mt-0.5 size-4 shrink-0 text-brand-700" />
@@ -101,7 +226,9 @@ export function VendorRegisterForm({
           check
             ? check.available
               ? `Your storefront address: ${check.slug}.${rootDomain}`
-              : check.reason
+              : check.suggestedSlug
+                ? `Storefront address assigned: ${check.suggestedSlug}.${rootDomain}`
+                : check.reason
             : "This also sets your subdomain (e.g. mamaputkitchen." + rootDomain + ")"
         }
         required
@@ -119,24 +246,81 @@ export function VendorRegisterForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Owner full name" htmlFor="ownerName" error={state?.fieldErrors?.ownerName} required>
-          <input id="ownerName" name="ownerName" className="input" required placeholder="Grace Etim" />
+          <input
+            id="ownerName"
+            name="ownerName"
+            value={ownerName}
+            onChange={(e) => setOwnerName(e.target.value)}
+            className="input"
+            required
+            placeholder="Grace Etim"
+          />
         </Field>
         <Field label="Phone / WhatsApp" htmlFor="phone" error={state?.fieldErrors?.phone} required>
-          <input id="phone" name="phone" className="input" required placeholder="0803 123 4567" />
+          <input
+            id="phone"
+            name="phone"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="input"
+            required
+            placeholder="0803 123 4567"
+          />
         </Field>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Business email" htmlFor="email" error={state?.fieldErrors?.email} required>
-          <input id="email" name="email" type="email" className="input" required autoComplete="email" />
+          <input
+            id="email"
+            name="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="input"
+            required
+            autoComplete="email"
+          />
         </Field>
-        <Field label="Password" htmlFor="password" error={state?.fieldErrors?.password} hint="Min 8 characters, letters & numbers" required>
-          <input id="password" name="password" type="password" className="input" required autoComplete="new-password" />
+        <Field
+          label="Password"
+          htmlFor="password"
+          error={state?.fieldErrors?.password}
+          hint="Min 8 characters, letters & numbers"
+          required
+        >
+          <div className="relative">
+            <input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input pr-10"
+              required
+              autoComplete="new-password"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-ink-400 hover:text-ink-700"
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
         </Field>
       </div>
 
       <Field label="Business category" htmlFor="categorySlug" error={state?.fieldErrors?.categorySlug} required>
-        <select id="categorySlug" name="categorySlug" className="select" required defaultValue="">
+        <select
+          id="categorySlug"
+          name="categorySlug"
+          className="select"
+          required
+          value={categorySlug}
+          onChange={(e) => setCategorySlug(e.target.value)}
+        >
           <option value="" disabled>Choose what best describes your business…</option>
           {categories.map((cat) => (
             <option key={cat.slug} value={cat.slug}>{cat.name}</option>
@@ -144,13 +328,35 @@ export function VendorRegisterForm({
         </select>
       </Field>
 
-      <Field label="About your business" htmlFor="description" error={state?.fieldErrors?.description} required>
-        <textarea id="description" name="description" rows={3} className="textarea" required placeholder="Tell customers what you sell, make or offer…" />
+      <Field
+        label="About your business"
+        htmlFor="description"
+        error={state?.fieldErrors?.description}
+        hint="Briefly describe your products or services (at least 10 characters)"
+        required
+      >
+        <textarea
+          id="description"
+          name="description"
+          rows={3}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          className="textarea"
+          required
+          placeholder="Tell customers what you sell, make or offer…"
+        />
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="LGA / Town in Akwa Ibom" htmlFor="city" error={state?.fieldErrors?.city} required>
-          <select id="city" name="city" className="select" required defaultValue="Uyo">
+          <select
+            id="city"
+            name="city"
+            className="select"
+            required
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+          >
             {AKWA_IBOM_LGAS.map((lga) => (
               <option key={lga} value={lga}>{lga}</option>
             ))}
@@ -177,6 +383,8 @@ export function VendorRegisterForm({
         <input
           id="address"
           name="address"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
           className="input"
           required
           placeholder="e.g. 12 Aba Road, beside Ibom Plaza, Uyo"
@@ -206,8 +414,9 @@ export function VendorRegisterForm({
             id="nin"
             name="nin"
             inputMode="numeric"
-            pattern="\d{11}"
-            maxLength={11}
+            maxLength={14}
+            value={nin}
+            onChange={(e) => setNin(e.target.value.replace(/[^\d\s-]/g, ""))}
             className="input font-mono tracking-wider"
             required
             placeholder="12345678901"
@@ -221,7 +430,14 @@ export function VendorRegisterForm({
             error={state?.fieldErrors?.proofOfResidenceType}
             required
           >
-            <select id="proofOfResidenceType" name="proofOfResidenceType" className="select" required defaultValue="utility_bill">
+            <select
+              id="proofOfResidenceType"
+              name="proofOfResidenceType"
+              className="select"
+              required
+              value={proofOfResidenceType}
+              onChange={(e) => setProofOfResidenceType(e.target.value)}
+            >
               {PROOF_OF_RESIDENCE_TYPES.map((item) => (
                 <option key={item.value} value={item.value}>{item.label}</option>
               ))}
@@ -231,17 +447,43 @@ export function VendorRegisterForm({
           <Field
             label="Upload proof of residence"
             htmlFor="proofOfResidenceFile"
-            error={state?.fieldErrors?.proofOfResidenceUrl}
-            hint={proofFileName ? `Selected: ${proofFileName}` : "JPG, PNG, WEBP or PDF (max 6MB)"}
+            error={proofUploadError || state?.fieldErrors?.proofOfResidenceUrl}
+            hint={
+              proofUploading
+                ? "Uploading document…"
+                : proofOfResidenceUrl
+                  ? `Uploaded ✓ (${proofFileName || "document ready"})`
+                  : proofFileName
+                    ? `Selected: ${proofFileName}`
+                    : "JPG, PNG, WEBP or PDF (max 10MB)"
+            }
             required
           >
             <input
               id="proofOfResidenceFile"
-              name="proofOfResidenceFile"
+              name={proofOfResidenceUrl ? undefined : "proofOfResidenceFile"}
               type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf"
-              required
-              onChange={(e) => setProofFileName(e.target.files?.[0]?.name ?? "")}
+              accept="image/jpeg,image/png,image/webp,application/pdf,.pdf,.jpg,.jpeg,.png,.webp"
+              required={!proofOfResidenceUrl}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                setProofUploadError("");
+                if (!file) {
+                  setProofFileName("");
+                  return;
+                }
+                setProofFileName(file.name);
+                setProofUploading(true);
+                try {
+                  const uploadedUrl = await preUploadFile(file, "kyc");
+                  setProofOfResidenceUrl(uploadedUrl);
+                } catch (err) {
+                  setProofOfResidenceUrl("");
+                  setProofUploadError(err instanceof Error ? err.message : "Could not upload document");
+                } finally {
+                  setProofUploading(false);
+                }
+              }}
               className="input py-1.5 text-xs"
             />
           </Field>
@@ -305,6 +547,8 @@ export function VendorRegisterForm({
             <input
               id="cacNumber"
               name="cacNumber"
+              value={cacNumber}
+              onChange={(e) => setCacNumber(e.target.value)}
               className="input font-mono uppercase"
               required
               placeholder="e.g. BN-3482910 or RC-1928374"
@@ -319,16 +563,67 @@ export function VendorRegisterForm({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Business logo" htmlFor="logoFile" hint="Square image, optional">
-          <input id="logoFile" name="logoFile" type="file" accept="image/*" className="input py-1.5 text-xs" />
+        <Field
+          label="Business logo"
+          htmlFor="logoFile"
+          hint={logoUploading ? "Uploading logo…" : logoUrl ? "Logo uploaded ✓" : "Square image, optional"}
+        >
+          <input
+            id="logoFile"
+            name={logoUrl ? undefined : "logoFile"}
+            type="file"
+            accept="image/*"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setLogoUploading(true);
+              try {
+                setLogoUrl(await preUploadFile(file, "logo"));
+              } catch {
+                setLogoUrl("");
+              } finally {
+                setLogoUploading(false);
+              }
+            }}
+            className="input py-1.5 text-xs"
+          />
         </Field>
-        <Field label="Cover banner" htmlFor="coverFile" hint="Wide image, optional">
-          <input id="coverFile" name="coverFile" type="file" accept="image/*" className="input py-1.5 text-xs" />
+        <Field
+          label="Cover banner"
+          htmlFor="coverFile"
+          hint={coverUploading ? "Uploading cover…" : coverUrl ? "Cover uploaded ✓" : "Wide image, optional"}
+        >
+          <input
+            id="coverFile"
+            name={coverUrl ? undefined : "coverFile"}
+            type="file"
+            accept="image/*"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setCoverUploading(true);
+              try {
+                setCoverUrl(await preUploadFile(file, "cover"));
+              } catch {
+                setCoverUrl("");
+              } finally {
+                setCoverUploading(false);
+              }
+            }}
+            className="input py-1.5 text-xs"
+          />
         </Field>
       </div>
 
       <label className="flex items-start gap-2 text-sm text-ink-600">
-        <input type="checkbox" name="acceptTerms" className="mt-0.5 size-4 rounded border-ink-300 text-brand-700" required />
+        <input
+          type="checkbox"
+          name="acceptTerms"
+          checked={acceptTerms}
+          onChange={(e) => setAcceptTerms(e.target.checked)}
+          className="mt-0.5 size-4 rounded border-ink-300 text-brand-700"
+          required
+        />
         <span>
           I confirm this business operates in <strong>Akwa Ibom State</strong> and agree to the{" "}
           <Link href="/terms" className="font-semibold text-brand-800 underline">terms of service</Link> and{" "}
@@ -337,30 +632,85 @@ export function VendorRegisterForm({
       </label>
       {state?.fieldErrors?.acceptTerms ? <p className="error-text">{state.fieldErrors.acceptTerms}</p> : null}
 
-      <SubmitButton className="w-full" pendingLabel="Creating your storefront…">
-        Create my storefront
-      </SubmitButton>
+      {anyUploading ? (
+        <button type="button" disabled className="btn-primary w-full opacity-70">
+          <Loader2 className="size-4 animate-spin" /> Finishing file upload…
+        </button>
+      ) : (
+        <SubmitButton className="w-full" pendingLabel="Creating your storefront…">
+          Create my storefront
+        </SubmitButton>
+      )}
     </form>
   );
 }
 
 export function CustomerRegisterForm({ next }: { next?: string }) {
   const [state, action] = useActionState<ActionState, FormData>(registerCustomerAction as Action, initial);
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <form action={action} className="space-y-4">
       <Feedback state={state} />
       {next ? <input type="hidden" name="next" value={next} /> : null}
       <Field label="Full name" htmlFor="fullName" error={state?.fieldErrors?.fullName} required>
-        <input id="fullName" name="fullName" className="input" required />
+        <input
+          id="fullName"
+          name="fullName"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          className="input"
+          required
+        />
       </Field>
       <Field label="Email address" htmlFor="email" error={state?.fieldErrors?.email} required>
-        <input id="email" name="email" type="email" className="input" required autoComplete="email" />
+        <input
+          id="email"
+          name="email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="input"
+          required
+          autoComplete="email"
+        />
       </Field>
       <Field label="Phone number" htmlFor="phone" error={state?.fieldErrors?.phone} required>
-        <input id="phone" name="phone" className="input" required placeholder="0803 123 4567" />
+        <input
+          id="phone"
+          name="phone"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          className="input"
+          required
+          placeholder="0803 123 4567"
+        />
       </Field>
       <Field label="Password" htmlFor="password" error={state?.fieldErrors?.password} hint="Min 8 characters, letters & numbers" required>
-        <input id="password" name="password" type="password" className="input" required autoComplete="new-password" />
+        <div className="relative">
+          <input
+            id="password"
+            name="password"
+            type={showPassword ? "text" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="input pr-10"
+            required
+            autoComplete="new-password"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-ink-400 hover:text-ink-700"
+          >
+            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          </button>
+        </div>
       </Field>
       <label className="flex items-start gap-2 text-sm text-ink-600">
         <input type="checkbox" name="acceptTerms" className="mt-0.5 size-4" required />

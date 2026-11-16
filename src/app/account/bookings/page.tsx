@@ -9,7 +9,7 @@ import { cancelBookingAction } from "@/app/actions/account";
 export const metadata: Metadata = { title: "My bookings · Ibom Vendors Hub" };
 
 export default async function AccountBookingsPage() {
-  const user = await requireUser(["customer"]);
+  const user = await requireUser(["customer", "vendor", "admin", "super_admin"]);
   const rows = await systemDb.query<{
     id: string;
     scheduled_date: string;

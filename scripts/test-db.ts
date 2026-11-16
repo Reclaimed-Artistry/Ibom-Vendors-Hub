@@ -439,6 +439,28 @@ async function main() {
     );
   }
 
+  /* 10. Storefront subdomain check & account guard ------------------------- */
+  const { checkSubdomain, resolveAvailableSubdomain } = await import("../src/lib/stores");
+  const freeSub = await checkSubdomain("Oron Seafood Palace");
+  check("checkSubdomain accepts an available Akwa Ibom business name", freeSub.available === true, freeSub);
+
+  const takenSub = await resolveAvailableSubdomain("Mamaput Kitchen", "Eket");
+  check(
+    "resolveAvailableSubdomain suggests a city-qualified address when exact name is taken",
+    takenSub.available === false && Boolean(takenSub.suggestedSlug),
+    takenSub,
+  );
+
+  let selfRoleEscalationBlocked = false;
+  try {
+    await withActor({ id: customerUser.id, role: "customer", email: customerUser.email }, async (db) => {
+      await db.execute(`update users set role = 'super_admin' where id = $1`, [customerUser.id]);
+    });
+  } catch {
+    selfRoleEscalationBlocked = true;
+  }
+  check("app_runtime user cannot escalate their own role", selfRoleEscalationBlocked);
+
   console.log(`\n${checks - failures}/${checks} checks passed`);
   if (failures > 0) process.exitCode = 1;
   process.exit(failures > 0 ? 1 : 0);

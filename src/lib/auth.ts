@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
@@ -8,7 +8,22 @@ import { systemDb, withSystem, type Actor } from "@/lib/db";
 import type { SessionUser, Store } from "@/lib/types";
 
 const COOKIE = "ivh_session";
-const SESSION_DAYS = 7;
+const SESSION_DAYS = 30;
+
+async function isHttpsRequest(): Promise<boolean> {
+  try {
+    const h = await headers();
+    const proto = h.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+    if (proto === "https") return true;
+    if (proto === "http") return false;
+    const origin = h.get("origin") ?? h.get("referer") ?? "";
+    if (origin.startsWith("https://")) return true;
+    if (origin.startsWith("http://")) return false;
+  } catch {
+    // Called outside request context
+  }
+  return Boolean(process.env.VERCEL);
+}
 
 function secretKey() {
   const secret =
@@ -49,10 +64,11 @@ export async function createSessionToken(user: SessionPayload) {
 
 export async function setSessionCookie(token: string) {
   const store = await cookies();
+  const secure = await isHttpsRequest();
   store.set(COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure,
     path: "/",
     maxAge: SESSION_DAYS * 86_400,
   });
@@ -60,7 +76,14 @@ export async function setSessionCookie(token: string) {
 
 export async function clearSessionCookie() {
   const store = await cookies();
-  store.delete(COOKIE);
+  const secure = await isHttpsRequest();
+  store.set(COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure,
+    path: "/",
+    maxAge: 0,
+  });
 }
 
 interface UserRow {
@@ -71,6 +94,7 @@ interface UserRow {
   status: SessionUser["status"];
   avatar_url: string | null;
   email_verified_at: string | null;
+  owns_store: boolean;
 }
 
 export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
@@ -81,16 +105,19 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     const id = payload.sub;
     if (!id) return null;
     const row = await systemDb.maybeOne<UserRow>(
-      `select id, email, full_name, role, status, avatar_url, email_verified_at
-         from users where id = $1`,
+      `select u.id, u.email, u.full_name, u.role, u.status, u.avatar_url, u.email_verified_at,
+              exists (select 1 from stores s where s.owner_id = u.id) as owns_store
+         from users u where u.id = $1`,
       [id],
     );
     if (!row || row.status !== "active") return null;
+    const effectiveRole: SessionUser["role"] =
+      row.role === "customer" && row.owns_store ? "vendor" : row.role;
     return {
       id: row.id,
       email: row.email,
       fullName: row.full_name,
-      role: row.role,
+      role: effectiveRole,
       avatarUrl: row.avatar_url,
       emailVerified: Boolean(row.email_verified_at),
       status: row.status,

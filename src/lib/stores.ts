@@ -11,6 +11,7 @@ import { url } from "@/lib/settings";
 export interface SubdomainCheck {
   available: boolean;
   slug: string;
+  suggestedSlug?: string;
   reason?: string;
 }
 
@@ -27,12 +28,12 @@ export async function checkSubdomain(name: string, excludeStoreId?: string): Pro
     return { available: false, slug, reason: "This address is reserved by the platform" };
   }
 
-  const existing = await systemDb.maybeOne<{ id: string }>(
-    `select s.id from stores s
-      where (s.slug = $1 or exists (select 1 from store_domains d where d.subdomain = $1))
+  const existing = await systemDb.maybeOne<{ hit: number }>(
+    `select 1 as hit from stores s
+      where (lower(s.slug) = lower($1) or exists (select 1 from store_domains d where lower(d.subdomain) = lower($1)))
         and ($2::uuid is null or s.id <> $2::uuid)
       union all
-     select r.id from reserved_subdomains r where r.name = $1
+     select 1 as hit from reserved_subdomains r where lower(r.name) = lower($1)
      limit 1`,
     [slug, excludeStoreId ?? null],
   );
@@ -46,7 +47,7 @@ export async function checkSubdomain(name: string, excludeStoreId?: string): Pro
 
   const pending = await systemDb.maybeOne<{ id: string }>(
     `select id from subdomain_change_requests
-      where requested_subdomain = $1 and status = 'pending' limit 1`,
+      where lower(requested_subdomain) = lower($1) and status = 'pending' limit 1`,
     [slug],
   );
   if (pending) {
@@ -56,15 +57,48 @@ export async function checkSubdomain(name: string, excludeStoreId?: string): Pro
   return { available: true, slug };
 }
 
+/** Resolve an available subdomain for a business name, using city or numeric suffix if the exact slug is taken/reserved. */
+export async function resolveAvailableSubdomain(name: string, city?: string): Promise<SubdomainCheck> {
+  const direct = await checkSubdomain(name);
+  if (direct.available) return direct;
+
+  const baseRaw = normaliseSubdomain(name).slice(0, 36);
+  const citySlug = normaliseSubdomain(city || "ibom").slice(0, 10) || "ibom";
+  if (!baseRaw || baseRaw.length < 2) {
+    return direct;
+  }
+
+  const candidates: string[] = [];
+  if (citySlug) candidates.push(`${baseRaw}-${citySlug}`);
+  candidates.push(`${baseRaw}-store`, `${baseRaw}-hub`);
+  for (let i = 2; i <= 15; i += 1) {
+    candidates.push(`${baseRaw}-${i}`);
+  }
+
+  for (const candidate of candidates) {
+    const check = await checkSubdomain(candidate);
+    if (check.available) {
+      return {
+        available: false,
+        slug: direct.slug,
+        suggestedSlug: check.slug,
+        reason: direct.reason,
+      };
+    }
+  }
+  return direct;
+}
+
 /** Find a free variation (used only when the platform decides to auto-suffix). */
 export async function suggestSubdomains(name: string) {
-  const base = normaliseSubdomain(name);
-  const candidates = [base];
-  for (let i = 2; i <= 6; i += 1) candidates.push(`${base}-${i}`);
+  const base = normaliseSubdomain(name).slice(0, 40);
+  if (!base) return [];
+  const candidates = [base, `${base}-uyo`, `${base}-store`];
+  for (let i = 2; i <= 8; i += 1) candidates.push(`${base}-${i}`);
   const free: string[] = [];
   for (const candidate of candidates) {
     const check = await checkSubdomain(candidate);
-    if (check.available) free.push(candidate);
+    if (check.available && !free.includes(check.slug)) free.push(check.slug);
     if (free.length >= 3) break;
   }
   return free;
@@ -118,19 +152,39 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
   );
   if (!category) throw new Error("Choose a valid business category");
 
-  const check = await checkSubdomain(input.businessName);
-  if (!check.available) throw new Error(check.reason ?? "Store address unavailable");
+  const resolved = await resolveAvailableSubdomain(input.businessName, input.city);
+  const chosenSlug = resolved.available ? resolved.slug : resolved.suggestedSlug;
+  if (!chosenSlug) {
+    throw new Error(resolved.reason ?? "Business name must contain at least 3 letters or numbers");
+  }
 
-  const existingUser = await systemDb.maybeOne<{ id: string }>(
-    `select id from users where lower(email) = $1`,
-    [email],
-  );
+  const existingUser = await systemDb.maybeOne<{
+    id: string;
+    role: string;
+    status: string;
+  }>(`select id, role, status from users where lower(email) = $1`, [email]);
+
   if (existingUser) {
-    throw new Error("An account with this email already exists. Please sign in instead.");
+    if (existingUser.status !== "active") {
+      throw new Error("This account has been suspended. Please contact support.");
+    }
+    if (existingUser.role === "admin" || existingUser.role === "super_admin") {
+      throw new Error("Admin accounts cannot be converted into vendor accounts. Please use a separate business email.");
+    }
+    const existingStore = await systemDb.maybeOne<{ id: string; name: string }>(
+      `select id, name from stores where owner_id = $1 limit 1`,
+      [existingUser.id],
+    );
+    if (existingStore) {
+      throw new Error(
+        `A storefront (${existingStore.name}) is already registered with this email. Please sign in to manage your store.`,
+      );
+    }
   }
 
   const passwordHash = await hashPassword(input.password);
   const status = settings.require_vendor_approval ? "pending" : "active";
+  const defaultTrialDays = Math.max(settings.default_trial_days || 14, 14);
 
   const trialPlan = await systemDb.maybeOne<{
     id: string;
@@ -143,17 +197,37 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
   );
 
   const result = await withSystem(async (db) => {
-    const user = await db.one<{ id: string }>(
-      `insert into users (email, password_hash, full_name, phone, role, email_verified_at)
-       values ($1,$2,$3,$4,'vendor', null)
-       returning id`,
-      [email, passwordHash, input.ownerName.trim(), input.phone.trim()],
-    );
+    const user = existingUser
+      ? await db.one<{ id: string }>(
+          `update users
+              set password_hash = $2,
+                  full_name = $3,
+                  phone = $4,
+                  role = 'vendor',
+                  updated_at = now()
+            where id = $1
+            returning id`,
+          [existingUser.id, passwordHash, input.ownerName.trim(), input.phone.trim()],
+        )
+      : await db.one<{ id: string }>(
+          `insert into users (email, password_hash, full_name, phone, role, email_verified_at)
+           values ($1,$2,$3,$4,'vendor', null)
+           returning id`,
+          [email, passwordHash, input.ownerName.trim(), input.phone.trim()],
+        );
 
     await db.execute(
       `insert into vendor_profiles
          (user_id, position, nin, proof_of_residence_type, proof_of_residence_url, cac_registered, cac_number, kyc_status)
-       values ($1, 'Owner', $2, $3, $4, $5, $6, 'submitted')`,
+       values ($1, 'Owner', $2, $3, $4, $5, $6, 'submitted')
+       on conflict (user_id) do update
+         set nin = excluded.nin,
+             proof_of_residence_type = excluded.proof_of_residence_type,
+             proof_of_residence_url = excluded.proof_of_residence_url,
+             cac_registered = excluded.cac_registered,
+             cac_number = excluded.cac_number,
+             kyc_status = 'submitted',
+             updated_at = now()`,
       [
         user.id,
         input.nin.trim(),
@@ -172,15 +246,17 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
       `insert into stores
          (owner_id, category_id, name, slug, tagline, description, logo_url, cover_url,
           email, phone, city, state, address, country, status, approved_at,
-          delivery_fee, prep_time_minutes)
+          access_until, delivery_fee, prep_time_minutes)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-               case when $15 = 'active' then now() else null end, 1500, 30)
+               case when $15 = 'active' then now() else null end,
+               case when $16::boolean then null else now() + make_interval(days => $17) end,
+               1500, 30)
        returning id, slug, status`,
       [
         user.id,
         category.id,
         input.businessName.trim(),
-        check.slug,
+        chosenSlug,
         input.description.slice(0, 120),
         input.description.trim(),
         input.logoUrl || null,
@@ -192,28 +268,28 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
         input.address?.trim() || null,
         settings.country,
         status,
+        Boolean(trialPlan),
+        defaultTrialDays,
       ],
     );
 
     let trialEndsAt: string | null = null;
-    let planName = "No plan";
+    let planName = "Free Trial";
     if (trialPlan) {
-      const trialDays = trialPlan.trial_days > 0 ? trialPlan.trial_days : settings.default_trial_days;
+      const trialDays = trialPlan.trial_days > 0 ? trialPlan.trial_days : defaultTrialDays;
       planName = trialPlan.name;
-      if (trialDays > 0) {
-        const sub = await db.one<{ id: string; expires_at: string }>(
-          `insert into subscriptions (store_id, plan_id, status, started_at, expires_at)
-           values ($1,$2,'trialing', now(), now() + make_interval(days => $3))
-           returning id, expires_at`,
-          [store.id, trialPlan.id, trialDays],
-        );
-        trialEndsAt = sub.expires_at;
-        await db.execute(
-          `insert into subscription_history (subscription_id, store_id, from_status, to_status, to_expires_at, note)
-           values ($1,$2,'none','trialing',$3,$4)`,
-          [sub.id, store.id, sub.expires_at, `${trialDays}-day free trial`],
-        );
-      }
+      const sub = await db.one<{ id: string; expires_at: string }>(
+        `insert into subscriptions (store_id, plan_id, status, started_at, expires_at)
+         values ($1,$2,'trialing', now(), now() + make_interval(days => $3))
+         returning id, expires_at`,
+        [store.id, trialPlan.id, trialDays],
+      );
+      trialEndsAt = sub.expires_at;
+      await db.execute(
+        `insert into subscription_history (subscription_id, store_id, from_status, to_status, to_expires_at, note)
+         values ($1,$2,'none','trialing',$3,$4)`,
+        [sub.id, store.id, sub.expires_at, `${trialDays}-day free trial`],
+      );
     }
 
     await db.execute(
@@ -230,7 +306,7 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
         entityType: "store",
         entityId: store.id,
         description: `${input.businessName} registered as ${category.name}`,
-        meta: { category: category.slug, slug: check.slug },
+        meta: { category: category.slug, slug: chosenSlug, upgradedExistingUser: Boolean(existingUser) },
       },
       db,
     );
@@ -241,9 +317,9 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
         storeId: store.id,
         type: "welcome",
         title: "Welcome to Ibom Vendors Hub",
-        body: `Your storefront address is ${check.slug}.${process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "localhost:3000"}. Start adding products.`,
+        body: `Your storefront address is ${chosenSlug}.${process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "localhost:3000"}. Start adding products.`,
         actionUrl: "/vendor",
-        dedupeKey: `welcome:${user.id}`,
+        dedupeKey: `welcome:${user.id}:${store.id}`,
       },
       db,
     );
@@ -263,35 +339,40 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
     return { userId: user.id, storeId: store.id, slug: store.slug, status: store.status, trialEndsAt, planName };
   });
 
-  // Verification + welcome emails (outside the transaction).
-  const { createAuthToken } = await import("@/lib/auth");
-  const token = await createAuthToken(result.userId, "verify_email", 60 * 24);
-  const verifyLink = url(`/verify-email?token=${token}`);
+  // Verification + welcome emails (outside the transaction — never block registration if email fails).
+  let token = "";
+  try {
+    const { createAuthToken } = await import("@/lib/auth");
+    token = await createAuthToken(result.userId, "verify_email", 60 * 24);
+    const verifyLink = url(`/verify-email?token=${token}`);
 
-  await sendEmail({
-    to: email,
-    template: "verify_email",
-    data: { name: input.ownerName, link: verifyLink },
-    dedupeKey: `verify:${result.userId}:${token.slice(0, 12)}`,
-  });
-  await sendEmail({
-    to: email,
-    template: "vendor_welcome",
-    data: {
-      name: input.ownerName,
-      storeName: input.businessName,
-      storeUrl: url(`/s/${result.slug}`),
-      planName: result.planName,
-      expiresAt: result.trialEndsAt ? new Date(result.trialEndsAt).toDateString() : "—",
-    },
-    dedupeKey: `vendor-welcome:${result.userId}`,
-  });
-  await sendEmail({
-    to: settings.support_email,
-    template: "admin_new_vendor",
-    data: { storeName: input.businessName, name: input.ownerName, email },
-    dedupeKey: `admin-new-vendor:${result.storeId}`,
-  });
+    await sendEmail({
+      to: email,
+      template: "verify_email",
+      data: { name: input.ownerName, link: verifyLink },
+      dedupeKey: `verify:${result.userId}:${token.slice(0, 12)}`,
+    });
+    await sendEmail({
+      to: email,
+      template: "vendor_welcome",
+      data: {
+        name: input.ownerName,
+        storeName: input.businessName,
+        storeUrl: url(`/s/${result.slug}`),
+        planName: result.planName,
+        expiresAt: result.trialEndsAt ? new Date(result.trialEndsAt).toDateString() : "—",
+      },
+      dedupeKey: `vendor-welcome:${result.userId}`,
+    });
+    await sendEmail({
+      to: settings.support_email,
+      template: "admin_new_vendor",
+      data: { storeName: input.businessName, name: input.ownerName, email },
+      dedupeKey: `admin-new-vendor:${result.storeId}`,
+    });
+  } catch (emailErr) {
+    console.error("[registerVendor] Non-fatal post-registration email error:", emailErr);
+  }
 
   return {
     ...result,

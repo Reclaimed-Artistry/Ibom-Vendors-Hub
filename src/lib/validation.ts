@@ -25,7 +25,10 @@ const password = z
 const ninSchema = z
   .string()
   .trim()
-  .regex(/^\d{11}$/, "Enter a valid 11-digit National Identification Number (NIN)");
+  .transform((val) => val.replace(/[\s-]/g, ""))
+  .refine((val) => /^\d{11}$/.test(val), "Enter a valid 11-digit National Identification Number (NIN)");
+
+const cacPattern = /^(?:(?:CAC[-\s/]*)?(?:RC|BN|IT)[-\s/:]*(?:NO\.?[-\s]*)?)?\d{4,14}$/i;
 
 const proofTypes = PROOF_OF_RESIDENCE_TYPES.map((item) => item.value) as [string, ...string[]];
 
@@ -43,13 +46,13 @@ export const loginSchema = z.object({
 
 export const vendorRegisterSchema = z
   .object({
-    businessName: z.string().trim().min(3, "Business name is required").max(120),
-    ownerName: z.string().trim().min(3, "Your full name is required").max(120),
+    businessName: z.string().trim().min(2, "Business name is required").max(120),
+    ownerName: z.string().trim().min(2, "Your full name is required").max(120),
     email,
     phone,
     password,
     categorySlug: z.string().min(1, "Choose a business category"),
-    description: z.string().trim().min(20, "Tell customers about your business (at least 20 characters)").max(4000),
+    description: z.string().trim().min(10, "Tell customers about your business (at least 10 characters)").max(4000),
     city: z.string().trim().min(2, "Select your Local Government Area / town in Akwa Ibom").max(80),
     state: akwaIbomStateSchema,
     address: z.string().trim().min(5, "Enter your physical business / pickup address in Akwa Ibom").max(240),
@@ -58,14 +61,14 @@ export const vendorRegisterSchema = z
     proofOfResidenceUrl: z.string().trim().min(1, "Upload your proof of residence document").max(3_200_000),
     cacRegistered: z.enum(["yes", "no"], { message: "Indicate whether your business is registered with CAC" }),
     cacNumber: z.string().trim().max(40).optional().or(z.literal("")),
-    logoUrl: z.string().trim().max(500).optional().or(z.literal("")),
-    coverUrl: z.string().trim().max(500).optional().or(z.literal("")),
+    logoUrl: z.string().trim().max(3_200_000).optional().or(z.literal("")),
+    coverUrl: z.string().trim().max(3_200_000).optional().or(z.literal("")),
     acceptTerms: z.literal("on", { message: "You must accept the terms" }),
   })
   .superRefine((data, ctx) => {
     if (data.cacRegistered === "yes") {
       const cleaned = (data.cacNumber ?? "").trim();
-      if (!/^(RC|BN|IT)?[-\s]?[0-9]{4,12}$/i.test(cleaned)) {
+      if (!cacPattern.test(cleaned)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["cacNumber"],
@@ -86,7 +89,7 @@ export const vendorKycSchema = z
   .superRefine((data, ctx) => {
     if (data.cacRegistered === "yes") {
       const cleaned = (data.cacNumber ?? "").trim();
-      if (!/^(RC|BN|IT)?[-\s]?[0-9]{4,12}$/i.test(cleaned)) {
+      if (!cacPattern.test(cleaned)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["cacNumber"],

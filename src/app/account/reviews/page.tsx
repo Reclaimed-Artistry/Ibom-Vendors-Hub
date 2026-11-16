@@ -10,7 +10,7 @@ import { ReviewForm } from "@/components/review-form";
 export const metadata: Metadata = { title: "My reviews · Ibom Vendors Hub" };
 
 export default async function AccountReviewsPage() {
-  const user = await requireUser(["customer"]);
+  const user = await requireUser(["customer", "vendor", "admin", "super_admin"]);
   const [reviews, pending] = await Promise.all([
     systemDb.query<{
       id: string;

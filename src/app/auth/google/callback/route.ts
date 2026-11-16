@@ -52,20 +52,36 @@ export async function GET(request: Request) {
     role: Role;
     status: string;
     avatar_url: string | null;
-  }>(`select id, email, full_name, role, status, avatar_url from users where lower(email) = $1`, [identity.email]);
+    owns_store: boolean;
+  }>(
+    `select u.id, u.email, u.full_name, u.role, u.status, u.avatar_url,
+            exists (select 1 from stores s where s.owner_id = u.id) as owns_store
+       from users u
+      where lower(u.email) = $1`,
+    [identity.email],
+  );
 
-  let user = existing;
+  let user: {
+    id: string;
+    email: string;
+    full_name: string;
+    role: Role;
+    status: string;
+    avatar_url: string | null;
+  } | null = existing;
   let created = false;
 
   if (existing) {
     if (existing.status !== "active") return fail("suspended");
-    await systemDb.execute(`update users set last_login_at = now(), avatar_url = coalesce(avatar_url, $2) where id = $1`, [
-      existing.id,
-      identity.picture ?? null,
-    ]);
+    const effectiveRole: Role = existing.role === "customer" && existing.owns_store ? "vendor" : existing.role;
+    user = { ...existing, role: effectiveRole };
+    await systemDb.execute(
+      `update users set last_login_at = now(), avatar_url = coalesce(avatar_url, $2), role = $3 where id = $1`,
+      [existing.id, identity.picture ?? null, effectiveRole],
+    );
     await logActivity({
       actorId: existing.id,
-      actorRole: existing.role,
+      actorRole: effectiveRole,
       action: "auth.login",
       entityType: "user",
       entityId: existing.id,

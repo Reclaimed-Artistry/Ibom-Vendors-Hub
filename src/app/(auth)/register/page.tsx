@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CustomerRegisterForm, VendorRegisterForm } from "@/components/auth-forms";
 import { GoogleAuthButton } from "@/components/google-auth-button";
+import { getCurrentUser } from "@/lib/auth";
+import { systemDb } from "@/lib/db";
 import { getStoreCategories } from "@/lib/storefront";
 import { rootDomain } from "@/lib/domains";
 
@@ -15,6 +18,36 @@ export default async function RegisterPage({
   const params = await searchParams;
   const isCustomer = params.role === "customer";
   const nextQuery = params.next ? `&next=${encodeURIComponent(params.next)}` : "";
+
+  const currentUser = await getCurrentUser();
+  let initialUser: { fullName?: string; email?: string; phone?: string | null } | undefined;
+
+  if (currentUser) {
+    if (isCustomer) {
+      if (params.next && params.next.startsWith("/")) redirect(params.next);
+      redirect(currentUser.role === "vendor" ? "/vendor" : currentUser.role === "customer" ? "/account" : "/admin");
+    } else {
+      const existingStore = await systemDb.maybeOne<{ id: string }>(
+        `select id from stores where owner_id = $1 limit 1`,
+        [currentUser.id],
+      );
+      if (existingStore) {
+        redirect("/vendor");
+      }
+      if (currentUser.role === "customer" || currentUser.role === "vendor") {
+        const profileRow = await systemDb.maybeOne<{ phone: string | null }>(
+          `select phone from users where id = $1`,
+          [currentUser.id],
+        );
+        initialUser = {
+          fullName: currentUser.fullName,
+          email: currentUser.email,
+          phone: profileRow?.phone ?? "",
+        };
+      }
+    }
+  }
+
   const categories = isCustomer ? [] : await getStoreCategories();
 
   return (
@@ -51,7 +84,9 @@ export default async function RegisterPage({
           <p className="mt-1.5 text-sm text-ink-500">
             Get your own business address on Ibom Vendors Hub with a free 14-day trial. Exclusively for Akwa Ibom State merchants.
           </p>
-          <div className="mt-6"><VendorRegisterForm categories={categories} rootDomain={rootDomain()} /></div>
+          <div className="mt-6">
+            <VendorRegisterForm categories={categories} rootDomain={rootDomain()} initialUser={initialUser} />
+          </div>
         </>
       )}
 

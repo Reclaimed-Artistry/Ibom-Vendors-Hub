@@ -9,7 +9,7 @@ import { ButtonLink, Card, CardHeader, EmptyState, PageHeader, StatCard, StatusB
 export const metadata: Metadata = { title: "Account overview · Ibom Vendors Hub" };
 
 export default async function AccountOverviewPage() {
-  const user = await requireUser(["customer"]);
+  const user = await requireUser(["customer", "vendor", "admin", "super_admin"]);
   const [stats, orders, bookings, notifications] = await Promise.all([
     systemDb.maybeOne<{ orders: number; spend: number; reviews: number; quotes: number }>(
       `select

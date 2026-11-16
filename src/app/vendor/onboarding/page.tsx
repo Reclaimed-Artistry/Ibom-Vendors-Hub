@@ -1,44 +1,41 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LifeBuoy, Store } from "lucide-react";
+import { ArrowRight, LifeBuoy, Store } from "lucide-react";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
+import { systemDb } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
 import { LogoutButton } from "@/components/dashboard-nav";
 
 export const metadata: Metadata = { title: "Vendor onboarding · Ibom Vendors Hub" };
 
-/**
- * Landing page for a vendor account that has no storefront yet.
- *
- * A store is created by vendor registration, which also creates the account —
- * so pointing an already-signed-in vendor at /register would only produce a
- * duplicate-email error. Vendor access normally comes from that same
- * registration, which means this page is a safety net for accounts set up by
- * hand (or a store that was removed); support finishes the setup instead.
- */
 export default async function VendorOnboardingPage() {
-  await requireUser(["vendor"]);
+  const user = await requireUser(["vendor"]);
+  const store = await systemDb.maybeOne<{ id: string }>(
+    `select id from stores where owner_id = $1 limit 1`,
+    [user.id],
+  );
+  if (store) redirect("/vendor");
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
       <PageHeader
-        title="Your storefront isn't set up yet"
-        description="Your account has vendor access, but no store is attached to it, so there is nothing to manage yet."
+        title="Finish setting up your Akwa Ibom storefront"
+        description="Your vendor account is ready — complete your business details and KYC verification to launch your storefront and start your 14-day free trial."
       />
       <Card className="card-pad space-y-4">
         <div className="flex items-start gap-3">
           <Store className="mt-0.5 size-4 shrink-0 text-brand-600" />
           <p className="text-sm text-ink-600">
-            Storefronts are created when a business registers, and the subscription trial starts at that moment. Because
-            accounts and stores are created together, support has to attach one to your existing account — it takes a
-            minute and nothing is lost.
+            Click below to attach your business name, Akwa Ibom location, and verification details to{" "}
+            <strong className="text-ink-900">{user.email}</strong>.
           </p>
         </div>
-        <div className="rounded-xl bg-ink-50 p-3 text-xs text-ink-500">
-          Registering a <span className="font-semibold text-ink-700">different</span> business? Sign out first, then use
-          the vendor registration form — signing up again with the same email is rejected on purpose.
-        </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/contact" className="btn-primary">
+          <Link href="/register" className="btn-primary">
+            Complete storefront setup <ArrowRight className="size-4" />
+          </Link>
+          <Link href="/contact" className="btn-secondary">
             <LifeBuoy className="size-4" /> Contact support
           </Link>
           <Link href="/" className="btn-secondary">

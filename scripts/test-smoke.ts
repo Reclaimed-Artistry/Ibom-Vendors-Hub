@@ -26,6 +26,7 @@ const expectations: Array<{ path: string; status: number[]; name?: string }> = [
   { path: "/s/does-not-exist", status: [404], name: "unknown storefront 404s" },
   { path: "/forbidden", status: [200] },
   { path: "/api/health", status: [200] },
+  { path: "/api/subdomain-check?name=Uyo%20Bakers&city=Uyo", status: [200], name: "live subdomain check endpoint" },
   { path: "/api/cron/subscriptions", status: [401], name: "cron requires the secret" },
   { path: "/vendor", status: [307, 302], name: "vendor area redirects anonymous visitors" },
   { path: "/admin", status: [307, 302], name: "admin area redirects anonymous visitors" },

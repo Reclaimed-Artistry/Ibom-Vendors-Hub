@@ -27,3 +27,4 @@ coverage/
 next-env.d.ts
 .vercel
 *.tsbuildinfo
+public/uploads/

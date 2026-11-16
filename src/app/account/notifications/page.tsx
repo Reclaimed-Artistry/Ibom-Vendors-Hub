@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Notifications · Ibom Vendors Hub" }
 
 async function markRead(id: string) {
   "use server";
-  const user = await requireUser(["customer"]);
+  const user = await requireUser(["customer", "vendor", "admin", "super_admin"]);
   await systemDb.execute(`update notifications set read_at = now() where id = $1 and user_id = $2`, [id, user.id]);
 }
 
@@ -22,7 +22,7 @@ export default async function AccountNotificationsPage({
 }: {
   searchParams: Promise<{ filter?: string }>;
 }) {
-  const user = await requireUser(["customer"]);
+  const user = await requireUser(["customer", "vendor", "admin", "super_admin"]);
   const { filter = "all" } = await searchParams;
   const rows = await systemDb.query<{ id: string; title: string; body: string | null; action_url: string | null; read_at: string | null; created_at: string; type: string }>(
     `select id, title, body, action_url, read_at, created_at, type from notifications

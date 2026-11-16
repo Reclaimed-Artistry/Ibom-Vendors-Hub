@@ -10,7 +10,7 @@ import { acceptQuotationAction, declineQuotationAction } from "@/app/actions/acc
 export const metadata: Metadata = { title: "My quotations · Ibom Vendors Hub" };
 
 export default async function AccountQuotationsPage() {
-  const user = await requireUser(["customer"]);
+  const user = await requireUser(["customer", "vendor", "admin", "super_admin"]);
   const rows = await systemDb.query<{
     id: string;
     title: string | null;

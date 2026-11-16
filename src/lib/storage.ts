@@ -2,9 +2,34 @@ import crypto from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-const MAX_BYTES = 6 * 1024 * 1024;
+const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_IMAGES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
 const ALLOWED_DOCS = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+function resolveMimeType(file: File): string {
+  const raw = (file.type || "").trim().toLowerCase();
+  if (raw === "image/jpg" || raw === "image/pjpeg") return "image/jpeg";
+  if (raw && raw !== "application/octet-stream") return raw;
+
+  const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+  switch (ext) {
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "png":
+      return "image/png";
+    case "webp":
+      return "image/webp";
+    case "gif":
+      return "image/gif";
+    case "svg":
+      return "image/svg+xml";
+    case "pdf":
+      return "application/pdf";
+    default:
+      return raw;
+  }
+}
 
 async function storeBytes(
   file: File,
@@ -15,7 +40,8 @@ async function storeBytes(
   if (!file || typeof file === "string" || file.size === 0) {
     throw new Error("No file received");
   }
-  if (!allowedTypes.includes(file.type)) {
+  const mimeType = resolveMimeType(file);
+  if (!allowedTypes.includes(mimeType)) {
     throw new Error(
       allowedTypes.includes("application/pdf")
         ? "Only JPEG, PNG, WEBP images or PDF documents are allowed"
@@ -23,13 +49,13 @@ async function storeBytes(
     );
   }
   if (file.size > MAX_BYTES) {
-    throw new Error("File must be smaller than 6MB");
+    throw new Error("File must be smaller than 10MB");
   }
 
-  const defaultExt = file.type === "application/pdf" ? "pdf" : "jpg";
+  const defaultExt = mimeType === "application/pdf" ? "pdf" : "jpg";
   const extension =
     (file.name.split(".").pop() ?? defaultExt).toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || defaultExt;
-  const safeFolder = folder.replace(/[^a-z0-9-]/gi, "").slice(0, 40) || "general";
+  const safeFolder = folder.replace(/[^a-z0-9-/]/gi, "").replace(/^\/+|\/+$/g, "").slice(0, 50) || "general";
   const filename = `${Date.now()}-${crypto.randomBytes(6).toString("hex")}.${extension}`;
   const objectPath = `${safeFolder}/${filename}`;
   const bytes = Buffer.from(await file.arrayBuffer());
@@ -39,28 +65,40 @@ async function storeBytes(
   const bucket = process.env.SUPABASE_STORAGE_BUCKET || "storefronts";
 
   if (supabaseUrl && serviceKey) {
-    const response = await fetch(
-      `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/${bucket}/${objectPath}`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${serviceKey}`,
-          "Content-Type": file.type,
-          "x-upsert": "true",
+    try {
+      const response = await fetch(
+        `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/${bucket}/${objectPath}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serviceKey}`,
+            "Content-Type": mimeType,
+            "x-upsert": "true",
+          },
+          body: bytes,
         },
-        body: bytes,
-      },
-    );
-    if (!response.ok) {
+      );
+      if (response.ok) {
+        return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${objectPath}`;
+      }
       const detail = await response.text();
+      if (allowDataUriFallback && file.size <= 2 * 1024 * 1024) {
+        console.warn("[storage] Supabase bucket upload failed, falling back to inline data URI:", detail.slice(0, 200));
+        return `data:${mimeType};base64,${bytes.toString("base64")}`;
+      }
       throw new Error(`Storage upload failed: ${detail.slice(0, 200)}`);
+    } catch (err) {
+      if (allowDataUriFallback && file.size <= 2 * 1024 * 1024) {
+        console.warn("[storage] Supabase upload exception, falling back to inline data URI:", err);
+        return `data:${mimeType};base64,${bytes.toString("base64")}`;
+      }
+      throw err;
     }
-    return `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${objectPath}`;
   }
 
   if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
     if (allowDataUriFallback && file.size <= 2 * 1024 * 1024) {
-      return `data:${file.type};base64,${bytes.toString("base64")}`;
+      return `data:${mimeType};base64,${bytes.toString("base64")}`;
     }
     throw new Error(
       "Storage is not configured on this deployment (or file exceeds 2MB inline limit). Set NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SUPABASE_STORAGE_BUCKET.",
@@ -77,7 +115,7 @@ async function storeBytes(
  * Image storage abstraction.
  */
 export async function uploadImage(file: File, folder = "general"): Promise<string> {
-  return storeBytes(file, folder, ALLOWED_IMAGES, false);
+  return storeBytes(file, folder, ALLOWED_IMAGES, true);
 }
 
 /**

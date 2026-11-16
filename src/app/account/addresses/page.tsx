@@ -9,7 +9,7 @@ import { deleteAddressAction, setDefaultAddressAction } from "@/app/actions/acco
 export const metadata: Metadata = { title: "My addresses · Ibom Vendors Hub" };
 
 export default async function AccountAddressesPage() {
-  const user = await requireUser(["customer"]);
+  const user = await requireUser(["customer", "vendor", "admin", "super_admin"]);
   const rows = await systemDb.query<{
     id: string;
     label: string | null;

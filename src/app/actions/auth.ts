@@ -48,9 +48,8 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   if (!parsed.success) {
     return { error: "Enter your email and password", fieldErrors: formatIssues(parsed.error) };
   }
-  const { email, password, next } = parsed.data;
-  const limit = rateLimit(`login:${email}`, 8, 60_000);
-  if (!limit.allowed) return { error: "Too many attempts. Please wait a minute and try again." };
+  const email = parsed.data.email.trim().toLowerCase();
+  const { password, next } = parsed.data;
 
   const user = await systemDb.maybeOne<{
     id: string;
@@ -59,35 +58,68 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
     full_name: string;
     role: "super_admin" | "admin" | "vendor" | "customer";
     status: string;
-  }>(`select id, email, password_hash, full_name, role, status from users where lower(email) = $1`, [email.toLowerCase()]);
+    owns_store: boolean;
+  }>(
+    `select u.id, u.email, u.password_hash, u.full_name, u.role, u.status,
+            exists (select 1 from stores s where s.owner_id = u.id) as owns_store
+       from users u
+      where lower(u.email) = $1`,
+    [email],
+  );
 
-  if (!user) return { error: "No account found with that email address." };
-  if (user.status !== "active") return { error: "This account has been suspended. Please contact support." };
+  if (!user) {
+    const limit = rateLimit(`login-fail:${email}`, 10, 60_000);
+    if (!limit.allowed) return { error: "Too many failed attempts. Please wait a minute and try again." };
+    return { error: "No account found with that email address." };
+  }
+  if (user.status !== "active") {
+    return { error: "This account has been suspended. Please contact support." };
+  }
+  if (!user.password_hash) {
+    return {
+      error:
+        "This account was created with Google sign-in and has no password set yet. Use 'Continue with Google' above, or click 'Forgot password?' to create a password.",
+    };
+  }
+
   const valid = await verifyPassword(password, user.password_hash);
-  if (!valid) return { error: "Incorrect password. Please try again." };
+  if (!valid) {
+    const limit = rateLimit(`login-fail:${email}`, 10, 60_000);
+    if (!limit.allowed) return { error: "Too many failed attempts. Please wait a minute and try again." };
+    return { error: "Incorrect password. Please try again." };
+  }
+
+  let effectiveRole = user.role;
+  if (user.role === "customer" && user.owns_store) {
+    effectiveRole = "vendor";
+    await withSystem((db) =>
+      db.execute(`update users set role = 'vendor', updated_at = now() where id = $1`, [user.id]),
+    );
+  }
 
   const token = await createSessionToken({
     sub: user.id,
     email: user.email,
-    role: user.role,
+    role: effectiveRole,
     name: user.full_name,
   });
   await setSessionCookie(token);
   await systemDb.execute(`update users set last_login_at = now() where id = $1`, [user.id]);
   await logActivity({
     actorId: user.id,
-    actorRole: user.role,
+    actorRole: effectiveRole,
     action: "auth.login",
     entityType: "user",
     entityId: user.id,
   });
+  revalidatePath("/", "layout");
 
   const destination =
     next && next.startsWith("/")
       ? next
-      : user.role === "vendor"
+      : effectiveRole === "vendor"
         ? "/vendor"
-        : user.role === "customer"
+        : effectiveRole === "customer"
           ? "/account"
           : "/admin";
   redirect(destination);
@@ -99,6 +131,7 @@ export async function logoutAction() {
     await logActivity({ actorId: user.id, actorRole: user.role, action: "auth.logout", entityType: "user", entityId: user.id });
   }
   await clearSessionCookie();
+  revalidatePath("/", "layout");
   redirect("/");
 }
 
@@ -152,11 +185,12 @@ export async function registerVendorAction(_prev: ActionState, formData: FormDat
 
     const token = await createSessionToken({
       sub: result.userId,
-      email: parsed.data.email.toLowerCase(),
+      email: parsed.data.email.trim().toLowerCase(),
       role: "vendor",
-      name: parsed.data.ownerName,
+      name: parsed.data.ownerName.trim(),
     });
     await setSessionCookie(token);
+    revalidatePath("/", "layout");
 
     const verify = devLinks() ? `&verify=${result.verificationToken}` : "";
     redirect(`/vendor?welcome=1${verify}`);
@@ -182,11 +216,12 @@ export async function registerCustomerAction(_prev: ActionState, formData: FormD
     const result = await registerCustomer(parsed.data);
     const token = await createSessionToken({
       sub: result.userId,
-      email: parsed.data.email.toLowerCase(),
+      email: parsed.data.email.trim().toLowerCase(),
       role: "customer",
-      name: parsed.data.fullName,
+      name: parsed.data.fullName.trim(),
     });
     await setSessionCookie(token);
+    revalidatePath("/", "layout");
     if (nextRaw && nextRaw.startsWith("/")) {
       redirect(nextRaw);
     }

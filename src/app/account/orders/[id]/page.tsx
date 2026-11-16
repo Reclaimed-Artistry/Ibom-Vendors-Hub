@@ -17,7 +17,7 @@ export const metadata: Metadata = { title: "Order detail · Ibom Vendors Hub" };
 
 export default async function AccountOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await requireUser(["customer"]);
+  const user = await requireUser(["customer", "vendor", "admin", "super_admin"]);
   const detail = await getOrderForActor(id, { id: user.id, role: user.role, email: user.email });
   if (!detail || (!detail.isCustomer && !detail.isAdmin)) notFound();
   const { order, items, history, tracking, category } = detail;
