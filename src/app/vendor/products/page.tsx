@@ -90,7 +90,7 @@ export default async function VendorProductsPage({
       ) : null}
 
       <form className="card card-pad flex flex-wrap items-end gap-3" action="/vendor/products">
-        <label className="min-w-48 flex-1">
+        <label className="min-w-0 w-full flex-1 sm:w-auto sm:min-w-48">
           <span className="label">Search</span>
           <span className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />

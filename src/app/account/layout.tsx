@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { CartDrawer } from "@/components/cart";
 import { Avatar } from "@/components/ui";
 import { DashboardNav, LogoutButton, MobileNav, type DashboardNavItem } from "@/components/dashboard-nav";
 
@@ -29,7 +30,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
   ];
 
   return (
-    <div className="flex min-h-screen flex-col bg-ink-50">
+    <div className="flex min-h-screen w-full max-w-full flex-col overflow-x-clip bg-ink-50">
       <SiteHeader />
       <main className="flex-1">
         <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6 lg:px-8">
@@ -73,8 +74,8 @@ export default async function AccountLayout({ children }: { children: React.Reac
           </aside>
 
           <div className="min-w-0 flex-1">
-            <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-ink-100 bg-white px-4 py-3 shadow-sm lg:hidden">
-              <div className="flex items-center gap-3">
+            <div className="relative mb-4 flex items-center justify-between gap-3 rounded-2xl border border-ink-100 bg-white px-4 py-3 shadow-sm lg:hidden">
+              <div className="flex min-w-0 items-center gap-3">
                 <MobileNav items={nav} title="My account" />
                 <span className="truncate text-sm font-semibold text-ink-900">{user.fullName}</span>
               </div>
@@ -92,6 +93,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
         </div>
       </main>
       <SiteFooter />
+      <CartDrawer />
     </div>
   );
 }

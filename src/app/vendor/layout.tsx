@@ -88,7 +88,7 @@ export default async function VendorLayout({ children }: { children: React.React
     (effectiveExpiresAt && !subscription ? "Admin access grant" : lastSubscription?.plan_name ?? "No active plan");
 
   return (
-    <div className="min-h-screen bg-ink-50">
+    <div className="min-h-screen w-full max-w-full overflow-x-clip bg-ink-50">
       <VendorAnnouncements />
       <div className="mx-auto flex max-w-[1440px] gap-6 px-4 py-5 lg:px-8">
         <aside className="hidden w-64 shrink-0 lg:block">
@@ -146,12 +146,12 @@ export default async function VendorLayout({ children }: { children: React.React
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-100 bg-white px-4 py-3 shadow-sm">
-            <div className="flex items-center gap-3">
+          <header className="relative mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-100 bg-white px-4 py-3 shadow-sm">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
               <MobileNav items={nav} title="Menu" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-ink-900">{store.name}</p>
-                <p className="text-xs text-ink-500">
+                <p className="truncate text-xs text-ink-500">
                   {storefrontPath(store.slug)}
                   <span className="text-ink-300"> · </span>
                   {user.email}

@@ -27,25 +27,24 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     images: ["/brand/og-image.png"],
   },
-  applicationName: "Ibom Vendors Hub", 
+  applicationName: "Ibom Vendors Hub",
 };
 
-// Every page renders tenant-scoped, per-request data (the storefront host header,
-// the signed-in user, live catalogue rows). Rendering them on demand keeps one
-// tenant's HTML from being cached and served to another, and keeps the build from
-// depending on database availability.
 export const dynamic = "force-dynamic";
 
 export const viewport: Viewport = {
   themeColor: "#065f46",
   width: "device-width",
   initialScale: 1,
+  minimumScale: 1,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" className="w-full max-w-full overflow-x-clip">
+      <body className="w-full max-w-full overflow-x-clip">
         <CartProvider>{children}</CartProvider>
       </body>
     </html>

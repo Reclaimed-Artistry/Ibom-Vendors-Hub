@@ -356,7 +356,7 @@ export function EmailTestForm({ defaultTo }: { defaultTo: string }) {
       </div>
       <StateNote state={state} />
       <div className="flex flex-wrap items-end gap-3">
-        <label className="min-w-56 flex-1">
+        <label className="min-w-0 w-full flex-1 sm:w-auto sm:min-w-56">
           <span className="label">Recipient</span>
           <input name="to" type="email" defaultValue={defaultTo} className="input" placeholder="you@example.com" />
         </label>

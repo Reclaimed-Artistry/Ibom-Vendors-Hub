@@ -35,7 +35,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   ];
 
   return (
-    <div className="min-h-screen bg-ink-50">
+    <div className="min-h-screen w-full max-w-full overflow-x-clip bg-ink-50">
       <div className="mx-auto flex max-w-[1500px] gap-6 px-4 py-5 lg:px-8">
         <aside className="hidden w-64 shrink-0 lg:block">
           <div className="sticky top-5 space-y-4">
@@ -57,12 +57,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-100 bg-white px-4 py-3 shadow-sm">
-            <div className="flex items-center gap-3">
+          <header className="relative mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-100 bg-white px-4 py-3 shadow-sm">
+            <div className="flex min-w-0 items-center gap-3">
               <MobileNav items={nav} title="Admin" />
-              <div>
-                <p className="text-sm font-semibold text-ink-900">Administrator</p>
-                <p className="text-xs text-ink-500">{user.fullName} · {user.role}</p>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-ink-900">Administrator</p>
+                <p className="truncate text-xs text-ink-500">{user.fullName} · {user.role}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">

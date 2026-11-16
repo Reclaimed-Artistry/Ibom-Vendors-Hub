@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -105,12 +106,18 @@ export function LogoutButton({ label = "Sign out" }: { label?: string }) {
 
 export function MobileNav({ items, title }: { items: DashboardNavItem[]; title: string }) {
   const pathname = usePathname();
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    if (detailsRef.current) detailsRef.current.open = false;
+  }, [pathname]);
+
   return (
-    <details className="group lg:hidden">
+    <details ref={detailsRef} className="group shrink-0 lg:hidden">
       <summary className="btn btn-secondary btn-sm cursor-pointer list-none">
         <span>{title}</span>
       </summary>
-      <div className="mt-2 rounded-2xl border border-ink-100 bg-white p-2 shadow-sm">
+      <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[75dvh] overflow-y-auto rounded-2xl border border-ink-100 bg-white p-2 shadow-xl">
         <DashboardNav items={items} compact />
         <div className="mt-1 border-t border-ink-100 pt-1">
           <LogoutButton />
