@@ -10,6 +10,7 @@ import {
   Flag,
   LayoutDashboard,
   LogOut,
+  Mail,
   MessageSquare,
   Package,
   ScrollText,
@@ -44,6 +45,7 @@ const ICONS = {
   flags: Flag,
   subdomains: ShieldCheck,
   audit: ScrollText,
+  emails: Mail,
   help: MessageSquare,
 } as const;
 

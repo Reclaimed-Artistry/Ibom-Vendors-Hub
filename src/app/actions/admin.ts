@@ -1,12 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireAdmin, getCurrentUser } from "@/lib/auth";
 import { systemDb, withSystem } from "@/lib/db";
 import { logActivity } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
-import { sendEmail } from "@/lib/email";
-import { getSettings, url } from "@/lib/settings";
+import { retryFailedEmails, sendEmail } from "@/lib/email";
+import { emailFrom, getSettings, resendKey, url } from "@/lib/settings";
 import { approveStore, rejectStore, restoreStore, suspendStore, checkSubdomain } from "@/lib/stores";
 import { adminGrantSubscription } from "@/lib/subscriptions";
 import { formatIssues, categorySchema } from "@/lib/validation";
@@ -462,4 +463,68 @@ export async function savePlatformSettingsAction(_prev: AdminState, formData: Fo
   }
   revalidatePath("/admin/settings");
   return { message: "Platform settings saved." };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Transactional email                                                        */
+/* -------------------------------------------------------------------------- */
+
+export async function sendTestEmailAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const to = (String(formData.get("to") ?? "").trim() || user.email).toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return { error: "Enter a valid email address" };
+
+  const settings = await getSettings();
+  if (!resendKey(settings)) {
+    return { error: "No email provider configured. Set RESEND_API_KEY (or save one in Platform settings) and redeploy." };
+  }
+
+  const result = await sendEmail({
+    to,
+    template: "provider_test",
+    data: {
+      name: user.fullName || user.email,
+      message: `This is a test message from ${emailFrom(settings)}. If you can read this, transactional email is delivering.`,
+      note: `Sent by ${user.email} from Admin → Emails.`,
+    },
+  });
+
+  await logActivity({
+    actorId: user.id,
+    actorRole: "admin",
+    action: "email.test_sent",
+    entityType: "email_log",
+    entityId: "id" in result ? result.id ?? null : null,
+    description: `Test email to ${to}`,
+    meta: { to, result: JSON.parse(JSON.stringify(result)) },
+  });
+
+  if ("error" in result && result.error) {
+    return {
+      error:
+        result.error.startsWith("Resend 403")
+          ? `Resend rejected the send — the from domain is not verified yet. ${result.error}`
+          : `Provider rejected the message: ${result.error}`,
+    };
+  }
+  if ("skipped" in result && result.skipped) {
+    return { error: `Message was not sent (${result.reason}).` };
+  }
+  revalidatePath("/admin/emails");
+  return { message: `Resend accepted the test message for ${to}. Delivery status is in the log below.` };
+}
+
+export async function retryFailedEmailsAction() {
+  const user = await admin();
+  const result = await retryFailedEmails(30);
+  await logActivity({
+    actorId: user.id,
+    actorRole: "admin",
+    action: "email.retried",
+    entityType: "email_log",
+    description: `Retried ${result.retried} failed message(s), ${result.sent} delivered`,
+    meta: result,
+  });
+  revalidatePath("/admin/emails");
+  redirect(`/admin/emails?retried=${result.sent}&attempted=${result.retried}`);
 }

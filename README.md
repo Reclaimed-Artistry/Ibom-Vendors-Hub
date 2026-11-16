@@ -157,8 +157,12 @@ register claims the first storefront.
 - Automatic git deployments are **off** on that project; a push does not redeploy.
   Turn them on under *Vercel → Project → Settings → Git → Ignored Build Step /
   Production branch*, or trigger a deployment from a new commit.
-- `RESEND_API_KEY` and `PAYSTACK_*` are not configured yet, so sign-in works but password
-  reset links are logged instead of emailed, and checkout runs on the sandbox gateway.
+- `RESEND_API_KEY` is configured. Delivery still depends on Resend's sender verification:
+  while `ibomvendorshub.com` is unverified in the Resend dashboard every send is answered
+  with 403 and recorded in **Admin → Emails** with the provider's exact message. Verify the
+  domain (or set `EMAIL_FROM`/the `email_from` platform setting to `onboarding@resend.dev`
+  to deliver to the Resend account owner) and the failures clear on the next send.
+- `PAYSTACK_*` is still unset, so checkout runs on the built-in sandbox gateway.
 
 ### Deploying to Vercel
 
@@ -189,6 +193,20 @@ runs `next build`. Every deploy is therefore self-migrating and idempotent.
    shared `*.vercel.app` host, storefronts are reachable at `/s/<slug>` (the middleware
    still rewrites subdomains when a wildcard domain is attached).
 5. Point the Paystack webhook at `https://<your-domain>/api/webhooks/paystack`.
+
+### Transactional email
+
+`src/lib/email.ts` renders every message through reusable HTML templates, writes it to
+`email_logs` with a dedupe key (so one event can never be emailed twice) and posts it to
+Resend when a key exists. **Admin → Emails** lists the log with per-message status,
+attempt count and the provider's error text, and offers two controls: *Send test email*
+(uses the real provider and from address) and *Retry failed messages* (the daily cron also
+retries up to three times, so an outage or an unverified sender self-heals once fixed).
+
+Sending requires Resend to trust the sender. Verify `ibomvendorshub.com` at
+`resend.com/domains` and add the DKIM/SPF records, or point `EMAIL_FROM` at
+`onboarding@resend.dev` for owner-only test delivery. Without a key the platform still
+renders and stores messages, marking them `skipped` — no flow silently depends on email.
 
 ---
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runSubscriptionMaintenance } from "@/lib/subscriptions";
+import { retryFailedEmails } from "@/lib/email";
 import { databaseHealthy } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,10 @@ async function handle(request: Request) {
     return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   }
   const summary = await runSubscriptionMaintenance();
-  return NextResponse.json({ ok: true, ...summary, ranAt: new Date().toISOString() });
+  // Provider outages and unverified domains leave messages failed; retry them
+  // here so a fix at Resend's end delivers the backlog without manual work.
+  const emailRetry = await retryFailedEmails(30);
+  return NextResponse.json({ ok: true, ...summary, emailRetry, ranAt: new Date().toISOString() });
 }
 
 export async function GET(request: Request) {

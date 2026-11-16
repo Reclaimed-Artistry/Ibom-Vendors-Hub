@@ -6,10 +6,12 @@ import {
   grantSubscriptionAction,
   markPaymentRefundedAction,
   rejectStoreAction,
+  retryFailedEmailsAction,
   reviewSubdomainRequestAction,
   saveCategoryAction,
   savePlanAction,
   savePlatformSettingsAction,
+  sendTestEmailAction,
   suspendStoreAction,
   type AdminState,
 } from "@/app/actions/admin";
@@ -320,6 +322,41 @@ export function PlatformSettingsForm({ values }: { values: PlatformSettingsValue
         <label className="flex items-center gap-2 text-sm text-ink-700"><input type="checkbox" name="maintenanceMode" defaultChecked={values.maintenanceMode} className="size-4 rounded border-ink-300" /> Maintenance banner</label>
       </div>
       <SubmitButton className="btn-primary" pendingLabel="Saving…">Save platform settings</SubmitButton>
+    </form>
+  );
+}
+
+export function EmailTestForm({ defaultTo }: { defaultTo: string }) {
+  const [state, formAction] = useActionState<AdminState, FormData>(sendTestEmailAction, {});
+  return (
+    <form action={formAction} className="card card-pad space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-ink-900">Send a test message</p>
+        <p className="text-xs text-ink-500">
+          Uses the configured provider and from address, exactly like a real receipt. Leave the field empty to send to your own
+          administrator address.
+        </p>
+      </div>
+      <StateNote state={state} />
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="min-w-56 flex-1">
+          <span className="label">Recipient</span>
+          <input name="to" type="email" defaultValue={defaultTo} className="input" placeholder="you@example.com" />
+        </label>
+        <SubmitButton className="btn btn-primary" pendingLabel="Sending…">
+          Send test email
+        </SubmitButton>
+      </div>
+    </form>
+  );
+}
+
+export function RetryEmailsButton() {
+  return (
+    <form action={retryFailedEmailsAction}>
+      <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Retrying…">
+        Retry failed messages
+      </SubmitButton>
     </form>
   );
 }

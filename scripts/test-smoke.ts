@@ -28,6 +28,7 @@ const expectations: Array<{ path: string; status: number[]; name?: string }> = [
   { path: "/api/cron/subscriptions", status: [401], name: "cron requires the secret" },
   { path: "/vendor", status: [307, 302], name: "vendor area redirects anonymous visitors" },
   { path: "/admin", status: [307, 302], name: "admin area redirects anonymous visitors" },
+  { path: "/admin/emails", status: [307, 302], name: "email console redirects anonymous visitors" },
   { path: "/account", status: [307, 302], name: "account area redirects anonymous visitors" },
 ];
 
