@@ -153,6 +153,22 @@ async function main() {
     console.log("  · no suspended store seeded — retention check skipped");
   }
 
+  console.log("\nGoogle sign-in");
+  const columns = await systemDb.query<{ column_name: string }>(
+    `select column_name from information_schema.columns
+      where table_name = 'platform_settings'
+        and column_name in ('google_client_id','google_client_secret','google_signin_enabled')`,
+  );
+  check(
+    "platform_settings can hold a Google OAuth client",
+    columns.length === 3,
+    columns.map((row) => row.column_name),
+  );
+  const toggle = await systemDb.maybeOne<{ google_signin_enabled: boolean }>(
+    `select google_signin_enabled from platform_settings where id = 1`,
+  );
+  check("Google sign-in switch has a sane default", typeof toggle?.google_signin_enabled === "boolean", toggle);
+
   console.log(`\n${checks - failures}/${checks} checks passed`);
   if (failures > 0) process.exitCode = 1;
   process.exit(failures > 0 ? 1 : 0);

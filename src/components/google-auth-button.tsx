@@ -3,12 +3,19 @@ import { googleConfigured } from "@/lib/google-auth";
 /**
  * "Continue with Google".
  *
- * Rendered only when GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are set, so the
- * product never shows a button that cannot work. It is a plain link: the route
- * generates the CSRF state, sets the cookie and redirects to Google.
+ * Rendered only when a complete OAuth client is available (saved in Admin ->
+ * Platform settings or supplied through GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET),
+ * so the product never shows a button that cannot work. It is a plain link: the
+ * route generates the CSRF state, sets the cookie and redirects to Google.
  */
-export function GoogleAuthButton({ label = "Continue with Google", next }: { label?: string; next?: string }) {
-  if (!googleConfigured()) return null;
+export async function GoogleAuthButton({
+  label = "Continue with Google",
+  next,
+}: {
+  label?: string;
+  next?: string;
+}) {
+  if (!(await googleConfigured())) return null;
   const href = next ? `/auth/google?next=${encodeURIComponent(next)}` : "/auth/google";
   return (
     <div className="space-y-3">

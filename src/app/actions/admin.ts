@@ -419,6 +419,70 @@ export async function adminMessageAction(_prev: AdminState, formData: FormData):
 /* Platform settings                                                          */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Stores the Google OAuth client used by "Continue with Google".
+ *
+ * The pair lives in platform_settings so the owner can connect (or rotate) it
+ * from the dashboard without a redeploy; the secret is never rendered back to
+ * the browser. A blank secret keeps the stored one, which is how the form shows
+ * "already saved" without shipping the value.
+ */
+export async function saveGoogleSignInAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const clientId = String(formData.get("clientId") ?? "").trim();
+  const clientSecret = String(formData.get("clientSecret") ?? "").trim();
+  const enabled = formData.get("enabled") === "on";
+
+  if (clientId && !clientId.endsWith(".apps.googleusercontent.com")) {
+    return {
+      error:
+        "That does not look like a client ID. Google OAuth web clients end with .apps.googleusercontent.com — copy it from Google Cloud Console → APIs & Services → Credentials.",
+    };
+  }
+
+  const current = await systemDb.maybeOne<{ google_client_secret: string | null }>(
+    `select google_client_secret from platform_settings where id = 1`,
+  );
+  const hasSecret = Boolean(clientSecret || current?.google_client_secret || process.env.GOOGLE_CLIENT_SECRET);
+  if (clientId && !hasSecret) {
+    return { error: "Add the client secret too — Google needs both halves of the pair to complete the exchange." };
+  }
+
+  await systemDb.execute(
+    `update platform_settings
+        set google_client_id = $1,
+            google_client_secret = case when $1::text is null then null
+                                        else coalesce(nullif($2, ''), google_client_secret) end,
+            google_signin_enabled = $3,
+            updated_at = now()
+      where id = 1`,
+    [clientId || null, clientSecret, enabled],
+  );
+
+  await logActivity({
+    actorId: user.id,
+    actorRole: "admin",
+    action: "integrations.google_signin_saved",
+    entityType: "platform_settings",
+    entityId: "1",
+    description: clientId
+      ? `Google sign-in ${enabled ? "enabled" : "disabled"} with client ${clientId.slice(0, 18)}…`
+      : "Google sign-in credentials cleared",
+    meta: { clientIdSuffix: clientId.slice(-28), secretUpdated: Boolean(clientSecret), enabled },
+  });
+
+  revalidatePath("/admin/settings");
+  revalidatePath("/login");
+  revalidatePath("/register/customer");
+
+  if (!clientId) return { message: "Google sign-in credentials cleared." };
+  return {
+    message: enabled
+      ? "Saved. The Continue with Google button is live on the sign-in and sign-up pages."
+      : "Saved, but the button stays hidden while this switch is off.",
+  };
+}
+
 export async function savePlatformSettingsAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const user = await getCurrentUser();
   if (!user || !["admin", "super_admin"].includes(user.role)) return { error: "Administrator only" };

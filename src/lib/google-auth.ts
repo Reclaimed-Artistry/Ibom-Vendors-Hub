@@ -1,7 +1,9 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { cache } from "react";
 import { appUrl } from "@/lib/domains";
+import { getSettings } from "@/lib/settings";
 
 /**
  * "Sign in with Google" — server-side authorization-code flow.
@@ -19,16 +21,54 @@ const JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/ce
 export const GOOGLE_STATE_COOKIE = "ivh_google_state";
 const STATE_MAX_AGE = 600;
 
-export function googleClientId() {
-  return process.env.GOOGLE_CLIENT_ID ?? "";
+export interface GoogleCredentials {
+  clientId: string;
+  clientSecret: string;
+  /** Where the pair came from, so the admin card can say so out loud. */
+  source: "dashboard" | "environment";
 }
 
-export function googleClientSecret() {
-  return process.env.GOOGLE_CLIENT_SECRET ?? "";
+/**
+ * Resolves the OAuth client. Credentials saved in Admin -> Platform settings
+ * win over environment variables, so the owner can (re)connect Google sign-in
+ * without a redeploy; the stored kill switch disables the feature either way.
+ */
+export const googleCredentials = cache(async (): Promise<GoogleCredentials | null> => {
+  const settings = await getSettings();
+  if (!settings.google_signin_enabled) return null;
+
+  const storedId = settings.google_client_id?.trim() ?? "";
+  const storedSecret = settings.google_client_secret?.trim() ?? "";
+  if (storedId && storedSecret) {
+    return { clientId: storedId, clientSecret: storedSecret, source: "dashboard" };
+  }
+
+  const envId = process.env.GOOGLE_CLIENT_ID?.trim() ?? "";
+  const envSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "";
+  if (envId && envSecret) {
+    return { clientId: envId, clientSecret: envSecret, source: "environment" };
+  }
+  return null;
+});
+
+export async function googleConfigured() {
+  return (await googleCredentials()) !== null;
 }
 
-export function googleConfigured() {
-  return Boolean(googleClientId() && googleClientSecret());
+/** Everything the admin card needs, without ever returning the secret. */
+export async function googleSignInStatus() {
+  const settings = await getSettings();
+  const credentials = await googleCredentials();
+  return {
+    enabled: settings.google_signin_enabled,
+    savedClientId: settings.google_client_id ?? "",
+    hasStoredSecret: Boolean(settings.google_client_secret),
+    hasEnvSecret: Boolean(process.env.GOOGLE_CLIENT_SECRET),
+    source: credentials?.source ?? null,
+    live: credentials !== null,
+    redirectUri: googleRedirectUri(),
+    origin: appUrl(),
+  };
 }
 
 export function googleRedirectUri() {
@@ -56,8 +96,11 @@ export async function beginGoogleSignIn(next?: string | null) {
     maxAge: STATE_MAX_AGE,
   });
 
+  const credentials = await googleCredentials();
+  if (!credentials) throw new GoogleAuthError("Google sign-in is not configured on this deployment.");
+
   const params = new URLSearchParams({
-    client_id: googleClientId(),
+    client_id: credentials.clientId,
     redirect_uri: googleRedirectUri(),
     response_type: "code",
     scope: "openid email profile",
@@ -92,7 +135,8 @@ export async function completeGoogleSignIn(
   code: string | null,
   state: string | null,
 ): Promise<{ identity: GoogleIdentity; next: string | null }> {
-  if (!googleConfigured()) throw new GoogleAuthError("Google sign-in is not configured on this deployment.");
+  const credentials = await googleCredentials();
+  if (!credentials) throw new GoogleAuthError("Google sign-in is not configured on this deployment.");
   if (!code) throw new GoogleAuthError("Google did not return an authorization code.");
 
   const store = await cookies();
@@ -111,8 +155,8 @@ export async function completeGoogleSignIn(
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         code,
-        client_id: googleClientId(),
-        client_secret: googleClientSecret(),
+        client_id: credentials.clientId,
+        client_secret: credentials.clientSecret,
         redirect_uri: googleRedirectUri(),
         grant_type: "authorization_code",
       }),
@@ -137,7 +181,7 @@ export async function completeGoogleSignIn(
   try {
     const { payload } = await jwtVerify(idToken, JWKS, {
       issuer: ["https://accounts.google.com", "accounts.google.com"],
-      audience: googleClientId(),
+      audience: credentials.clientId,
     });
     const email = typeof payload.email === "string" ? payload.email.toLowerCase() : "";
     if (!email) throw new GoogleAuthError("Google did not share an email address for this account.");

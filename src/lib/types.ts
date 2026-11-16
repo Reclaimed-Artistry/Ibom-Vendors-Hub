@@ -29,6 +29,9 @@ export interface PlatformSettings {
   sandbox_payments: boolean;
   paystack_public_key: string | null;
   paystack_secret_key: string | null;
+  google_client_id: string | null;
+  google_client_secret: string | null;
+  google_signin_enabled: boolean;
   email_from: string | null;
   resend_api_key: string | null;
   expiry_reminder_days: number[];

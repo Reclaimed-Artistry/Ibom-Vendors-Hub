@@ -228,10 +228,18 @@ store needs business details). Suspended accounts are refused. The flow is only 
 `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set, so no dead button appears otherwise.
 
 To enable it: Google Cloud Console → APIs & Services → Credentials → *Create credentials* →
-*OAuth client ID* → *Web application*, then add
-`https://<your-domain>/auth/google/callback` under **Authorised redirect URIs** (and
-`https://<your-domain>` under **Authorised JavaScript origins**). Put the client ID and secret
-in the Vercel environment. `GOOGLE_REDIRECT_URI` overrides the computed callback URL.
+*OAuth client ID* → *Web application*, then add `https://<your-domain>/auth/google/callback`
+under **Authorised redirect URIs** (and `https://<your-domain>` under **Authorised JavaScript
+origins**).
+
+Paste the resulting client ID and secret into **Admin → Platform settings → Sign in with
+Google**. They are stored in `platform_settings` (secret server-side only, never echoed back to
+the browser), so connecting, rotating or switching the feature off needs no redeploy — the card
+shows whether the button is live, which credentials are in force, and the exact redirect URI to
+whitelist. `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` still work as a fallback for
+environment-driven deployments, and `GOOGLE_REDIRECT_URI` overrides the computed callback URL
+(useful for vendor subdomains, which all share the platform's callback). `/api/health` reports
+`signIn.google` as `live`, `unconfigured` or `off`.
 
 ### Payments
 
