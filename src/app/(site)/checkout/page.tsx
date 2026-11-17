@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { CheckoutForm } from "@/components/checkout-form";
 import { getCurrentUser } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
+import { getWalletBalance } from "@/app/actions/wallet";
 
 export const metadata = { title: "Checkout" };
 export const dynamic = "force-dynamic";
@@ -12,7 +13,8 @@ export default async function CheckoutPage() {
     redirect("/login?next=%2Fcheckout");
   }
 
-  const [userRow, savedAddress, customerProfile] = await Promise.all([
+  const [walletBalance, userRow, savedAddress, customerProfile] = await Promise.all([
+    getWalletBalance(user.id),
     systemDb.maybeOne<{ phone: string | null }>(
       `select phone from users where id = $1`,
       [user.id],
@@ -58,6 +60,7 @@ export default async function CheckoutPage() {
           city: savedAddress?.city ?? customerProfile?.city ?? profileAddr.city ?? "Uyo",
           state: savedAddress?.state ?? customerProfile?.state ?? profileAddr.state ?? "Akwa Ibom",
         }}
+        walletBalance={walletBalance}
       />
     </div>
   );

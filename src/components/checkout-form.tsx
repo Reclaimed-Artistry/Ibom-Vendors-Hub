@@ -28,6 +28,7 @@ interface StoreFulfilmentInfo {
 
 export function CheckoutForm({
   defaults,
+  walletBalance = 0,
 }: {
   defaults: {
     name?: string;
@@ -38,8 +39,12 @@ export function CheckoutForm({
     city?: string;
     state?: string;
   };
+  walletBalance?: number;
 }) {
   const { items, ready, subtotal } = useCart();
+  const [paymentMethod, setPaymentMethod] = useState<"wallet" | "paystack">(
+    walletBalance > 0 ? "wallet" : "paystack",
+  );
   const [fulfilment, setFulfilment] = useState<"delivery" | "pickup">("delivery");
   const [bioAddress, setBioAddress] = useState(defaults.bioAddress ?? defaults.address ?? "");
   const [deliveryAddress, setDeliveryAddress] = useState(defaults.address ?? defaults.bioAddress ?? "");
@@ -108,6 +113,7 @@ export function CheckoutForm({
   const deliveryTotal =
     fulfilment === "delivery" ? [...stores.values()].reduce((s, v) => s + v.fee, 0) : 0;
   const total = subtotal + deliveryTotal;
+  const walletCovers = walletBalance >= total;
 
   const payload = JSON.stringify(
     items.map((item) => ({
@@ -136,6 +142,7 @@ export function CheckoutForm({
   return (
     <form action={action} className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
       <input type="hidden" name="items" value={payload} />
+      <input type="hidden" name="paymentMethod" value={paymentMethod} />
 
       <div className="space-y-5">
         {state?.error ? <Alert tone="danger">{state.error}</Alert> : null}
@@ -423,6 +430,58 @@ export function CheckoutForm({
             <span>Total to pay</span>
             <span>{formatMoney(total)}</span>
           </div>
+
+          {/* Payment method: wallet balance or PayStack */}
+          {walletBalance > 0 ? (
+            <div className="mt-4 space-y-2 rounded-xl border p-3">
+              <p className="text-xs font-semibold text-ink-600 uppercase tracking-wide">Pay with</p>
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl border p-2.5 transition">
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="wallet"
+                  checked={paymentMethod === "wallet"}
+                  onChange={() => setPaymentMethod("wallet")}
+                  className="mt-0.5 shrink-0"
+                  disabled={!walletCovers}
+                />
+                <div>
+                  <p className="text-sm font-semibold text-ink-900">
+                    Wallet balance
+                  </p>
+                  <p className="text-xs text-ink-500">
+                    {walletCovers
+                      ? `Covers full amount (₦${formatMoney(walletBalance)} available)`
+                      : `Insufficient balance (₦${formatMoney(walletBalance)} available)`}
+                  </p>
+                </div>
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl border p-2.5 transition">
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="paystack"
+                  checked={paymentMethod === "paystack"}
+                  onChange={() => setPaymentMethod("paystack")}
+                  className="mt-0.5 shrink-0"
+                />
+                <div>
+                  <p className="text-sm font-semibold text-ink-900">PayStack</p>
+                  <p className="text-xs text-ink-500">Pay by card, bank transfer or USSD</p>
+                </div>
+              </label>
+              {!walletCovers && paymentMethod === "wallet" ? (
+                <p className="mt-1 text-xs text-red-600">
+                  Wallet balance is too low for this order. Add funds or switch to PayStack.
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-ink-500 text-center">
+              Fund your wallet at <a href="/account/wallet" className="text-brand-700 font-semibold underline">Account &rarr; Wallet</a>, then pay with your balance here.
+            </p>
+          )}
+
           <SubmitButton className="w-full" pendingLabel="Preparing payment…">
             <Lock className="size-4" /> Pay {formatMoney(total)}
           </SubmitButton>

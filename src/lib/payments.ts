@@ -1,4 +1,4 @@
-import { systemDb, withSystem } from "@/lib/db";
+import { systemDb, withSystem, type Db } from "@/lib/db";
 import { getSettings, paystackSecret } from "@/lib/settings";
 import { verifyTransaction } from "@/lib/payments/gateway";
 import { markOrdersPaid } from "@/lib/orders";
@@ -10,7 +10,7 @@ import { notifyAdmins } from "@/lib/notifications";
 export interface PaymentRow {
   id: string;
   reference: string;
-  scope: "order" | "subscription";
+  scope: "order" | "subscription" | "wallet";
   provider: "paystack" | "flutterwave" | "manual" | "sandbox";
   provider_reference: string | null;
   checkout_reference: string | null;
@@ -72,6 +72,15 @@ export async function markPaymentSuccessful(
         plan_id: payment.plan_id,
         amount: Number(payment.amount),
         reference: payment.reference,
+      });
+    }
+    if (payment.scope === "wallet") {
+      await creditWallet(db, {
+        userId: payment.payer_user_id,
+        amount: Number(payment.amount),
+        reference: payment.reference,
+        provider: payment.provider,
+        description: `Wallet topped up with ${payment.currency} ${Number(payment.amount).toLocaleString()}`,
       });
     }
 
@@ -353,5 +362,42 @@ export async function getPaymentStats() {
        coalesce(sum(case when status='success' and scope='subscription' then amount else 0 end),0) as subscription_revenue,
        coalesce(sum(case when status='success' and scope='order' then amount else 0 end),0) as order_revenue
      from payments`,
+  );
+}
+
+/** Credit a customer's wallet after a successful top-up payment. Idempotent
+ *  via the wallet_transactions reference (unique). */
+async function creditWallet(db: Db, input: {
+  userId: string | null;
+  amount: number;
+  reference: string;
+  provider: string;
+  description: string;
+}) {
+  if (!input.userId || input.amount <= 0) return;
+  const wallet = await db.one<{ id: string; balance: number }>(
+    `insert into wallets (user_id, balance, currency)
+     values ($1, $2, 'NGN')
+     on conflict (user_id) do update
+       set balance = wallets.balance + excluded.balance, updated_at = now()
+     returning id, balance`,
+    [input.userId, input.amount],
+  );
+  await db.execute(
+    `insert into wallet_transactions (wallet_id, type, amount, reference, description, status)
+     values ($1,'credit',$2,$3,$4,'success')`,
+    [wallet.id, input.amount, input.reference, input.description],
+  );
+  await logActivity(
+    {
+      actorRole: "system",
+      storeId: null,
+      action: "wallet.credited",
+      entityType: "wallet",
+      entityId: wallet.id,
+      description: input.description,
+      meta: { amount: input.amount, provider: input.provider, reference: input.reference },
+    },
+    db,
   );
 }

@@ -10,6 +10,7 @@ import {
   createCheckout,
   reportOrderIssueByCustomer,
 } from "@/lib/orders";
+import { payWithWalletCheckout } from "@/app/actions/wallet";
 import { sendEmail } from "@/lib/email";
 import { notify, notifyAdmins } from "@/lib/notifications";
 import { logActivity } from "@/lib/audit";
@@ -63,12 +64,32 @@ export async function submitCheckoutAction(_prev: PublicState, formData: FormDat
     return { error: "Please check your bio and fulfilment details", fieldErrors: formatIssues(parsed.error) };
   }
 
+  const paymentMethod = String(formData.get("paymentMethod") ?? "paystack");
+
   try {
     const result = await createCheckout(parsed.data, {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
     });
+
+    // Wallet payment: deduct from wallet balance and confirm the order(s)
+    // without touching PayStack at all.
+    if (paymentMethod === "wallet") {
+      await payWithWalletCheckout({
+        userId: user.id,
+        email: user.email,
+        checkoutReference: result.checkoutReference,
+        grandTotal: result.total,
+      });
+      revalidatePath("/account/wallet");
+      revalidatePath("/account/orders");
+      return {
+        message: `Paid ₦${result.total.toLocaleString()} from your wallet. Your order is confirmed.`,
+        redirectUrl: "/account/orders",
+      };
+    }
+
     return { redirectUrl: result.authorizationUrl };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Checkout failed. Please try again." };
