@@ -128,17 +128,17 @@ export default async function HomePage() {
                     Open dashboard <ArrowRight className="ml-1 size-4" />
                   </Link>
                 )}
-                <dl className="mt-6 grid grid-cols-3 gap-3 text-center text-white">
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <dt className="text-[10px] uppercase tracking-wide text-ink-300">Trial</dt>
+                <dl className="mt-6 grid grid-cols-3 gap-2 text-center text-white sm:gap-3">
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-2 sm:p-3">
+                    <dt className="whitespace-nowrap text-[clamp(8px,2.6vw,10px)] uppercase tracking-wide text-ink-300">Trial</dt>
                     <dd className="mt-1 text-sm font-semibold">{settings.default_trial_days}d</dd>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <dt className="text-[10px] uppercase tracking-wide text-ink-300">Setup fee</dt>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-2 sm:p-3">
+                    <dt className="whitespace-nowrap text-[clamp(8px,2.6vw,10px)] uppercase tracking-wide text-ink-300">Setup fee</dt>
                     <dd className="mt-1 text-sm font-semibold">₦0</dd>
                   </div>
-                  <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                    <dt className="text-[10px] uppercase tracking-wide text-ink-300">Categories</dt>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-2 sm:p-3">
+                    <dt className="whitespace-nowrap text-[clamp(8px,2.6vw,10px)] uppercase tracking-wide text-ink-300">Categories</dt>
                     <dd className="mt-1 text-sm font-semibold">{categories.length}</dd>
                   </div>
                 </dl>
