@@ -19,7 +19,7 @@ import {
 } from "@/lib/stores";
 import { checkPaystackCredentials } from "@/lib/payments/gateway";
 import { processRefund } from "@/lib/payments";
-import { adminGrantSubscription } from "@/lib/subscriptions";
+import { adminGrantSubscription, adminWaiveSubscription } from "@/lib/subscriptions";
 import { formatIssues, categorySchema } from "@/lib/validation";
 
 export interface AdminState {
@@ -255,6 +255,34 @@ export async function grantSubscriptionAction(_prev: AdminState, formData: FormD
   revalidatePath(`/admin/vendors/${storeId}`);
   revalidatePath("/admin/subscriptions");
   return { message: "Subscription granted and the vendor notified." };
+}
+
+/**
+ * Administrator waives a vendor subscription for 1–12 calendar months at ₦0.
+ * Extends from the later of now() or the current expiry so remaining paid
+ * time is never lost, and restores an expired storefront unless manually
+ * suspended.
+ */
+export async function waiveSubscriptionAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
+  const user = await admin();
+  const storeId = String(formData.get("storeId") ?? "");
+  const months = Number(formData.get("months") ?? "");
+  const planId = String(formData.get("planId") ?? "") || null;
+  const note = String(formData.get("note") ?? "").trim();
+  if (!storeId) return { error: "Choose a store" };
+  if (!Number.isInteger(months) || months < 1 || months > 12) {
+    return { error: "Choose a waiver of 1–12 months" };
+  }
+  try {
+    await adminWaiveSubscription({ storeId, months, planId, adminId: user.id, note: note || undefined });
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not waive the subscription" };
+  }
+  revalidatePath(`/admin/vendors/${storeId}`);
+  revalidatePath("/admin/subscriptions");
+  return {
+    message: `Subscription waived for ${months} month${months === 1 ? "" : "s"} and the vendor notified.`,
+  };
 }
 
 /* -------------------------------------------------------------------------- */

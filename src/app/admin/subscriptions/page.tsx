@@ -6,7 +6,7 @@ import { systemDb } from "@/lib/db";
 import { getPlans } from "@/lib/subscriptions";
 import { formatMoney, formatDate } from "@/lib/utils";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, StatCard } from "@/components/ui";
-import { PlanForm } from "@/components/admin-forms";
+import { PlanForm, WaiveSubscriptionForm } from "@/components/admin-forms";
 
 export const metadata: Metadata = { title: "Subscriptions · Admin" };
 
@@ -120,6 +120,16 @@ export default async function AdminSubscriptionsPage() {
             </div>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader title="Waive a subscription" description="Grant 1–12 calendar months at ₦0; extends from the later of now or the current expiry." />
+          <div className="card-pad">
+            <WaiveSubscriptionForm
+              stores={stores.map((row) => ({ id: row.store_id, name: row.store_name }))}
+              plans={plans.map((plan) => ({ id: plan.id, name: plan.name, price: Number(plan.price) }))}
+            />
+          </div>
+        </Card>
 
         <Card>
           <CardHeader title="Create a plan" description="New plans appear on vendor billing pages immediately." />

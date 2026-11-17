@@ -14,6 +14,7 @@ import {
   sendTestEmailAction,
   suspendStoreAction,
   verifyPaystackAction,
+  waiveSubscriptionAction,
   type AdminState,
 } from "@/app/actions/admin";
 import { Alert, Field } from "@/components/ui";
@@ -70,6 +71,66 @@ export function GrantSubscriptionForm({ storeId, plans }: { storeId: string; pla
         <input id={`grant-note-${storeId}`} name="note" className="input" placeholder="e.g. goodwill extension" />
       </Field>
       <SubmitButton className="btn-secondary btn-sm" pendingLabel="Granting…">Grant subscription</SubmitButton>
+    </form>
+  );
+}
+
+export function WaiveSubscriptionForm({
+  storeId,
+  stores,
+  plans,
+}: {
+  storeId?: string;
+  stores?: Array<{ id: string; name: string }>;
+  plans: Array<{ id: string; name: string; price: number }>;
+}) {
+  const [state, formAction] = useActionState<AdminState, FormData>(waiveSubscriptionAction, {});
+  const storeSelect = !storeId && stores ? (
+    <Field label="Store" htmlFor={`waive-store-${Date.now()}`} required>
+      <select name="storeId" className="select" required>
+        <option value="">Choose a store</option>
+        {stores.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+    </Field>
+  ) : (
+    <input type="hidden" name="storeId" value={storeId} />
+  );
+  return (
+    <form action={formAction} className="space-y-2">
+      {storeSelect}
+      <StateNote state={state} />
+      <Field
+        label="Waive for (months)"
+        htmlFor={`waive-months-${storeId}`}
+        required
+        hint="1–12 calendar months added to the later of now or the current expiry; remaining paid time is never lost."
+      >
+        <select id={`waive-months-${storeId}`} name="months" className="select" required defaultValue="1">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
+            <option key={m} value={m}>
+              {m} month{m === 1 ? "" : "s"}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Plan (optional)" htmlFor={`waive-plan-${storeId}`} hint="Defaults to the store's current / cheapest paid plan.">
+        <select id={`waive-plan-${storeId}`} name="planId" className="select">
+          <option value="">Default plan</option>
+          {plans.map((plan) => (
+            <option key={plan.id} value={plan.id}>
+              {plan.name} — ₦{Number(plan.price).toLocaleString()}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Note (optional)" htmlFor={`waive-note-${storeId}`}>
+        <input id={`waive-note-${storeId}`} name="note" className="input" placeholder="e.g. goodwill waiver" />
+      </Field>
+      <SubmitButton className="btn-secondary btn-sm" pendingLabel="Waiving…">Waive subscription</SubmitButton>
     </form>
   );
 }

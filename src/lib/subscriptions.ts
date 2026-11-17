@@ -289,6 +289,82 @@ export async function adminGrantSubscription(input: {
   return result;
 }
 
+/** Administrator waives a vendor subscription for 1–12 calendar months at ₦0. */
+export async function adminWaiveSubscription(input: {
+  storeId: string;
+  months: number;
+  planId?: string | null;
+  adminId: string;
+  note?: string;
+}) {
+  const months = Number(input.months);
+  if (!Number.isInteger(months) || months < 1 || months > 12) {
+    throw new Error("Waiver duration must be a whole number of months between 1 and 12");
+  }
+
+  const result = await withSystem(async (db) => {
+    const applied = await db.one<{
+      id: string;
+      new_expires_at: string;
+      plan_id: string | null;
+      store_id: string;
+    }>(
+      `select * from admin_waive_subscription($1,$2,$3,$4,$5)`,
+      [input.storeId, months, input.planId ?? null, input.adminId, input.note ?? null],
+    );
+
+    const plan = applied.plan_id
+      ? await db.maybeOne<{ name: string; slug: string }>(
+          `select name, slug from subscription_plans where id = $1`,
+          [applied.plan_id],
+        )
+      : null;
+
+    await logActivity(
+      {
+        actorId: input.adminId,
+        actorRole: "admin",
+        storeId: input.storeId,
+        action: "subscription.waived",
+        entityType: "subscription_payment",
+        entityId: applied.id,
+        description: `Subscription waived for ${months} month${months === 1 ? "" : "s"} (₦0)`,
+        meta: {
+          monthsWaived: months,
+          expiresAt: applied.new_expires_at,
+          plan: plan?.slug ?? null,
+        },
+      },
+      db,
+    );
+
+    return { applied, plan };
+  });
+
+  const owner = await systemDb.maybeOne<{ email: string; full_name: string; name: string }>(
+    `select u.email, u.full_name, s.name from stores s join users u on u.id = s.owner_id where s.id = $1`,
+    [input.storeId],
+  );
+  if (owner) {
+    const settings = await getSettings();
+    await sendEmail({
+      to: owner.email,
+      template: "subscription_activated",
+      data: {
+        name: owner.full_name,
+        storeName: owner.name,
+        planName: result.plan?.name ?? "subscription",
+        amount: 0,
+        currency: settings.currency,
+        expiresAt: result.applied.new_expires_at,
+        note: `Waived by an administrator for ${months} month${months === 1 ? "" : "s"} at no cost.` + (input.note ? ` ${input.note}` : ""),
+      },
+      dedupeKey: `sub-waive:${result.applied.id}`,
+    });
+  }
+  return result;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Scheduled maintenance                                                      */
 /* -------------------------------------------------------------------------- */

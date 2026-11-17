@@ -19,7 +19,11 @@ import {
 } from "@/app/actions/admin";
 import { SubmitButton } from "@/components/submit-button";
 import { ConfirmSubmit } from "@/components/confirm-button";
-import { GrantSubscriptionForm, SuspendStoreForm } from "@/components/admin-forms";
+import {
+  GrantSubscriptionForm,
+  SuspendStoreForm,
+  WaiveSubscriptionForm,
+} from "@/components/admin-forms";
 import { KycDocumentReviewPanel } from "@/components/kyc-document-review";
 import type { VendorProfile } from "@/lib/types";
 
@@ -365,8 +369,9 @@ export default async function AdminVendorDetailPage({ params }: { params: Promis
 
           <Card>
             <CardHeader title="Subscription" description={subscription ? `${subscription.plan.name} · ends ${formatDate(subscription.expires_at)}` : "No active subscription"} />
-            <div className="card-pad">
+            <div className="card-pad space-y-3">
               <GrantSubscriptionForm storeId={store.id} plans={plans.map((plan) => ({ id: plan.id, name: plan.name, price: Number(plan.price) }))} />
+              <WaiveSubscriptionForm storeId={store.id} plans={plans.map((plan) => ({ id: plan.id, name: plan.name, price: Number(plan.price) }))} />
             </div>
           </Card>
 
