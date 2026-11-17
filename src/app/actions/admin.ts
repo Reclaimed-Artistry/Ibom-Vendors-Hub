@@ -7,7 +7,7 @@ import { systemDb, withSystem } from "@/lib/db";
 import { logActivity } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
 import { retryFailedEmails, sendEmail } from "@/lib/email";
-import { emailFrom, getSettings, paystackSecret, resendKey, url } from "@/lib/settings";
+import { emailFrom, getSettings, mailProvider, paystackSecret, url } from "@/lib/settings";
 import {
   approveStore,
   checkSubdomain,
@@ -752,8 +752,9 @@ export async function sendTestEmailAction(_prev: AdminState, formData: FormData)
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) return { error: "Enter a valid email address" };
 
   const settings = await getSettings();
-  if (!resendKey(settings)) {
-    return { error: "No email provider configured. Set RESEND_API_KEY (or save one in Platform settings) and redeploy." };
+  const provider = mailProvider(settings);
+  if (provider.kind === "none") {
+    return { error: "No email provider configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS (Whogohost/Go54: mail.yourdomain.com, port 465) or RESEND_API_KEY, then redeploy." };
   }
 
   const result = await sendEmail({
@@ -788,7 +789,8 @@ export async function sendTestEmailAction(_prev: AdminState, formData: FormData)
     return { error: `Message was not sent (${result.reason}).` };
   }
   revalidatePath("/admin/emails");
-  return { message: `Resend accepted the test message for ${to}. Delivery status is in the log below.` };
+  const via = provider.kind === "smtp" ? "The mail server" : "Resend";
+  return { message: `${via} accepted the test message for ${to}. Delivery status is in the log below.` };
 }
 
 export async function retryFailedEmailsAction() {

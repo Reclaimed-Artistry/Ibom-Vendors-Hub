@@ -1,6 +1,7 @@
+import nodemailer, { type Transporter } from "nodemailer";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { systemDb } from "@/lib/db";
-import { emailFrom, getSettings, resendKey, url } from "@/lib/settings";
+import { emailFrom, getSettings, mailProvider, url, type MailProvider } from "@/lib/settings";
 import { formatMoney } from "@/lib/utils";
 
 /**
@@ -8,9 +9,11 @@ import { formatMoney } from "@/lib/utils";
  *
  * All messages are rendered through reusable HTML templates, persisted to
  * `email_logs` (with dedupe keys so an event can never be emailed twice) and
- * delivered through Resend when a key is configured. Without a provider the
- * message is still rendered and stored, which keeps every flow testable and
- * visible to administrators under Admin → Emails.
+ * delivered through the configured provider: SMTP when `SMTP_HOST`/`SMTP_USER`/
+ * `SMTP_PASS` are set (e.g. Whogohost/Go54 mail), otherwise Resend when a key
+ * is configured. Without a provider the message is still rendered and stored,
+ * which keeps every flow testable and visible to administrators under
+ * Admin → Emails.
  */
 
 export interface EmailData {
@@ -525,6 +528,58 @@ function layout(content: RenderedEmail) {
   return { html, text };
 }
 
+/** Reused across sends so serverless invocations do not re-handshake TLS per message. */
+let smtpTransporter: Transporter | null = null;
+let smtpTransporterKey = "";
+
+function getSmtpTransporter(provider: Extract<MailProvider, { kind: "smtp" }>) {
+  const key = `${provider.host}:${provider.port}:${provider.user}`;
+  if (smtpTransporter && smtpTransporterKey === key) return smtpTransporter;
+  smtpTransporter = nodemailer.createTransport({
+    host: provider.host,
+    port: provider.port,
+    secure: provider.secure,
+    auth: { user: provider.user, pass: provider.pass },
+  });
+  smtpTransporterKey = key;
+  return smtpTransporter;
+}
+
+/** Delivers one message through the configured provider. Throws with a provider-safe message on failure. */
+async function deliver(
+  provider: MailProvider,
+  message: { from: string; to: string; subject: string; html: string; text: string },
+): Promise<string | null> {
+  if (provider.kind === "smtp") {
+    const info = await getSmtpTransporter(provider).sendMail({
+      from: message.from,
+      to: message.to,
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    });
+    return info.messageId ?? null;
+  }
+  if (provider.kind === "resend") {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${provider.key}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(message),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`Resend ${response.status}: ${detail.slice(0, 300)}`);
+    }
+    const json = (await response.json()) as { id?: string };
+    return json.id ?? null;
+  }
+  throw new Error("No email provider configured");
+}
+
 export interface SendEmailInput {
   to: string;
   template: string;
@@ -535,6 +590,7 @@ export interface SendEmailInput {
 
 export async function sendEmail(input: SendEmailInput) {
   const settings = await getSettings();
+  const provider = mailProvider(settings);
   const content = template(input.template, input.data ?? {});
   const { html, text } = layout(content);
   const from = emailFrom(settings);
@@ -552,7 +608,7 @@ export async function sendEmail(input: SendEmailInput) {
         content.subject,
         html,
         text,
-        resendKey(settings) ? "resend" : "log",
+        provider.kind === "none" ? "log" : provider.kind,
         JSON.stringify(input.data ?? {}),
         input.dedupeKey ?? null,
       ],
@@ -566,8 +622,7 @@ export async function sendEmail(input: SendEmailInput) {
     return { skipped: true as const, reason: "log-failed", subject: content.subject };
   }
 
-  const key = resendKey(settings);
-  if (!key) {
+  if (provider.kind === "none") {
     // Development / unconfigured provider: the email is stored and visible in
     // Admin → Emails (and mirrored to the server log).
     await systemDb.execute(
@@ -579,23 +634,10 @@ export async function sendEmail(input: SendEmailInput) {
   }
 
   try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from, to: [input.to], subject: content.subject, html, text }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!response.ok) {
-      const detail = await response.text();
-      throw new Error(`Resend ${response.status}: ${detail.slice(0, 300)}`);
-    }
-    const json = (await response.json()) as { id?: string };
+    const messageId = await deliver(provider, { from, to: input.to, subject: content.subject, html, text });
     await systemDb.execute(
       `update email_logs set status = 'sent', sent_at = now(), provider_message_id = $2, attempts = attempts + 1 where id = $1`,
-      [logId, json.id ?? null],
+      [logId, messageId],
     );
     return { skipped: false as const, id: logId, subject: content.subject };
   } catch (error) {
@@ -612,28 +654,24 @@ export async function sendEmail(input: SendEmailInput) {
 /** Retry failed/skipped emails — invoked by the scheduled job. */
 export async function retryFailedEmails(limit = 20) {
   const settings = await getSettings();
-  if (!resendKey(settings)) return { retried: 0, sent: 0 };
+  const provider = mailProvider(settings);
+  if (provider.kind === "none") return { retried: 0, sent: 0 };
   const rows = await systemDb.query<{ id: string; to_email: string; subject: string; html: string | null; text: string | null; attempts: number }>(
     `select id, to_email, subject, html, text, attempts from email_logs
       where status = 'failed' and attempts < 3 order by created_at limit $1`,
     [limit],
   );
+  const from = emailFrom(settings);
   let sent = 0;
   for (const row of rows) {
     try {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${resendKey(settings)}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from: emailFrom(settings),
-          to: [row.to_email],
-          subject: row.subject,
-          html: row.html ?? "<p></p>",
-          text: row.text ?? "",
-        }),
-        signal: AbortSignal.timeout(15_000),
+      await deliver(provider, {
+        from,
+        to: row.to_email,
+        subject: row.subject,
+        html: row.html ?? "<p></p>",
+        text: row.text ?? "",
       });
-      if (!response.ok) throw new Error(await response.text());
       await systemDb.execute(
         `update email_logs set status='sent', sent_at=now(), attempts=attempts+1, error=null where id=$1`,
         [row.id],

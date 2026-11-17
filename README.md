@@ -8,7 +8,8 @@ every order from checkout to delivery.
 Built with **Next.js 15 (App Router) + React 19 + TypeScript + Tailwind CSS 4** on
 **PostgreSQL (Supabase-compatible)** with strict row-level security. Payments run
 through **Paystack** (or the built-in sandbox gateway when no keys are set), email
-through **Resend**, hosting on **Vercel**.
+through **your mail host's SMTP** (Whogohost/Go54; Resend as an optional fallback),
+hosting on **Vercel**.
 
 ---
 
@@ -137,7 +138,8 @@ Paystack keys, sender address and maintenance flag.
 | `AUTH_SECRET` | HS256 key for session cookies (32+ chars) |
 | `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_ROOT_DOMAIN` | Public URL and subdomain root |
 | `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY` | Live payments; leave empty for the sandbox gateway |
-| `RESEND_API_KEY`, `EMAIL_FROM` | Transactional email (logged locally when absent) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | Transactional email via your mail host (recommended); without it the platform falls back to Resend |
+| `RESEND_API_KEY`, `EMAIL_FROM` | Fallback email provider and sender address (logged when neither is set) |
 | `CRON_SECRET` | Bearer token required by `/api/cron/subscriptions` |
 | `NEXT_PUBLIC_DEV_EMAIL_LINKS` | `true` shows verification/reset links in the UI during local work |
 
@@ -158,11 +160,13 @@ register claims the first storefront.
 - Automatic git deployments are **off** on that project; a push does not redeploy.
   Turn them on under *Vercel → Project → Settings → Git → Ignored Build Step /
   Production branch*, or trigger a deployment from a new commit.
-- `RESEND_API_KEY` is configured. Delivery still depends on Resend's sender verification:
-  while `ibomvendorshub.com` is unverified in the Resend dashboard every send is answered
-  with 403 and recorded in **Admin → Emails** with the provider's exact message. Verify the
-  domain (or set `EMAIL_FROM`/the `email_from` platform setting to `onboarding@resend.dev`
-  to deliver to the Resend account owner) and the failures clear on the next send.
+- Email delivers through **your mail host's SMTP** when `SMTP_HOST`/`SMTP_PORT`/`SMTP_USER`/`SMTP_PASS`
+  are set in the Vercel environment — create a mailbox (e.g. `noreply@ibomvendorshub.com`) in
+  Whogohost/Go54, point the domain's MX and SPF records at the mail host, and set
+  `EMAIL_FROM` to that mailbox. This is the recommended path and needs no third-party
+  sender verification. `RESEND_API_KEY` remains as an optional fallback; note that while
+  `ibomvendorshub.com` is unverified in the Resend dashboard every Resend send is answered
+  with 403 and recorded in **Admin → Emails**.
 - Payments run on Paystack **test** keys (`pk_test_…` / `sk_test_…`, secret stored as a Vercel
   sensitive variable) with the sandbox switch turned off, so checkouts create real Paystack
   test transactions and are verified server-side. Switch the keys to live and re-check
@@ -187,7 +191,8 @@ runs `next build`. Every deploy is therefore self-migrating and idempotent.
    | `NEXT_PUBLIC_APP_URL` | `https://<project>.vercel.app` |
    | `NEXT_PUBLIC_ROOT_DOMAIN` | `<project>.vercel.app` |
    | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | first platform administrator |
-   | `RESEND_API_KEY`, `EMAIL_FROM` | optional — without them email is logged, not sent |
+   | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | recommended — without them email falls back to Resend, then to log-only |
+   | `EMAIL_FROM`, `RESEND_API_KEY` | optional fallback provider + sender identity |
    | `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY` | optional — otherwise the sandbox gateway is used |
 
 3. Deploy. The build migrates the database and boots the admin account; the daily cron
@@ -260,7 +265,7 @@ These are owner-side steps that no code change can complete:
 | Item | Effect until done |
 | --- | --- |
 | Google OAuth client ID + secret (Admin → Platform settings) | the "Continue with Google" button stays hidden |
-| Resend domain verification for `ibomvendorshub.com` | transactional email fails (visible in Admin → Emails) |
+| Whogohost/Go54 mail hosting + MX/SPF records for `ibomvendorshub.com` (e.g. `mail.ibomvendorshub.com`, port 465) | transactional email fails or lands in spam (Admin → Emails shows the exact provider error) |
 | Paystack live keys | checkout runs in test mode |
 | A real domain on Vercel | storefront subdomains can't resolve; `/s/<slug>` works in the meantime |
 
@@ -288,16 +293,20 @@ Webhooks in Paystack; the webhook is verified with the same secret key (`x-payst
 ### Transactional email
 
 `src/lib/email.ts` renders every message through reusable HTML templates, writes it to
-`email_logs` with a dedupe key (so one event can never be emailed twice) and posts it to
-Resend when a key exists. **Admin → Emails** lists the log with per-message status,
+`email_logs` with a dedupe key (so one event can never be emailed twice) and delivers it
+through the configured provider. **Admin → Emails** lists the log with per-message status,
 attempt count and the provider's error text, and offers two controls: *Send test email*
 (uses the real provider and from address) and *Retry failed messages* (the daily cron also
-retries up to three times, so an outage or an unverified sender self-heals once fixed).
+retries up to three times, so an outage self-heals once the provider recovers).
 
-Sending requires Resend to trust the sender. Verify `ibomvendorshub.com` at
-`resend.com/domains` and add the DKIM/SPF records, or point `EMAIL_FROM` at
-`onboarding@resend.dev` for owner-only test delivery. Without a key the platform still
-renders and stores messages, marking them `skipped` — no flow silently depends on email.
+Recommended provider: **your mail host's SMTP** (Whogohost/Go54). Create a mailbox in
+cPanel — e.g. `noreply@ibomvendorshub.com` — and set `SMTP_HOST=mail.ibomvendorshub.com`,
+`SMTP_PORT=465`, `SMTP_SECURE=true`, `SMTP_USER=<full mailbox address>`, `SMTP_PASS=<password>`.
+The domain must resolve to the mail host (MX record) and carry an SPF record naming it, or
+messages bounce or land in spam. Resend remains available as a fallback when the SMTP
+block is absent (`RESEND_API_KEY`; sender domain must then be verified at `resend.com/domains`).
+Without any provider the platform still renders and stores messages, marking them `skipped` —
+no flow silently depends on email.
 
 ---
 

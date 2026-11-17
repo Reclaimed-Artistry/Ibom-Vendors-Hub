@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Mail, RotateCcw, Search } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
-import { getSettings, emailFrom, resendKey } from "@/lib/settings";
+import { getSettings, emailFrom, mailProvider } from "@/lib/settings";
 import { formatDateTime } from "@/lib/utils";
 import { Alert, Badge, EmptyState, PageHeader, Pagination, Tabs } from "@/components/ui";
 import { EmailTestForm, RetryEmailsButton } from "@/components/admin-forms";
@@ -76,7 +76,7 @@ export default async function AdminEmailsPage({
   ]);
 
   const totalPages = Math.max(1, Math.ceil(counts.total / PAGE_SIZE));
-  const providerReady = Boolean(resendKey(settings));
+  const provider = mailProvider(settings);
   const retried = params.retried !== undefined;
 
   const buildHref = (target: number) => {
@@ -105,7 +105,13 @@ export default async function AdminEmailsPage({
         </Alert>
       ) : null}
 
-      {providerReady ? (
+      {provider.kind === "smtp" ? (
+        <Alert tone={recent?.failed ? "warning" : "info"} title={`Sending through your mail host (${provider.host}) as ${emailFrom(settings)}`}>
+          Messages are delivered over SMTP with the mailbox credentials in the server environment
+          (<span className="font-mono">SMTP_HOST</span>, <span className="font-mono">SMTP_PORT</span>, <span className="font-mono">SMTP_USER</span>, <span className="font-mono">SMTP_PASS</span>).
+          The from address must belong to the mail account, and the domain needs the MX and SPF records your mail host provides, or messages will bounce or land in spam.
+        </Alert>
+      ) : provider.kind === "resend" ? (
         <Alert tone={recent?.failed ? "warning" : "info"} title={`Sending through Resend as ${emailFrom(settings)}`}>
           Delivery requires the from address to sit on a domain or address verified in your Resend account
           (resend.com/domains). Until then Resend answers 403 and the failure is recorded below. Without a verified
@@ -113,8 +119,10 @@ export default async function AdminEmailsPage({
         </Alert>
       ) : (
         <Alert tone="warning" title="No email provider configured">
-          Messages are still rendered and stored here, but nothing leaves the platform. Add <span className="font-mono">RESEND_API_KEY</span> to
-          the Vercel environment (or save a key in Platform settings) to switch sending on.
+          Messages are still rendered and stored here, but nothing leaves the platform. Set <span className="font-mono">SMTP_HOST</span>,{" "}
+          <span className="font-mono">SMTP_USER</span> and <span className="font-mono">SMTP_PASS</span> for your mail host
+          (for Whogohost/Go54: <span className="font-mono">mail.yourdomain.com</span>, port 465), or <span className="font-mono">RESEND_API_KEY</span> as a fallback,
+          then redeploy.
         </Alert>
       )}
 

@@ -16,7 +16,7 @@ import {
 import { systemDb, withSystem } from "@/lib/db";
 import { logActivity } from "@/lib/audit";
 import { sendEmail } from "@/lib/email";
-import { getSettings, url } from "@/lib/settings";
+import { getSettings, mailProvider, url } from "@/lib/settings";
 import { registerCustomer, registerVendor } from "@/lib/stores";
 import { uploadImage, uploadVerificationDocument } from "@/lib/storage";
 import { AKWA_IBOM_STATE } from "@/lib/akwa-ibom";
@@ -36,8 +36,14 @@ export interface ActionState {
   link?: string;
 }
 
-const devLinks = () =>
-  process.env.NEXT_PUBLIC_DEV_EMAIL_LINKS === "true" && !process.env.RESEND_API_KEY;
+// Reading NEXT_PUBLIC_DEV_EMAIL_LINKS alone is not enough — the flag may only
+// leak links to outsiders if the deployment silently lost its email provider.
+// Require a provider to be configured before hiding the dev-only path.
+const devLinks = async () => {
+  if (process.env.NEXT_PUBLIC_DEV_EMAIL_LINKS !== "true") return false;
+  const settings = await getSettings();
+  return mailProvider(settings).kind === "none";
+};
 
 export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = loginSchema.safeParse({
@@ -212,7 +218,7 @@ export async function registerVendorAction(_prev: ActionState, formData: FormDat
     await setSessionCookie(token);
     revalidatePath("/", "layout");
 
-    const verify = devLinks() ? `&verify=${result.verificationToken}` : "";
+    const verify = (await devLinks()) ? `&verify=${result.verificationToken}` : "";
     redirect(`/vendor?welcome=1${verify}`);
   } catch (error) {
     if (error && typeof error === "object" && "digest" in error) throw error;
@@ -249,7 +255,7 @@ export async function registerCustomerAction(_prev: ActionState, formData: FormD
     if (nextRaw && nextRaw.startsWith("/")) {
       redirect(nextRaw);
     }
-    const verify = devLinks() ? `?verify=${result.verificationToken}` : "";
+    const verify = (await devLinks()) ? `?verify=${result.verificationToken}` : "";
     redirect(`/account${verify}`);
   } catch (error) {
     if (error && typeof error === "object" && "digest" in error) throw error;
@@ -281,7 +287,7 @@ export async function forgotPasswordAction(_prev: ActionState, formData: FormDat
     await logActivity({ actorId: user.id, actorRole: "customer", action: "auth.reset_requested", entityType: "user", entityId: user.id });
     return {
       message: "If that email is registered, a reset link is on its way.",
-      link: devLinks() ? link : undefined,
+      link: (await devLinks()) ? link : undefined,
     };
   }
 
@@ -367,7 +373,7 @@ export async function resendVerificationAction(): Promise<ActionState> {
     data: { name: user.fullName, link },
     dedupeKey: `verify:${user.id}:${token.slice(0, 12)}`,
   });
-  return { message: "Verification email sent.", link: devLinks() ? link : undefined };
+  return { message: "Verification email sent.", link: (await devLinks()) ? link : undefined };
 }
 
 export async function requestSubdomainChangeAction(_prev: ActionState, formData: FormData): Promise<ActionState> {

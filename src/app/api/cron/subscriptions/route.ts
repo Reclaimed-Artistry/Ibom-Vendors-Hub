@@ -22,8 +22,8 @@ async function handle(request: Request) {
     return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
   }
   const summary = await runSubscriptionMaintenance();
-  // Provider outages and unverified domains leave messages failed; retry them
-  // here so a fix at Resend's end delivers the backlog without manual work.
+  // Provider outages and undeliverable senders leave messages failed; retry them
+  // here so a fix at the provider's end delivers the backlog without manual work.
   const emailRetry = await retryFailedEmails(30);
   return NextResponse.json({ ok: true, ...summary, emailRetry, ranAt: new Date().toISOString() });
 }

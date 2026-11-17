@@ -103,6 +103,58 @@ export function emailFrom(settings: PlatformSettings) {
   return settings.email_from || process.env.EMAIL_FROM || "Ibom Vendors Hub <noreply@ibomvendorshub.com>";
 }
 
+/**
+ * SMTP (e.g. Whogohost / cPanel mail) configuration, read from the environment.
+ * Any one of SMTP_HOST / SMTP_USER / SMTP_PASS frees us from the Resend domain
+ * verification requirement — every message the platform renders can leave
+ * through the domain's own mail server instead.
+ *
+ *   SMTP_HOST      e.g. mail.ibomvendorshub.com   (or the server hostname cPanel shows)
+ *   SMTP_PORT      465 (SSL/TLS, default) or 587 (STARTTLS)
+ *   SMTP_SECURE    true/false — defaults to true on 465, false otherwise
+ *   SMTP_USER      full mailbox address, e.g. noreply@ibomvendorshub.com
+ *   SMTP_PASS      mailbox password
+ */
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+}
+
+export function smtpConfig(): SmtpConfig | null {
+  const host = (process.env.SMTP_HOST ?? "").trim();
+  const user = (process.env.SMTP_USER ?? "").trim();
+  const pass = process.env.SMTP_PASS ?? "";
+  if (!host || !user || !pass.trim()) return null;
+  const rawPort = (process.env.SMTP_PORT ?? "").trim();
+  const port = rawPort ? Number(rawPort) : 465;
+  const rawSecure = (process.env.SMTP_SECURE ?? "").trim().toLowerCase();
+  const secure = rawSecure
+    ? ["1", "true", "yes", "on"].includes(rawSecure)
+    : port === 465;
+  return { host, port: Number.isFinite(port) && port > 0 ? port : 465, secure, user, pass };
+}
+
+export type MailProvider =
+  | { kind: "smtp"; host: string; port: number; secure: boolean; user: string; pass: string; from: string }
+  | { kind: "resend"; key: string; from: string }
+  | { kind: "none" };
+
+/**
+ * Provider selection order: SMTP when configured (Whogohost/cPanel mail, set
+ * via environment), else Resend (dashboard or environment), else disabled —
+ * every email stays rendered and stored in email_logs either way.
+ */
+export function mailProvider(settings: PlatformSettings): MailProvider {
+  const smtp = smtpConfig();
+  if (smtp) return { kind: "smtp", ...smtp, from: emailFrom(settings) };
+  const key = resendKey(settings);
+  if (key) return { kind: "resend", key, from: emailFrom(settings) };
+  return { kind: "none" };
+}
+
 export function paymentMode(settings: PlatformSettings): "paystack" | "sandbox" {
   return paystackSecret(settings) ? "paystack" : "sandbox";
 }
