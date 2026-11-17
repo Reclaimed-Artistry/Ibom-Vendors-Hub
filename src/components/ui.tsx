@@ -174,38 +174,46 @@ export function StatCard({
   hint,
   icon,
   tone = "neutral",
+  href,
 }: {
   label: string;
   value: ReactNode;
   hint?: ReactNode;
   icon?: ReactNode;
   tone?: Tone;
+  href?: string;
 }) {
-  return (
-    <div className="card card-pad">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="stat-label">{label}</p>
-          <p className="stat-value mt-1.5">{value}</p>
-          {hint ? <p className="mt-1 text-xs text-ink-400">{hint}</p> : null}
-        </div>
-        {icon ? (
-          <span
-            className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-xl",
-              tone === "success" && "bg-brand-50 text-brand-700",
-              tone === "warning" && "bg-amber-50 text-amber-700",
-              tone === "danger" && "bg-red-50 text-red-600",
-              tone === "info" && "bg-sky-50 text-sky-700",
-              tone === "neutral" && "bg-ink-100 text-ink-500",
-            )}
-          >
-            {icon}
-          </span>
-        ) : null}
+  const inner = (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <p className="stat-label">{label}</p>
+        <p className="stat-value mt-1.5">{value}</p>
+        {hint ? <p className="mt-1 text-xs text-ink-400">{hint}</p> : null}
       </div>
+      {icon ? (
+        <span
+          className={cn(
+            "flex size-10 shrink-0 items-center justify-center rounded-xl",
+            tone === "success" && "bg-brand-50 text-brand-700",
+            tone === "warning" && "bg-amber-50 text-amber-700",
+            tone === "danger" && "bg-red-50 text-red-600",
+            tone === "info" && "bg-sky-50 text-sky-700",
+            tone === "neutral" && "bg-ink-100 text-ink-500",
+          )}
+        >
+          {icon}
+        </span>
+      ) : null}
     </div>
   );
+  if (href) {
+    return (
+      <Link href={href} className="card card-pad block transition hover:border-brand-300 hover:shadow-sm focus-visible:outline-2 focus-visible:outline-brand-500" aria-label={`${label} — view list`}>
+        {inner}
+      </Link>
+    );
+  }
+  return <div className="card card-pad">{inner}</div>;
 }
 
 export function Avatar({ name, src, size = 40 }: { name: string; src?: string | null; size?: number }) {

@@ -22,6 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const nav: DashboardNavItem[] = [
     { href: "/admin", label: "Overview", icon: "overview" },
     { href: "/admin/vendors", label: "Vendors", icon: "vendors", badge: pending?.pending || undefined },
+    { href: "/admin/customers", label: "Customers", icon: "customers" },
     { href: "/admin/subscriptions", label: "Subscriptions", icon: "subscriptions" },
     { href: "/admin/payments", label: "Payments", icon: "payments" },
     { href: "/admin/categories", label: "Categories & flags", icon: "categories" },

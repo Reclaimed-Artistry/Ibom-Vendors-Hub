@@ -101,7 +101,7 @@ export default async function AdminOverviewPage() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Customers" value={stats?.customers ?? 0} icon={<Users className="size-4" />} />
+        <StatCard label="Customers" value={stats?.customers ?? 0} hint="View customer directory" href="/admin/customers" icon={<Users className="size-4" />} />
         <StatCard label="Expired stores" value={stats?.expired ?? 0} hint="Data retained" icon={<AlertTriangle className="size-4" />} />
         <StatCard label="Suspended" value={stats?.suspended ?? 0} icon={<Flag className="size-4" />} />
         <StatCard label="Open refund requests" value={stats?.open_refunds ?? 0} icon={<CalendarClock className="size-4" />} />
