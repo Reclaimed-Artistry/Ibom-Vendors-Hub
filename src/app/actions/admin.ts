@@ -757,7 +757,7 @@ export async function sendTestEmailAction(_prev: AdminState, formData: FormData)
   const settings = await getSettings();
   const provider = mailProvider(settings);
   if (provider.kind === "none") {
-    return { error: "No email provider configured. Set SMTP_HOST=mail.ibomvendorshub.com, SMTP_PORT=587, SMTP_SECURE=false, SMTP_USER=noreply@ibomvendorshub.com and SMTP_PASS, then redeploy." };
+    return { error: "No email provider configured. Set SMTP_HOST=da44.host-ww.net, SMTP_PORT=587, SMTP_SECURE=false, SMTP_USER=noreply@ibomvendorshub.com and SMTP_PASS, then redeploy." };
   }
 
   const result = await sendEmail({
@@ -782,15 +782,15 @@ export async function sendTestEmailAction(_prev: AdminState, formData: FormData)
 
   if ("error" in result && result.error) {
     return {
-      error: `Whogohost SMTP rejected the message: ${result.error}`,
+      error: `Ibomvendorshub could not send the message: ${result.error}`,
     };
   }
   if ("skipped" in result && result.skipped) {
     return { error: `Message was not sent (${result.reason}).` };
   }
   revalidatePath("/admin/emails");
-  const via = "Whogohost SMTP";
-  return { message: `${via} accepted the test message for ${to}. Delivery status is in the log below.` };
+  const via = "Ibomvendorshub";
+  return { message: `${via} accepted the test message for ${to}. The mail server accepted it; inbox delivery is not confirmed. Check spam or junk if it does not arrive.` };
 }
 
 export async function retryFailedEmailsAction() {

@@ -115,14 +115,14 @@ export default async function AdminEmailsPage({
         <Alert tone="warning" title="No email provider configured">
           Messages are still rendered and stored here, but nothing leaves the platform. Set <span className="font-mono">SMTP_HOST</span>,{" "}
           <span className="font-mono">SMTP_USER</span> and <span className="font-mono">SMTP_PASS</span> for your mail host
-          (Whogohost: <span className="font-mono">mail.ibomvendorshub.com</span>, port 587 with STARTTLS),
+          (Ibomvendorshub: <span className="font-mono">da44.host-ww.net</span>, port 587 with STARTTLS),
           then redeploy.
         </Alert>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Delivered", value: recent?.sent ?? 0, hint: "accepted by the provider" },
+          { label: "Accepted by mail server", value: recent?.sent ?? 0, hint: "inbox delivery not confirmed" },
           { label: "Failed", value: recent?.failed ?? 0, hint: "rejected or unreachable" },
           { label: "Skipped", value: recent?.skipped ?? 0, hint: "no provider configured" },
           { label: "Last 24 hours", value: recent?.last24 ?? 0, hint: "messages rendered" },
