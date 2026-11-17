@@ -385,7 +385,6 @@ export const platformSettingsSchema = z.object({
   paystackPublicKey: z.string().trim().max(200).optional().or(z.literal("")),
   paystackSecretKey: z.string().trim().max(200).optional().or(z.literal("")),
   emailFrom: z.string().trim().max(200).optional().or(z.literal("")),
-  resendApiKey: z.string().trim().max(200).optional().or(z.literal("")),
   termsMarkdown: z.string().max(20000).optional().or(z.literal("")),
   privacyMarkdown: z.string().max(20000).optional().or(z.literal("")),
   maintenanceMode: z.coerce.boolean().default(false),

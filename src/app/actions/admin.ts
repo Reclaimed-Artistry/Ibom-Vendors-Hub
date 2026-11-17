@@ -757,7 +757,7 @@ export async function sendTestEmailAction(_prev: AdminState, formData: FormData)
   const settings = await getSettings();
   const provider = mailProvider(settings);
   if (provider.kind === "none") {
-    return { error: "No email provider configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS (Whogohost/Go54: mail.yourdomain.com, port 465) or RESEND_API_KEY, then redeploy." };
+    return { error: "No email provider configured. Set SMTP_HOST=mail.ibomvendorshub.com, SMTP_PORT=587, SMTP_SECURE=false, SMTP_USER=noreply@ibomvendorshub.com and SMTP_PASS, then redeploy." };
   }
 
   const result = await sendEmail({
@@ -782,17 +782,14 @@ export async function sendTestEmailAction(_prev: AdminState, formData: FormData)
 
   if ("error" in result && result.error) {
     return {
-      error:
-        result.error.startsWith("Resend 403")
-          ? `Resend rejected the send — the from domain is not verified yet. ${result.error}`
-          : `Provider rejected the message: ${result.error}`,
+      error: `Whogohost SMTP rejected the message: ${result.error}`,
     };
   }
   if ("skipped" in result && result.skipped) {
     return { error: `Message was not sent (${result.reason}).` };
   }
   revalidatePath("/admin/emails");
-  const via = provider.kind === "smtp" ? "The mail server" : "Resend";
+  const via = "Whogohost SMTP";
   return { message: `${via} accepted the test message for ${to}. Delivery status is in the log below.` };
 }
 

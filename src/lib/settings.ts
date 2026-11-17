@@ -27,7 +27,6 @@ const DEFAULTS: PlatformSettings = {
   google_client_secret: null,
   google_signin_enabled: true,
   email_from: null,
-  resend_api_key: null,
   expiry_reminder_days: [7, 3, 1],
   terms_markdown: null,
   privacy_markdown: null,
@@ -95,26 +94,11 @@ export function paystackPublic(settings: PlatformSettings) {
   );
 }
 
-export function resendKey(settings: PlatformSettings) {
-  return settings.resend_api_key || process.env.RESEND_API_KEY || "";
+export function emailFrom(_settings: PlatformSettings) {
+  return "Ibom Vendors Hub <noreply@ibomvendorshub.com>";
 }
 
-export function emailFrom(settings: PlatformSettings) {
-  return settings.email_from || process.env.EMAIL_FROM || "Ibom Vendors Hub <noreply@ibomvendorshub.com>";
-}
-
-/**
- * SMTP (e.g. Whogohost / cPanel mail) configuration, read from the environment.
- * Any one of SMTP_HOST / SMTP_USER / SMTP_PASS frees us from the Resend domain
- * verification requirement — every message the platform renders can leave
- * through the domain's own mail server instead.
- *
- *   SMTP_HOST      e.g. mail.ibomvendorshub.com   (or the server hostname cPanel shows)
- *   SMTP_PORT      465 (SSL/TLS, default) or 587 (STARTTLS)
- *   SMTP_SECURE    true/false — defaults to true on 465, false otherwise
- *   SMTP_USER      full mailbox address, e.g. noreply@ibomvendorshub.com
- *   SMTP_PASS      mailbox password
- */
+/** Whogohost SMTP credentials are read only from the server environment. */
 export interface SmtpConfig {
   host: string;
   port: number;
@@ -139,19 +123,12 @@ export function smtpConfig(): SmtpConfig | null {
 
 export type MailProvider =
   | { kind: "smtp"; host: string; port: number; secure: boolean; user: string; pass: string; from: string }
-  | { kind: "resend"; key: string; from: string }
   | { kind: "none" };
 
-/**
- * Provider selection order: SMTP when configured (Whogohost/cPanel mail, set
- * via environment), else Resend (dashboard or environment), else disabled —
- * every email stays rendered and stored in email_logs either way.
- */
+/** Whogohost SMTP is the only delivery provider; missing credentials disable delivery. */
 export function mailProvider(settings: PlatformSettings): MailProvider {
   const smtp = smtpConfig();
   if (smtp) return { kind: "smtp", ...smtp, from: emailFrom(settings) };
-  const key = resendKey(settings);
-  if (key) return { kind: "resend", key, from: emailFrom(settings) };
   return { kind: "none" };
 }
 

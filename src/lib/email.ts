@@ -10,8 +10,8 @@ import { formatMoney } from "@/lib/utils";
  * All messages are rendered through reusable HTML templates, persisted to
  * `email_logs` (with dedupe keys so an event can never be emailed twice) and
  * delivered through the configured provider: SMTP when `SMTP_HOST`/`SMTP_USER`/
- * `SMTP_PASS` are set (e.g. Whogohost/Go54 mail), otherwise Resend when a key
- * is configured. Without a provider the message is still rendered and stored,
+ * `SMTP_PASS` are set (Whogohost/Go54 mail). There is no fallback provider.
+ * Without SMTP credentials the message is still rendered and stored,
  * which keeps every flow testable and visible to administrators under
  * Admin → Emails.
  */
@@ -539,6 +539,7 @@ function getSmtpTransporter(provider: Extract<MailProvider, { kind: "smtp" }>) {
     host: provider.host,
     port: provider.port,
     secure: provider.secure,
+    requireTLS: !provider.secure,
     auth: { user: provider.user, pass: provider.pass },
   });
   smtpTransporterKey = key;
@@ -559,23 +560,6 @@ async function deliver(
       text: message.text,
     });
     return info.messageId ?? null;
-  }
-  if (provider.kind === "resend") {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${provider.key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(message),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!response.ok) {
-      const detail = await response.text();
-      throw new Error(`Resend ${response.status}: ${detail.slice(0, 300)}`);
-    }
-    const json = (await response.json()) as { id?: string };
-    return json.id ?? null;
   }
   throw new Error("No email provider configured");
 }

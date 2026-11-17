@@ -111,17 +111,11 @@ export default async function AdminEmailsPage({
           (<span className="font-mono">SMTP_HOST</span>, <span className="font-mono">SMTP_PORT</span>, <span className="font-mono">SMTP_USER</span>, <span className="font-mono">SMTP_PASS</span>).
           The from address must belong to the mail account, and the domain needs the MX and SPF records your mail host provides, or messages will bounce or land in spam.
         </Alert>
-      ) : provider.kind === "resend" ? (
-        <Alert tone={recent?.failed ? "warning" : "info"} title={`Sending through Resend as ${emailFrom(settings)}`}>
-          Delivery requires the from address to sit on a domain or address verified in your Resend account
-          (resend.com/domains). Until then Resend answers 403 and the failure is recorded below. Without a verified
-          domain you can only deliver to the Resend account owner, from <span className="font-mono">onboarding@resend.dev</span>.
-        </Alert>
       ) : (
         <Alert tone="warning" title="No email provider configured">
           Messages are still rendered and stored here, but nothing leaves the platform. Set <span className="font-mono">SMTP_HOST</span>,{" "}
           <span className="font-mono">SMTP_USER</span> and <span className="font-mono">SMTP_PASS</span> for your mail host
-          (for Whogohost/Go54: <span className="font-mono">mail.yourdomain.com</span>, port 465), or <span className="font-mono">RESEND_API_KEY</span> as a fallback,
+          (Whogohost: <span className="font-mono">mail.ibomvendorshub.com</span>, port 587 with STARTTLS),
           then redeploy.
         </Alert>
       )}

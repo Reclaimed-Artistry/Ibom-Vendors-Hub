@@ -8,7 +8,7 @@ every order from checkout to delivery.
 Built with **Next.js 15 (App Router) + React 19 + TypeScript + Tailwind CSS 4** on
 **PostgreSQL (Supabase-compatible)** with strict row-level security. Payments run
 through **Paystack** (or the built-in sandbox gateway when no keys are set), email
-through **your mail host's SMTP** (Whogohost/Go54; Resend as an optional fallback),
+through **your mail host's SMTP** (Whogohost/Go54 only),
 hosting on **Vercel**.
 
 ---
@@ -138,8 +138,8 @@ Paystack keys, sender address and maintenance flag.
 | `AUTH_SECRET` | HS256 key for session cookies (32+ chars) |
 | `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_ROOT_DOMAIN` | Public URL and subdomain root |
 | `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY` | Live payments; leave empty for the sandbox gateway |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | Transactional email via your mail host (recommended); without it the platform falls back to Resend |
-| `RESEND_API_KEY`, `EMAIL_FROM` | Fallback email provider and sender address (logged when neither is set) |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | Transactional email via Whogohost SMTP only; missing credentials disable delivery |
+| Sender | `Ibom Vendors Hub <noreply@ibomvendorshub.com>` |
 | `CRON_SECRET` | Bearer token required by `/api/cron/subscriptions` |
 | `NEXT_PUBLIC_DEV_EMAIL_LINKS` | `true` shows verification/reset links in the UI during local work |
 
@@ -164,9 +164,7 @@ register claims the first storefront.
   are set in the Vercel environment — create a mailbox (e.g. `noreply@ibomvendorshub.com`) in
   Whogohost/Go54, point the domain's MX and SPF records at the mail host, and set
   `EMAIL_FROM` to that mailbox. This is the recommended path and needs no third-party
-  sender verification. `RESEND_API_KEY` remains as an optional fallback; note that while
-  `ibomvendorshub.com` is unverified in the Resend dashboard every Resend send is answered
-  with 403 and recorded in **Admin → Emails**.
+  sender verification. No alternative email provider is used.
 - Payments run on Paystack **test** keys (`pk_test_…` / `sk_test_…`, secret stored as a Vercel
   sensitive variable) with the sandbox switch turned off, so checkouts create real Paystack
   test transactions and are verified server-side. Switch the keys to live and re-check
@@ -191,8 +189,8 @@ runs `next build`. Every deploy is therefore self-migrating and idempotent.
    | `NEXT_PUBLIC_APP_URL` | `https://<project>.vercel.app` |
    | `NEXT_PUBLIC_ROOT_DOMAIN` | `<project>.vercel.app` |
    | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | first platform administrator |
-   | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | recommended — without them email falls back to Resend, then to log-only |
-   | `EMAIL_FROM`, `RESEND_API_KEY` | optional fallback provider + sender identity |
+   | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` | required for Whogohost delivery — without them email is logged only |
+   | Sender | Fixed to `noreply@ibomvendorshub.com` |
    | `PAYSTACK_SECRET_KEY`, `PAYSTACK_PUBLIC_KEY` | optional — otherwise the sandbox gateway is used |
 
 3. Deploy. The build migrates the database and boots the admin account; the daily cron
@@ -300,11 +298,10 @@ attempt count and the provider's error text, and offers two controls: *Send test
 retries up to three times, so an outage self-heals once the provider recovers).
 
 Recommended provider: **your mail host's SMTP** (Whogohost/Go54). Create a mailbox in
-cPanel — e.g. `noreply@ibomvendorshub.com` — and set `SMTP_HOST=mail.ibomvendorshub.com`,
-`SMTP_PORT=465`, `SMTP_SECURE=true`, `SMTP_USER=<full mailbox address>`, `SMTP_PASS=<password>`.
+DirectAdmin — e.g. `noreply@ibomvendorshub.com` — and set `SMTP_HOST=mail.ibomvendorshub.com`,
+`SMTP_PORT=587`, `SMTP_SECURE=false` (STARTTLS), `SMTP_USER=<full mailbox address>`, `SMTP_PASS=<password>`.
 The domain must resolve to the mail host (MX record) and carry an SPF record naming it, or
-messages bounce or land in spam. Resend remains available as a fallback when the SMTP
-block is absent (`RESEND_API_KEY`; sender domain must then be verified at `resend.com/domains`).
+messages may bounce or land in spam. Whogohost SMTP is the only provider; there is no fallback.
 Without any provider the platform still renders and stores messages, marking them `skipped` —
 no flow silently depends on email.
 

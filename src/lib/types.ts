@@ -50,7 +50,6 @@ export interface PlatformSettings {
   google_client_secret: string | null;
   google_signin_enabled: boolean;
   email_from: string | null;
-  resend_api_key: string | null;
   expiry_reminder_days: number[];
   terms_markdown: string | null;
   privacy_markdown: string | null;
