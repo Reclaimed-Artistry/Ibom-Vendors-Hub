@@ -143,18 +143,18 @@ Paystack keys, sender address and maintenance flag.
 
 ### Live deployment
 
-The application is deployed at **https://ibom-vendors-hub.vercel.app** (Vercel project
+The application is deployed at **https://www.ibomvendorshub.com** (Vercel project
 `ibom-vendors-hub`, Supabase project `zjoktecqfdjprjwiwdgj`, Frankfurt pooler). The
 production database carries reference data only — 7 categories, subscription plans and
 the reserved-subdomain list — so the marketplace starts empty and the first vendor to
 register claims the first storefront.
 
-- Health: `https://ibom-vendors-hub.vercel.app/api/health` → `{"status":"ok","database":true}`
+- Health: `https://www.ibomvendorshub.com/api/health` → `{"status":"ok","database":true}`
 - Admin: the account named by `ADMIN_EMAIL` is created during the first build by
   `scripts/bootstrap-admin.ts`; change its password from **Account → Profile** after
   the first sign-in.
-- Storefronts: `https://ibom-vendors-hub.vercel.app/s/<slug>` until a wildcard domain is
-  attached (wildcards are not available on `*.vercel.app`).
+- Storefronts: `https://www.ibomvendorshub.com/s/<slug>` (wildcard subdomains resolve
+  off `ibomvendorshub.com`).
 - Automatic git deployments are **off** on that project; a push does not redeploy.
   Turn them on under *Vercel → Project → Settings → Git → Ignored Build Step /
   Production branch*, or trigger a deployment from a new commit.

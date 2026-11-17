@@ -9,7 +9,7 @@ const DEFAULTS: PlatformSettings = {
   platform_name: "Ibom Vendors Hub",
   tagline: "Every business. One address.",
   logo_url: null,
-  main_domain: "localhost:3000",
+  main_domain: "ibomvendorshub.com",
   support_email: "support@ibomvendorshub.com",
   support_phone: "+234 800 000 0000",
   currency: "NGN",
