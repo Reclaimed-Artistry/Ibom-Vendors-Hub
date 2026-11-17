@@ -528,6 +528,13 @@ function layout(content: RenderedEmail) {
   return { html, text };
 }
 
+/** Aggregate network errors can have an empty message; retain useful safe diagnostics. */
+function smtpErrorMessage(error: unknown): string {
+  const e = error as { message?: string; code?: string; command?: string; responseCode?: number } | null;
+  return [e?.message?.trim() || "SMTP connection or delivery failed", e?.code, e?.command, e?.responseCode]
+    .filter(Boolean).join(" · ").slice(0, 500);
+}
+
 /** Reused across sends so serverless invocations do not re-handshake TLS per message. */
 let smtpTransporter: Transporter | null = null;
 let smtpTransporterKey = "";
@@ -540,6 +547,9 @@ function getSmtpTransporter(provider: Extract<MailProvider, { kind: "smtp" }>) {
     port: provider.port,
     secure: provider.secure,
     requireTLS: !provider.secure,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
     auth: { user: provider.user, pass: provider.pass },
   });
   smtpTransporterKey = key;
@@ -625,7 +635,7 @@ export async function sendEmail(input: SendEmailInput) {
     );
     return { skipped: false as const, id: logId, subject: content.subject };
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = smtpErrorMessage(error);
     await systemDb.execute(
       `update email_logs set status = 'failed', error = $2, attempts = attempts + 1 where id = $1`,
       [logId, message.slice(0, 500)],
@@ -664,7 +674,7 @@ export async function retryFailedEmails(limit = 20) {
     } catch (error) {
       await systemDb.execute(
         `update email_logs set attempts = attempts + 1, error = $2 where id = $1`,
-        [row.id, error instanceof Error ? error.message.slice(0, 500) : "retry failed"],
+        [row.id, smtpErrorMessage(error).slice(0, 500)],
       );
     }
   }
