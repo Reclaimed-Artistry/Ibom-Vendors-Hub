@@ -106,10 +106,10 @@ export default async function AdminEmailsPage({
       ) : null}
 
       {provider.kind === "smtp" ? (
-        <Alert tone={recent?.failed ? "warning" : "info"} title={`Sending through your mail host (${provider.host}) as ${emailFrom(settings)}`}>
-          Messages are delivered over SMTP with the mailbox credentials in the server environment
-          (<span className="font-mono">SMTP_HOST</span>, <span className="font-mono">SMTP_PORT</span>, <span className="font-mono">SMTP_USER</span>, <span className="font-mono">SMTP_PASS</span>).
-          The from address must belong to the mail account, and the domain needs the MX and SPF records your mail host provides, or messages will bounce or land in spam.
+        <Alert tone={recent?.failed ? "warning" : "info"} title={`Ibomvendorshub email — ${emailFrom(settings)}`}>
+          Ibomvendorshub sends account updates and notifications from noreply@ibomvendorshub.com.
+          The log below shows whether the mail server accepted each message; it does not confirm inbox delivery.
+          If an expected email has not arrived, check the recipient address and spam or junk folder.
         </Alert>
       ) : (
         <Alert tone="warning" title="No email provider configured">
