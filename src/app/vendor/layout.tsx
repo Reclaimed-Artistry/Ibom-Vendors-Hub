@@ -1,3 +1,4 @@
+import { LiveDashboard } from "@/components/live-dashboard";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -89,6 +90,7 @@ export default async function VendorLayout({ children }: { children: React.React
 
   return (
     <div className="min-h-screen w-full max-w-full overflow-x-clip bg-ink-50">
+      <LiveDashboard />
       <VendorAnnouncements />
       <div className="mx-auto flex max-w-[1440px] gap-6 px-4 py-5 lg:px-8">
         <aside className="hidden w-64 shrink-0 lg:block">

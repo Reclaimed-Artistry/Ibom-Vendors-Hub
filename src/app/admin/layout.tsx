@@ -1,3 +1,4 @@
+import { LiveDashboard } from "@/components/live-dashboard";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Bell, ExternalLink, ShieldCheck } from "lucide-react";
@@ -37,6 +38,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen w-full max-w-full overflow-x-clip bg-ink-50">
+      <LiveDashboard />
       <div className="mx-auto flex max-w-[1500px] gap-6 px-4 py-5 lg:px-8">
         <aside className="hidden w-64 shrink-0 lg:block">
           <div className="sticky top-5 space-y-4">

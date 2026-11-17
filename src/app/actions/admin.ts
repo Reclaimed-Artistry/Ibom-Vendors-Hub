@@ -280,6 +280,9 @@ export async function waiveSubscriptionAction(_prev: AdminState, formData: FormD
   }
   revalidatePath(`/admin/vendors/${storeId}`);
   revalidatePath("/admin/subscriptions");
+  revalidatePath("/vendor", "layout");
+  revalidatePath("/admin", "layout");
+  revalidatePath("/", "layout");
   return {
     message: `Subscription waived for ${months} month${months === 1 ? "" : "s"} and the vendor notified.`,
   };

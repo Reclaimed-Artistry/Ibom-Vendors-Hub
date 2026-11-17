@@ -1,3 +1,4 @@
+import { LiveDashboard } from "@/components/live-dashboard";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Bell, Store } from "lucide-react";
@@ -31,6 +32,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
 
   return (
     <div className="flex min-h-screen w-full max-w-full flex-col overflow-x-clip bg-ink-50">
+      <LiveDashboard />
       <SiteHeader />
       <main className="flex-1">
         <div className="mx-auto flex max-w-6xl gap-6 px-4 py-6 lg:px-8">
