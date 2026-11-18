@@ -414,6 +414,7 @@ export async function submitBookingAction(_prev: PublicState, formData: FormData
   ));
   if (!bookableStore) return { error: "This store is not accepting bookings right now." };
 
+  if (store.category_slug === "house-agents-realtors") return { error: "Choose an available inspection slot on the property page." };
   const profile = getCategoryBookingProfile(store.category_slug);
   const fieldErrors: Record<string, string> = {};
 

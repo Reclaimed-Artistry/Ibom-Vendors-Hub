@@ -142,7 +142,8 @@ export function ProductForm({
   const [uploadingCount, setUploadingCount] = useState(0);
   const [uploadError, setUploadError] = useState("");
   const [imageUrls, setImageUrls] = useState("");
-  const [kind, setKind] = useState(product.kind || "product");
+  const propertyListing = Boolean(features.propertyListings);
+  const [kind, setKind] = useState(propertyListing ? "service" : product.kind || "product");
   const [madeToOrder, setMadeToOrder] = useState(product.madeToOrder);
 
   const specsJson = JSON.stringify(
@@ -205,7 +206,8 @@ export function ProductForm({
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <section className="card card-pad space-y-4">
-            <h2 className="text-base font-semibold text-ink-900">Basics</h2>
+            <h2 className="text-base font-semibold text-ink-900">{propertyListing ? "Property listing" : "Basics"}</h2>
+            {propertyListing ? <p className="rounded-xl bg-brand-50 p-3 text-sm">List a property for rent or sale, upload photos, and enter the separate inspection fee in Category details. Save first, then publish inspection slots and their meeting points below the editor.</p> : null}
             <Field label="Name" htmlFor="name" required error={state.fieldErrors?.name}>
               <input
                 id="name"
@@ -220,9 +222,9 @@ export function ProductForm({
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Offering type" htmlFor="kind" hint="Choose a service to show Book now instead of a shopping cart. Customers can request a visit or come to your office / studio.">
-                <select id="kind" name="kind" className="select" value={kind} onChange={(event) => setKind(event.target.value)}>
+                <select id="kind" name="kind" className="select" disabled={propertyListing} value={kind} onChange={(event) => setKind(event.target.value)}>
                   <option value="product">Product</option>
-                  <option value="service">Professional service — Book now</option>
+                  <option value="service">{propertyListing ? "Property — Book inspection" : "Professional service — Book now"}</option>
                 </select>
               </Field>
               <Field label="Store category" htmlFor="categoryId" hint={categoryName ? `Store category: ${categoryName}` : undefined}>
@@ -266,7 +268,7 @@ export function ProductForm({
           <section className="card card-pad space-y-4">
             <h2 className="text-base font-semibold text-ink-900">Pricing &amp; availability</h2>
             <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="Price (₦)" htmlFor="price" required error={state.fieldErrors?.price}>
+              <Field label={propertyListing ? "Property rent / sale price (₦)" : "Price (₦)"} htmlFor="price" required error={state.fieldErrors?.price}>
                 <input
                   id="price"
                   name="price"

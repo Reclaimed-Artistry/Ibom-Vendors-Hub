@@ -1,5 +1,7 @@
 "use server";
 
+import { isPropertyCategory, validatePropertyAttributes } from "@/lib/property-inspections";
+
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import {
@@ -15,7 +17,7 @@ import { notify, notifyAdmins } from "@/lib/notifications";
 import { sendEmail } from "@/lib/email";
 import { uploadImage, uploadVerificationDocument } from "@/lib/storage";
 import { AKWA_IBOM_STATE } from "@/lib/akwa-ibom";
-import { getSettings } from "@/lib/settings";
+import { getSettings, url } from "@/lib/settings";
 import { updateOrderByVendor } from "@/lib/orders";
 import {
   deleteProductCompletely,
@@ -82,6 +84,13 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
   const addons = parseJsonField<Array<{ name: string; price?: string }>>(formData.get("addonsJson"), []);
   const specifications = parseJsonField<Record<string, string>>(formData.get("specificationsJson"), {});
   const attributes = parseJsonField<Record<string, string>>(formData.get("attributesJson"), {});
+
+  const propertyListing = isPropertyCategory(ctx.category?.slug);
+  if (propertyListing) {
+    try { validatePropertyAttributes(attributes); } catch (error) { return { error: error instanceof Error ? error.message : "Check the property details." }; }
+    formData.set("kind", "service");
+    formData.set("pricingType", "fixed");
+  }
 
   const parsed = productSchema.safeParse({
     name: formData.get("name"),
@@ -741,8 +750,13 @@ export async function bookingAction(formData: FormData) {
     scheduled_time: string;
     product_id: string | null;
     order_id: string | null;
-  }>(`select id, customer_email, customer_name, scheduled_date, scheduled_time, product_id, order_id from service_bookings where id = $1 and store_id = $2`, [bookingId, ctx.store.id]);
+    inspection_slot_id: string | null;
+    customer_id: string | null;
+    location: string | null;
+    status: string;
+  }>(`select id, customer_email, customer_name, scheduled_date, scheduled_time, product_id, order_id, inspection_slot_id, customer_id, location, status from service_bookings where id = $1 and store_id = $2`, [bookingId, ctx.store.id]);
   if (!booking) return;
+  if (booking.inspection_slot_id && (["cancelled", "completed", "no_show"].includes(booking.status) || status === "rescheduled")) return;
 
   await withActor({ id: ctx.user.id, role: "vendor", email: ctx.user.email }, async (db) => {
     await db.execute(`update service_bookings set status = $3 where id = $1 and store_id = $2`, [bookingId, ctx.store.id, status]);
@@ -752,7 +766,11 @@ export async function bookingAction(formData: FormData) {
     );
   });
 
-  if (status === "confirmed") {
+  if (booking.inspection_slot_id) {
+    const message = `Your inspection is ${status}. ${booking.scheduled_date} at ${booking.scheduled_time} WAT. Meeting point: ${booking.location ?? "See My bookings"}. No payment collected online. Contact the agent before making changes.`;
+    await notify({userId:booking.customer_id,storeId:ctx.store.id,type:"inspection_update",title:`Inspection ${status}`,body:message,actionUrl:"/account/bookings",dedupeKey:`inspection-${status}:${booking.id}`});
+    await sendEmail({to:booking.customer_email,template:"inspection_requested",data:{subject:`Inspection ${status}`,message,link:url("/account/bookings")},dedupeKey:`inspection-${status}:${booking.id}`});
+  } else if (status === "confirmed") {
     await sendEmail({
       to: booking.customer_email,
       template: "booking_confirmed",
@@ -775,6 +793,7 @@ export async function bookingAction(formData: FormData) {
     dedupeKey: `booking-${status}:${booking.id}`,
   });
   revalidatePath("/vendor/bookings");
+  revalidatePath("/account/bookings");
 }
 
 /* -------------------------------------------------------------------------- */

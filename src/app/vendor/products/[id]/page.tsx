@@ -1,3 +1,5 @@
+import { isPropertyCategory, inspectionSlots } from "@/lib/property-inspections";
+import { InspectionSlotManager } from "@/components/inspection-forms";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -67,6 +69,7 @@ export default async function EditProductPage({
   ]);
 
   const base = await storeBase(store.slug);
+  const slots = isPropertyCategory(category?.slug) ? await inspectionSlots(id, store.owner_id) : [];
 
   const editable: EditableProduct = {
     id: product.id,
@@ -119,6 +122,7 @@ export default async function EditProductPage({
           </Link>
         }
       />
+      {isPropertyCategory(category?.slug) ? <InspectionSlotManager productId={id} slots={slots} office={store.address ?? ""}/> : null}
       {saved ? <Alert tone="success" title="Saved">Your product has been updated.</Alert> : null}
       <div className="mt-4">
         <ProductForm vendorLga={store.city}

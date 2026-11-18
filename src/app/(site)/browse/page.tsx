@@ -193,7 +193,7 @@ export default async function BrowsePage({
                   ) : null}
                 </div>
                 <div className="mt-2 flex items-center gap-2">
-                  {product.kind === "service" ? <Badge tone="info">Service</Badge> : null}
+                  {product.kind === "service" ? <Badge tone="info">{product.attributes?.listing_type ?? "Service"}</Badge> : null}
                   {product.condition ? <Badge tone="neutral">{product.condition}</Badge> : null}
                   {product.rating_count > 0 ? <span className="text-[11px] text-gold-600">★ {product.rating_avg} ({product.rating_count})</span> : null}
                 </div>

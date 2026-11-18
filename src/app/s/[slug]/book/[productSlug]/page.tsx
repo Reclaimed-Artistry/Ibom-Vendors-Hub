@@ -1,3 +1,5 @@
+import { isPropertyCategory, inspectionSlots } from "@/lib/property-inspections";
+import { InspectionBookingForm } from "@/components/inspection-forms";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStoreProduct, resolveStore } from "@/lib/storefront";
@@ -25,6 +27,18 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
         <Link href={base || "/"} className="btn-primary mt-5">Back to storefront</Link>
       </div>
     );
+  }
+
+  if (isPropertyCategory(category?.slug)) {
+    const slots = await inspectionSlots(product.id);
+    return <div className="container-page max-w-2xl py-10 space-y-5">
+      <Link href={`${base}/products/${product.slug}`} className="text-sm text-brand-700">← Back to property</Link>
+      <Card className="card-pad space-y-3"><h1 className="text-2xl font-bold">Book inspection</h1><h2 className="font-semibold">{product.name}</h2>
+        <p className="text-sm text-ink-500">{product.attributes?.listing_type} · {product.attributes?.property_location}</p>
+        <p className="text-sm">Select a time the agent has published. Times shown are Nigeria time (WAT). The meeting point is separate from the property location.</p>
+        {user ? <InspectionBookingForm slots={slots} fee={Number(product.attributes?.inspection_fee ?? 0)}/> : <Link className="btn-primary" href={`/login?next=${encodeURIComponent(`${base}/book/${product.slug}`)}`}>Sign in to book inspection</Link>}
+      </Card>
+    </div>;
   }
 
   return (

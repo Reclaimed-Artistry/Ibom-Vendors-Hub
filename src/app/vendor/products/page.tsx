@@ -18,7 +18,8 @@ export default async function VendorProductsPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string; page?: string; category?: string; deleted?: string }>;
 }) {
-  const { store } = await requireActiveVendorContext();
+  const { store, category: storeCategory } = await requireActiveVendorContext();
+  const propertyAgency = storeCategory?.slug === "house-agents-realtors";
   const { q, status, page: pageParam, category, deleted } = await searchParams;
   const page = Math.max(1, Number(pageParam ?? 1) || 1);
 
@@ -78,9 +79,9 @@ export default async function VendorProductsPage({
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Products & services"
+        title={propertyAgency ? "Properties for rent & sale" : "Products & services"}
         description="What customers see on your storefront, with pricing, stock and category-specific details."
-        actions={<ButtonLink href="/vendor/products/new"><Plus className="size-4" /> Add product</ButtonLink>}
+        actions={<ButtonLink href="/vendor/products/new"><Plus className="size-4" /> {propertyAgency ? "Add property" : "Add product"}</ButtonLink>}
       />
 
       {deleted ? (

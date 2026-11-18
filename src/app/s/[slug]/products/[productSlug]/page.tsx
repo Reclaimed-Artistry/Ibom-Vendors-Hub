@@ -1,3 +1,4 @@
+import { isPropertyCategory } from "@/lib/property-inspections";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2, ClipboardCheck, Clock, Package, ShieldCheck, Star } from "lucide-react";
@@ -59,6 +60,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
     eligibleOrderId = unreviewedOrder?.id ?? null;
     alreadyReviewedByUser = Boolean(existingReview);
   }
+  const propertyListing = isPropertyCategory(category?.slug);
   const features = (category?.features ?? {}) as Record<string, boolean>;
   const money = (value: number) => formatMoney(value, product.currency, settings.currency_symbol);
   const image = product.images?.[0]?.url ?? "/images/seed/product-jollof.svg";
@@ -116,6 +118,15 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             {product.pricing_type === "from" ? <span className="text-xs text-ink-400">starting price</span> : null}
           </div>
 
+          {propertyListing ? <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-4 space-y-2 text-sm">
+            <p className="font-bold">{product.attributes?.listing_type} · {product.attributes?.property_type}</p>
+            <p>Property location: {product.attributes?.property_location}</p>
+            <p>Property price basis: {product.attributes?.price_period}</p>
+            <p>Inspection fee: <strong>{Number(product.attributes?.inspection_fee) === 0 ? "Free" : money(Number(product.attributes?.inspection_fee ?? 0))}</strong> — separate from the property price; payable directly to agent by arrangement.</p>
+            {product.attributes?.additional_fees ? <p>Other fees / terms: {product.attributes.additional_fees}</p> : null}
+            <p className="text-xs">Book an available inspection time and review its exact meeting point. Verify the property and agent’s authority before paying rent or a purchase deposit.</p>
+          </div> : null}
+
           {product.short_description ? <p className="mt-4 text-sm leading-7 text-ink-600">{product.short_description}</p> : null}
 
           <div className="mt-5 space-y-3">
@@ -145,7 +156,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             {(() => {
               const bookingProfile = getCategoryBookingProfile(category?.slug);
               const showBooking = product.kind === "service" || Boolean(features.serviceBooking);
-              const showCart = product.kind !== "service" && features.cart !== false;
+              const showCart = !propertyListing && product.kind !== "service" && features.cart !== false;
               const showQuote = Boolean(features.quotations) && product.pricing_type !== "quotation";
 
               if (!live) {
@@ -158,7 +169,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
               return (
                 <div className="space-y-4">
-                  {showBooking ? (
+                  {showBooking && !propertyListing ? (
                     <div className="rounded-xl border border-brand-200 bg-brand-50/70 p-4">
                       <div className="flex items-start gap-2.5">
                         <ClipboardCheck className="mt-0.5 size-4 shrink-0 text-brand-700" />
@@ -193,7 +204,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                       variant={showCart || product.pricing_type === "quotation" ? "secondary" : "primary"}
                       className="w-full"
                     >
-                      {product.kind === "service" ? "Book now" : bookingProfile.ctaLabel}
+                      {propertyListing ? "Book inspection" : product.kind === "service" ? "Book now" : bookingProfile.ctaLabel}
                     </ButtonLink>
                   ) : null}
 

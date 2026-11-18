@@ -189,6 +189,7 @@ export function BookingActionForm({ bookingId, status }: { bookingId: string; st
         <>
           <button type="submit" name="status" value="completed" className="btn btn-secondary btn-sm">Mark completed</button>
           <button type="submit" name="status" value="no_show" className="btn btn-ghost btn-sm">No show</button>
+          <button type="submit" name="status" value="cancelled" className="btn btn-ghost btn-sm">Cancel booking</button>
         </>
       ) : null}
     </form>

@@ -17,7 +17,7 @@ export default async function NewProductPage() {
   return (
     <div>
       <PageHeader
-        title="Add a product"
+        title={category?.slug === "house-agents-realtors" ? "Add a property" : "Add a product"}
         description="Only the fields that matter to your category are shown."
         breadcrumb={<Link href="/vendor/products" className="hover:text-brand-700">← Products</Link>}
       />

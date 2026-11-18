@@ -334,3 +334,20 @@ no flow silently depends on email.
 ---
 
 © Ibom Vendors Hub — Every business. One address.
+
+### House agents & realtors
+
+Choose **House Agents & Realtors** during vendor registration. In **Products → Add property**,
+upload property photos and enter the rent/sale price, location, price period, inspection fee
+(0 for free), and other fees. Save, then open the listing editor’s **Inspection availability**
+section to publish future date/time slots (WAT), duration and an exact meeting address:
+agent’s office or another clearly specified location. Slots cannot overlap across the agency.
+
+Customers open a property and select **Book inspection**, sign in and choose a published slot.
+The slot is reserved pending agent confirmation; both parties see the meeting point and fee in
+Bookings and receive notifications/email records. No online fee or property payment is taken.
+Agents confirm, decline, complete or cancel in **Bookings**. A cancelled slot may be booked
+again, or withdrawn in the property editor; booked slots cannot be silently changed or removed.
+To reschedule, contact the customer, cancel the original booking, and agree on another slot.
+Property purchases are blocked from the shopping checkout. Booking details snapshot the fee
+and location, so subsequent listing edits do not change the customer’s existing request.

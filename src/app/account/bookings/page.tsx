@@ -43,7 +43,7 @@ export default async function AccountBookingsPage() {
     <div className="space-y-4">
       <PageHeader
         title="My bookings"
-        description="Artisan site visits, service bookings and appointments you requested."
+        description="Property inspections, artisan site visits, service bookings and appointments you requested."
         actions={<ButtonLink href="/browse?kind=service" variant="secondary" size="sm">Book an artisan / service</ButtonLink>}
       />
       {rows.length === 0 ? (
@@ -69,7 +69,7 @@ export default async function AccountBookingsPage() {
                   </Badge>
                 </div>
                 <p className="flex items-center gap-2 text-sm text-ink-700">
-                  <CalendarClock className="size-4 shrink-0 text-brand-600" /> {formatDate(booking.scheduled_date)} · {booking.scheduled_time}
+                  <CalendarClock className="size-4 shrink-0 text-brand-600" /> {formatDate(booking.scheduled_date)} · {booking.scheduled_time} WAT
                   {booking.duration_minutes ? <span className="text-ink-400">({booking.duration_minutes} min)</span> : null}
                 </p>
                 {booking.location ? (

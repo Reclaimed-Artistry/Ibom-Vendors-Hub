@@ -106,7 +106,7 @@ export default async function VendorBookingsPage({
                 <p className="flex flex-wrap items-center gap-2 text-sm text-ink-700">
                   <CalendarClock className="size-4 shrink-0 text-brand-600" />
                   <span>
-                    {formatDate(booking.scheduled_date)} · {booking.scheduled_time}
+                    {formatDate(booking.scheduled_date)} · {booking.scheduled_time} WAT
                   </span>
                   {booking.duration_minutes ? <span className="text-ink-400">({booking.duration_minutes} min)</span> : null}
                 </p>
@@ -121,7 +121,7 @@ export default async function VendorBookingsPage({
                 {(details.visitType || details.materialsOption || extraFields.length > 0) ? (
                   <div className="space-y-1.5 rounded-xl border border-brand-100 bg-brand-50/50 p-3 text-xs text-ink-800">
                     <p className="flex items-center gap-1.5 font-semibold text-brand-900">
-                      <Wrench className="size-3.5 text-brand-700" /> Submitted job &amp; site requirements
+                      <Wrench className="size-3.5 text-brand-700" /> Booking / inspection details
                     </p>
                     {details.visitType ? (
                       <p>

@@ -104,6 +104,9 @@ function template(name: string, data: EmailData): RenderedEmail {
         footnote: "Times are estimates in Nigeria time (WAT, UTC+1), not confirmation that delivery or pickup has happened.",
       };
 
+    case "inspection_requested":
+      return { subject: String(data.subject ?? "Property inspection"), heading: String(data.subject ?? "Property inspection"), intro: String(data.message ?? ""), cta: { label: "View bookings", href: data.link ?? url("/account/bookings") } };
+
     case "admin_notification":
       return {
         subject: `Ibomvendorshub · ${data.subject ?? "New notification"}`,
