@@ -159,7 +159,7 @@ export default async function HomePage() {
               <Link
                 key={category.id}
                 href={`/browse?category=${category.slug}`}
-                className="group card flex items-center gap-4 rounded-2xl border-ink-100 bg-gradient-to-br from-white to-[#faf9f6] p-4 transition-all duration-300 hover:border-[#d8cba9] hover:shadow-[0_12px_30px_-18px_rgba(55,65,45,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700"
+                className="group card flex items-center gap-4 rounded-2xl border-ink-100 bg-gradient-to-br from-white to-brand-50/40 p-4 transition-all duration-300 hover:border-brand-200 hover:shadow-[0_12px_30px_-18px_rgba(55,65,45,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700"
               >
                 <CategoryIcon name={category.icon} />
                 <div>
