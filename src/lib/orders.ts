@@ -69,7 +69,7 @@ function addonsTotal(raw: unknown): number {
 export async function createCheckout(
   input: CheckoutInput,
   customer: { id: string; email: string; fullName: string } | null,
-  paymentMethod: "gateway" | "bank_transfer" = "gateway",
+  paymentMethod: "gateway" | "bank_transfer" | "wallet" = "gateway",
 ): Promise<CheckoutResult> {
   if (!customer?.id) {
     throw new Error("Please sign in to your account before checking out.");
@@ -398,7 +398,7 @@ export async function createCheckout(
       await db.one<{ ref: string }>(`select next_payment_reference('PAY') as ref`)
     ).ref;
 
-    const provider = paymentMethod === "bank_transfer" ? "manual" : paystackSecret(settings) ? "paystack" : "sandbox";
+    const provider = paymentMethod === "wallet" ? "wallet" : paymentMethod === "bank_transfer" ? "manual" : paystackSecret(settings) ? "paystack" : "sandbox";
     const payment = await db.one<{ id: string }>(
       `insert into payments
          (reference, scope, provider, checkout_reference, payer_user_id, payer_email, amount, currency,
@@ -434,7 +434,7 @@ export async function createCheckout(
   // Start the payment *after* the transaction commits.
   let authorizationUrl = `/pay/${prepared.paymentReference}`;
   try {
-    if (paymentMethod !== "bank_transfer") {
+    if (paymentMethod === "gateway") {
     const init = await initializeTransaction({
       reference: prepared.paymentReference,
       amount: prepared.grandTotal,

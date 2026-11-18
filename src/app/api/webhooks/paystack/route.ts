@@ -41,7 +41,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true, note: "unknown reference" });
   }
 
+  if (payment.provider !== "paystack") return NextResponse.json({ error: "Provider mismatch" }, { status: 400 });
+
   if (event.event === "charge.success") {
+    if (event.data?.currency?.toUpperCase() !== payment.currency.toUpperCase()) return NextResponse.json({ error: "Currency mismatch" }, { status: 400 });
     const paid = Number(event.data?.amount ?? 0) / 100;
     if (Math.abs(paid - Number(payment.amount)) > 0.01) {
       await failPayment(reference, "Webhook amount does not match the payment record", event as Record<string, unknown>);

@@ -1,3 +1,4 @@
+import { Alert } from "@/components/ui";
 import { ManualPaymentPortal } from "@/components/manual-payment-portal";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -60,7 +61,7 @@ export default async function PayPage({ params }: { params: Promise<{ reference:
             )}
           </div>
 
-          {isSandbox ? (
+          {isSandbox && process.env.NODE_ENV === "production" ? <Alert tone="warning">Online payment is not available yet. No money has been collected. For orders, return to checkout and choose bank transfer.</Alert> : isSandbox ? (
             <div className="mt-5 space-y-4">
               <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
                 <p className="font-semibold">Sandbox gateway</p>

@@ -52,6 +52,7 @@ export function providerFor(secretKey: string | null | undefined): ProviderName 
 
 export async function initializeTransaction(input: InitInput): Promise<InitResult> {
   if (!input.secretKey) {
+    if (process.env.NODE_ENV === "production") throw new Error("Online payment is not available yet. Please use bank transfer for orders.");
     return { provider: "sandbox", authorizationUrl: `/pay/${input.reference}` };
   }
 

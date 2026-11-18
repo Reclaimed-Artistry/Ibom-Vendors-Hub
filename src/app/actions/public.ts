@@ -10,7 +10,7 @@ import {
   createCheckout,
   reportOrderIssueByCustomer,
 } from "@/lib/orders";
-import { payWithWalletCheckout } from "@/app/actions/wallet";
+import { payWithWalletCheckout } from "@/lib/wallet-payments";
 import { sendEmail } from "@/lib/email";
 import { notify, notifyAdmins } from "@/lib/notifications";
 import { logActivity } from "@/lib/audit";
@@ -68,21 +68,19 @@ export async function submitCheckoutAction(_prev: PublicState, formData: FormDat
   if (!["wallet", "bank_transfer"].includes(paymentMethod)) return { error: "Choose bank transfer or wallet payment." };
 
   try {
-    const result = await createCheckout(parsed.data, {
+    const result = await withSystem(async () => {
+    const checkout = await createCheckout(parsed.data, {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
-    }, paymentMethod === "bank_transfer" ? "bank_transfer" : "gateway");
+    }, paymentMethod as "bank_transfer" | "wallet");
+    if (paymentMethod === "wallet") await payWithWalletCheckout({ userId: user.id, email: user.email, checkoutReference: checkout.checkoutReference, grandTotal: checkout.total });
+    return checkout;
+    });
 
     // Wallet payment: deduct from wallet balance and confirm the order(s)
     // without touching PayStack at all.
     if (paymentMethod === "wallet") {
-      await payWithWalletCheckout({
-        userId: user.id,
-        email: user.email,
-        checkoutReference: result.checkoutReference,
-        grandTotal: result.total,
-      });
       revalidatePath("/account/wallet");
       revalidatePath("/account/orders");
       return {

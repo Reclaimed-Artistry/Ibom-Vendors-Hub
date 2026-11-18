@@ -11,7 +11,7 @@ export interface PaymentRow {
   id: string;
   reference: string;
   scope: "order" | "subscription" | "wallet";
-  provider: "paystack" | "flutterwave" | "manual" | "sandbox";
+  provider: "paystack" | "flutterwave" | "manual" | "sandbox" | "wallet";
   provider_reference: string | null;
   checkout_reference: string | null;
   store_id: string | null;
@@ -57,6 +57,7 @@ export async function markPaymentSuccessful(
       [reference],
     );
     if (!payment) throw new Error("Payment not found");
+    if (payment.provider === "wallet") throw new Error("Wallet payments must be processed through wallet checkout.");
     if (payment.provider === "manual" && payment.scope === "order") throw new Error("Direct bank transfers must be approved individually by the receiving vendor.");
     if (payment.status === "success") {
       return { payment, alreadyProcessed: true as const };
@@ -115,7 +116,7 @@ export async function failPayment(reference: string, reason: string, raw?: Recor
   const payment = await getPayment(reference);
   if (!payment || payment.status === "success") return;
   await systemDb.execute(
-    `update payments set status = 'failed', failure_reason = $2, raw = $3::jsonb where id = $1`,
+    `update payments set status = 'failed', failure_reason = $2, raw = $3::jsonb where id = $1 and status not in ('success','refunded') and provider not in ('manual','wallet')`,
     [payment.id, reason.slice(0, 400), JSON.stringify(raw ?? {})],
   );
   const settings = await getSettings();
@@ -167,6 +168,7 @@ export async function verifyPayment(reference: string) {
 }
 
 export async function confirmSandboxPayment(reference: string, opts?: { channel?: string }) {
+  if (process.env.NODE_ENV === "production") throw new Error("Test payments cannot be confirmed on the live site.");
   const settings = await getSettings();
   if (!settings.sandbox_payments) throw new Error("Sandbox payments are disabled");
   const payment = await getPayment(reference);
@@ -271,6 +273,10 @@ export async function processRefund(refundId: string, adminId: string, approve: 
 
   if (payment?.provider === "manual" && payment.scope === "order") throw new Error("This transfer went directly to the vendor. Arrange and verify the refund with the vendor; it cannot be refunded from platform funds.");
 
+  if (!payment) throw new Error("The original payment could not be found. No refund has been processed.");
+  if (payment.provider === "paystack" && !paystackSecret(settings)) throw new Error("Gateway refunds are unavailable until Paystack is configured.");
+  if (!["paystack", "wallet"].includes(payment.provider)) throw new Error("This payment provider does not support automatic refunds.");
+
   let gatewayReference: string | null = null;
   if (payment && payment.provider === "paystack" && paystackSecret(settings)) {
     const response = await fetch("https://api.paystack.co/refund", {
@@ -290,12 +296,16 @@ export async function processRefund(refundId: string, adminId: string, approve: 
   }
 
   await withSystem(async (db) => {
+    const locked = await db.one<{ status: string }>(`select status from refunds where id=$1 for update`, [refundId]);
+    if (locked.status === "processed") return;
+    if (locked.status !== "requested") throw new Error("This refund is no longer awaiting processing.");
+    if (payment.provider === "wallet") await creditWallet(db, { userId: payment.payer_user_id, amount: Number(refund.amount), reference: `refund:${refundId}`, provider: "wallet", description: `Refund for ${payment.reference}` });
     await db.execute(
       `update refunds set status='processed', processed_by=$2, processed_at=now(), gateway_reference=$3 where id=$1`,
       [refundId, adminId, gatewayReference],
     );
     if (payment) {
-      await db.execute(`update payments set status = 'refunded' where id = $1`, [payment.id]);
+      await db.execute(`update payments set status = 'refunded' where id = $1 and (select coalesce(sum(amount),0) from refunds where payment_id=$1 and status='processed') >= payments.amount`, [payment.id]);
     }
     if (refund.order_id) {
       await db.execute(

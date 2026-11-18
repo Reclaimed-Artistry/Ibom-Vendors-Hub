@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isReservedSubdomain, rootDomain, storefrontUrl, subdomainFromHost } from "@/lib/domains";
 
+// Platform routes must never be rewritten into non-existent tenant pages.
+const PLATFORM_ROUTES = /^\/(checkout|cart|pay|login|logout|register|forgot-password|reset-password|auth|account|vendor|admin|track|forbidden)(?:\/|$)/;
 const PASSTHROUGH_PREFIXES = ["/api", "/_next", "/s/", "/uploads/", "/favicon", "/images", "/brand/"];
 
 function applyNoStoreHeaders(response: NextResponse) {
@@ -35,7 +37,7 @@ export function middleware(request: NextRequest) {
     return applyNoStoreHeaders(NextResponse.redirect(destination, 308));
   }
 
-  if (!subdomain || isReservedSubdomain(subdomain)) {
+  if (!subdomain || isReservedSubdomain(subdomain) || PLATFORM_ROUTES.test(pathname)) {
     if (pathname === "/checkout" && !request.cookies.get("ivh_session")?.value) {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = "/login";

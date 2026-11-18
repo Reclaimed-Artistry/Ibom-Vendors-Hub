@@ -5,10 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { systemDb, withSystem } from "@/lib/db";
 import { getSettings, paystackSecret, url } from "@/lib/settings";
 import { initializeTransaction } from "@/lib/payments/gateway";
-import { markOrdersPaid } from "@/lib/orders";
-import { logActivity } from "@/lib/audit";
-import { notify } from "@/lib/notifications";
-import { sendEmail } from "@/lib/email";
+import { payWithWalletCheckout } from "@/lib/wallet-payments";
 import type { PublicState } from "@/app/actions/public";
 
 /* -------------------------------------------------------------------------- */
@@ -123,76 +120,6 @@ export async function getWalletTransactions(
 
 /** Deduct the wallet balance and mark the checkout's orders as paid.
  *  Used when a customer chooses to pay with their wallet instead of Paystack. */
-export async function payWithWalletCheckout(input: {
-  userId: string;
-  email: string;
-  checkoutReference: string;
-  grandTotal: number;
-}) {
-  return withSystem(async (db) => {
-    const settings = await getSettings();
-
-    // Lock the wallet row so concurrent top-ups/payments can't race.
-    const wallet = await db.maybeOne<{ id: string; balance: number }>(
-      `select id, balance from wallets where user_id = $1 for update`,
-      [input.userId],
-    );
-    if (!wallet || Number(wallet.balance) < input.grandTotal) {
-      throw new Error("Insufficient wallet balance. Fund your wallet or pay with Paystack instead.");
-    }
-
-    const payment = await db.one<{ id: string; reference: string }>(
-      `insert into payments (reference, scope, provider, checkout_reference, payer_user_id, payer_email, amount, currency, status, metadata)
-       values ($1,'wallet','wallet',$2,$3,$4,$5,$6,'success',$7::jsonb)
-       returning id, reference`,
-      [
-        (await db.one<{ ref: string }>(`select next_payment_reference('WAL') as ref`)).ref,
-        input.checkoutReference,
-        input.userId,
-        input.email,
-        input.grandTotal,
-        settings.currency,
-        JSON.stringify({ purpose: "wallet_checkout" }),
-      ],
-    );
-
-    // Mark all orders in this checkout as paid (reuses commission/allocation logic).
-    await markOrdersPaid(db, input.checkoutReference, payment.id, "wallet");
-
-    // Debit the wallet.
-    await db.execute(
-      `update wallets set balance = balance - $1, updated_at = now() where id = $2`,
-      [input.grandTotal, wallet.id],
-    );
-    await db.execute(
-      `insert into wallet_transactions (wallet_id, type, amount, reference, description, status)
-       values ($1,'debit',$2,$3,$4,'success')`,
-      [
-        wallet.id,
-        input.grandTotal,
-        payment.reference,
-        `Paid for order checkout ${input.checkoutReference} with wallet balance`,
-      ],
-    );
-
-    await logActivity(
-      {
-        actorId: input.userId,
-        actorRole: "customer",
-        storeId: null,
-        action: "wallet.debited",
-        entityType: "wallet",
-        entityId: wallet.id,
-        description: `Paid ₦${input.grandTotal.toLocaleString()} from wallet for checkout ${input.checkoutReference}`,
-        meta: { amount: input.grandTotal, checkoutReference: input.checkoutReference, paymentId: payment.id },
-      },
-      db,
-    );
-
-    return { payment, wallet };
-  });
-}
-
 /** Server action wrapper so a checkout form can submit a wallet payment. */
 export async function payWithWalletCheckoutAction(
   _prev: PublicState,
