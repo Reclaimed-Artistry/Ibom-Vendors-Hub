@@ -54,6 +54,7 @@ export function AddToCart({
       kind: product.kind,
       madeToOrder: product.made_to_order,
       storeDeliveryFee: store.delivery_fee,
+      productDeliveryFee: product.delivery_fee,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2500);

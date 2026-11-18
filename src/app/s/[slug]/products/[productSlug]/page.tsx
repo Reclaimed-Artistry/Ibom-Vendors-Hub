@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, ClipboardCheck, Clock, Package, ShieldCheck, Star, Truck } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Clock, Package, ShieldCheck, Star } from "lucide-react";
 import { getStoreProduct, getStoreReviews, resolveStore } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
 import { storeBase } from "@/lib/storefront-base";
@@ -138,11 +138,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               <p className="flex items-center gap-2 text-sm text-ink-500"><Clock className="size-4" /> Preparation time: about {product.prep_time_minutes} minutes</p>
             ) : null}
             {product.portion ? <p className="flex items-center gap-2 text-sm text-ink-500"><Package className="size-4" /> Portion: {product.portion}</p> : null}
-            {features.delivery ? (
-              <p className="flex items-center gap-2 text-sm text-ink-500">
-                <Truck className="size-4" /> Delivery {store.delivery_fee > 0 ? money(store.delivery_fee) : "available"} · pickup available
-              </p>
-            ) : null}
+
           </div>
 
           <div className="mt-6">
@@ -321,11 +317,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                 <p className="text-xs text-ink-400">{store.city}, {store.state ?? "Akwa Ibom"}</p>
               </div>
             </div>
-            {store.address ? (
-              <p className="mt-2 text-xs text-ink-600">
-                <strong>Pickup location:</strong> {store.address}, {store.city}, Akwa Ibom
-              </p>
-            ) : null}
+
             <p className="mt-2 text-xs leading-6 text-ink-500">Sold and fulfilled by {store.name} in Akwa Ibom State.</p>
             <ButtonLink href={base || "/"} variant="secondary" className="mt-3 w-full">Visit storefront</ButtonLink>
           </Card>

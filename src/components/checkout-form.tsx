@@ -1,5 +1,7 @@
 "use client";
 
+import { calculateDeliveryFee } from "@/lib/delivery-fees";
+
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { Lock, MapPin, ShieldCheck, Store, Truck, User } from "lucide-react";
@@ -51,6 +53,8 @@ export function CheckoutForm({
   const [deliveryCity, setDeliveryCity] = useState(defaults.city || "Uyo");
   const [deliveryState, setDeliveryState] = useState(defaults.state || "Akwa Ibom");
   const [storeInfos, setStoreInfos] = useState<Record<string, StoreFulfilmentInfo>>({});
+  const [productFees, setProductFees] = useState<Record<string, number | null>>({});
+  const productIdsKey = [...new Set(items.map((item) => item.productId))].sort().join(",");
   const [pickupLocation, setPickupLocation] = useState("");
   const [state, action] = useActionState<PublicState, FormData>(submitCheckoutAction as Action, {});
 
@@ -68,13 +72,14 @@ export function CheckoutForm({
   useEffect(() => {
     if (!storeSlugsKey) return;
     let cancelled = false;
-    fetch(`/api/checkout-stores?slugs=${encodeURIComponent(storeSlugsKey)}`)
+    fetch(`/api/checkout-stores?slugs=${encodeURIComponent(storeSlugsKey)}&productIds=${encodeURIComponent(productIdsKey)}`)
       .then((res) => res.json())
-      .then((data: { stores?: StoreFulfilmentInfo[] }) => {
+      .then((data: { stores?: StoreFulfilmentInfo[]; productDeliveryFees?: Record<string, number | null> }) => {
         if (cancelled || !data.stores) return;
         const map: Record<string, StoreFulfilmentInfo> = {};
         for (const s of data.stores) map[s.slug] = s;
         setStoreInfos(map);
+        setProductFees(data.productDeliveryFees ?? {});
 
         const defaultPickup = data.stores
           .map((s) => `${s.name}: ${[s.address, s.city, s.state ?? "Akwa Ibom"].filter(Boolean).join(", ")}`)
@@ -85,7 +90,7 @@ export function CheckoutForm({
     return () => {
       cancelled = true;
     };
-  }, [storeSlugsKey]);
+  }, [storeSlugsKey, productIdsKey]);
 
   if (!ready) return <p className="py-12 text-center text-sm text-ink-400">Loading checkout…</p>;
 
@@ -109,6 +114,12 @@ export function CheckoutForm({
         fee: liveInfo ? Number(liveInfo.delivery_fee ?? 0) : item.storeDeliveryFee ?? 0,
       });
     }
+  }
+  for (const store of stores.values()) {
+    store.fee = calculateDeliveryFee(items.filter((item) => item.storeSlug === store.slug).map((item) => ({
+      kind: item.kind, quantity: item.quantity,
+      deliveryFee: Object.hasOwn(productFees, item.productId) ? productFees[item.productId] : item.productDeliveryFee,
+    })), store.fee);
   }
   const deliveryTotal =
     fulfilment === "delivery" ? [...stores.values()].reduce((s, v) => s + v.fee, 0) : 0;

@@ -180,6 +180,7 @@ export interface Product {
   description: string | null;
   short_description: string | null;
   price: number;
+  delivery_fee: number | null;
   compare_at_price: number | null;
   currency: string;
   pricing_type: "fixed" | "from" | "quotation";

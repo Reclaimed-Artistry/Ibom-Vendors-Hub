@@ -31,6 +31,7 @@ export default async function EditProductPage({
     kind: string;
     category_id: string | null;
     price: number;
+    delivery_fee: number | null;
     compare_at_price: number | null;
     pricing_type: string;
     sku: string | null;
@@ -79,6 +80,7 @@ export default async function EditProductPage({
     sku: product.sku ?? "",
     trackStock: product.track_stock,
     stockQuantity: String(product.stock_quantity),
+    deliveryFee: product.delivery_fee == null ? "" : String(product.delivery_fee),
     isAvailable: product.is_available,
     isFeatured: product.is_featured,
     condition: product.condition ?? "",

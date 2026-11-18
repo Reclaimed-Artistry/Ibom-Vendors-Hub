@@ -43,7 +43,7 @@ export function CartView() {
               <Link href={`/s/${group.storeSlug}`} className="text-sm font-semibold text-brand-800 hover:text-brand-900">
                 {group.storeName}
               </Link>
-              <span className="text-xs text-ink-400">Delivery from {formatMoney(group.deliveryFee)}</span>
+              <span className="text-xs text-ink-400">Delivery calculated at checkout</span>
             </div>
             <ul className="divide-y divide-ink-100">
               {group.lines.map((item) => {

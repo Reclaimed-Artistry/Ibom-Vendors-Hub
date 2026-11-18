@@ -146,6 +146,7 @@ export const productSchema = z.object({
   kind: z.enum(["product", "service"]).default("product"),
   categoryId: z.string().uuid().optional().or(z.literal("")),
   price: z.coerce.number().min(0, "Price cannot be negative").max(100_000_000),
+  deliveryFee: z.preprocess((value) => value === "" || value == null ? undefined : value, z.coerce.number().min(0).max(1_000_000).optional()),
   compareAtPrice: z.coerce.number().min(0).optional(),
   pricingType: z.enum(["fixed", "from", "quotation"]).default("fixed"),
   sku: z.string().trim().max(60).optional().or(z.literal("")),

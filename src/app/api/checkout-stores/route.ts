@@ -45,8 +45,8 @@ export async function GET(request: Request) {
         ),
     productIds.length === 0
       ? Promise.resolve([])
-      : systemDb.query<{ id: string }>(
-          `select p.id
+      : systemDb.query<{ id: string; delivery_fee: number | null }>(
+          `select p.id, p.delivery_fee
              from products p
             where p.id = any($1::uuid[])
               and p.is_available = true
@@ -57,6 +57,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     stores,
+    productDeliveryFees: Object.fromEntries(validProducts.map((p) => [p.id, p.delivery_fee])),
     validProductIds: validProducts.map((p) => p.id),
   });
 }

@@ -24,6 +24,7 @@ export interface EditableProduct {
   kind: string;
   categoryId: string;
   price: string;
+  deliveryFee?: string;
   compareAtPrice: string;
   pricingType: string;
   sku: string;
@@ -108,6 +109,7 @@ export function ProductForm({
   const [shortDescription, setShortDescription] = useState(product.shortDescription);
   const [description, setDescription] = useState(product.description);
   const [price, setPrice] = useState(product.price || "");
+  const [deliveryFee, setDeliveryFee] = useState(product.deliveryFee ?? "");
   const [compareAtPrice, setCompareAtPrice] = useState(product.compareAtPrice);
   const [pricingType, setPricingType] = useState(product.pricingType || "fixed");
   const [sku, setSku] = useState(product.sku);
@@ -273,6 +275,12 @@ export function ProductForm({
                   required
                 />
               </Field>
+              {kind === "product" ? (
+                <Field label="Delivery fee per unit (₦)" htmlFor="deliveryFee" error={state.fieldErrors?.deliveryFee} hint="Charged per unit at checkout. Enter 0 for free delivery. Blank uses your store delivery fee once for products without their own fee.">
+                  <input id="deliveryFee" name="deliveryFee" type="number" min="0" max="1000000" step="0.01" className="input" value={deliveryFee} onChange={(event) => setDeliveryFee(event.target.value)} placeholder="e.g. 1500" />
+                  {deliveryFee === "" ? <p className="mt-2 text-xs font-medium text-amber-700">Add a delivery fee so customers see accurate delivery costs at checkout.</p> : null}
+                </Field>
+              ) : null}
               <Field label="Compare-at price (₦)" htmlFor="compareAtPrice" hint="Optional, shown crossed out.">
                 <input
                   id="compareAtPrice"

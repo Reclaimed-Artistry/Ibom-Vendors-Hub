@@ -2,7 +2,7 @@ import { StoreStockCarousel } from "@/components/store-stock-carousel";
 import { StoreImage } from "@/components/store-image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock, Mail, MapPin, Phone, Star, Truck, Package, Store as StoreIcon, CalendarClock, FileText, ClipboardCheck, CheckCircle2 } from "lucide-react";
+import { Clock, Mail, MapPin, Phone, Star, Store as StoreIcon, CalendarClock, FileText, ClipboardCheck, CheckCircle2 } from "lucide-react";
 import { resolveStore, getStoreProducts, getStoreReviews, storeOpenState } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
 import { storeBase } from "@/lib/storefront-base";
@@ -81,10 +81,6 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
               </div>
             </div>
             <div className="flex flex-wrap gap-2 pb-1">
-              {features.delivery ? (
-                <span className="badge-neutral"><Truck className="size-3.5" /> Delivery {store.delivery_fee > 0 ? money(store.delivery_fee) : "available"}</span>
-              ) : null}
-              {features.pickup ? <span className="badge-neutral"><Package className="size-3.5" /> Pickup</span> : null}
               {features.prepTime && store.prep_time_minutes ? (
                 <span className="badge-neutral"><Clock className="size-3.5" /> ~{store.prep_time_minutes} min prep</span>
               ) : null}
@@ -243,7 +239,6 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
               <li className="flex items-start gap-2"><MapPin className="mt-0.5 size-4 text-ink-400" /> {store.address ? `${store.address}, ` : ""}{store.city}, {store.state}</li>
               {features.operatingHours ? <li className="flex items-start gap-2"><CalendarClock className="mt-0.5 size-4 text-ink-400" /> {openState.label}</li> : null}
               {store.minimum_order > 0 ? <li className="text-xs text-ink-500">Minimum order: {money(store.minimum_order)}</li> : null}
-              {store.delivery_areas ? <li className="text-xs text-ink-500">Delivery areas: {store.delivery_areas}</li> : null}
             </ul>
             <div className="mt-4 grid gap-2">
               <ButtonLink href={`${base}/products`} variant="secondary">Browse catalogue</ButtonLink>

@@ -24,6 +24,7 @@ export interface CartItem {
   kind: "product" | "service";
   madeToOrder?: boolean;
   storeDeliveryFee?: number;
+  productDeliveryFee?: number | null;
 }
 
 interface CartContextValue {

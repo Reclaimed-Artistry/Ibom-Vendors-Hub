@@ -109,6 +109,7 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
     prepTimeMinutes: formData.get("prepTimeMinutes") || undefined,
     portion: formData.get("portion") ?? "",
     serviceDurationMinutes: formData.get("serviceDurationMinutes") || undefined,
+    deliveryFee: formData.get("kind") === "service" ? undefined : formData.get("deliveryFee"),
     images: [],
     attributes,
     specifications,
@@ -229,6 +230,7 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
         }
 
         if (!id) throw new Error("Product could not be saved");
+        await db.execute(`update products set delivery_fee = $2 where id = $1 and store_id = $3`, [id, data.deliveryFee ?? null, ctx.store.id]);
 
         for (const [index, variant] of data.variants.entries()) {
           await db.execute(
