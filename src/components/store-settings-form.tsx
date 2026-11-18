@@ -34,6 +34,7 @@ export interface StoreSettingsValues {
   acceptsPickup: boolean;
   acceptsOrders: boolean;
   deliveryFee: string;
+  deliveryFeeOutside: string;
   minimumOrder: string;
   deliveryAreas: string;
   prepTimeMinutes: string;
@@ -55,7 +56,7 @@ export interface VendorKycValues {
 export function StoreSettingsForm({ values }: { values: StoreSettingsValues }) {
   const [state, formAction] = useActionState<VendorState, FormData>(saveStoreSettingsAction, {});
 
-  const currentCity = values.city || "Uyo";
+  const [currentCity, setCurrentCity] = useState(values.city || "Uyo");
   const cityOptions = AKWA_IBOM_LGAS.includes(currentCity as (typeof AKWA_IBOM_LGAS)[number])
     ? AKWA_IBOM_LGAS
     : ([currentCity, ...AKWA_IBOM_LGAS] as const);
@@ -138,7 +139,7 @@ export function StoreSettingsForm({ values }: { values: StoreSettingsValues }) {
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="LGA / Town in Akwa Ibom" htmlFor="store-city" required error={state.fieldErrors?.city}>
-            <select id="store-city" name="city" className="select" defaultValue={currentCity} required>
+            <select id="store-city" name="city" className="select" value={currentCity} onChange={(event) => setCurrentCity(event.target.value)} required>
               {cityOptions.map((lga) => (
                 <option key={lga} value={lga}>{lga}</option>
               ))}
@@ -176,8 +177,11 @@ export function StoreSettingsForm({ values }: { values: StoreSettingsValues }) {
           </label>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Dispatch delivery fee (₦)" htmlFor="store-delivery-fee">
+          <Field label={`Within ${currentCity} · fallback (₦)`} htmlFor="store-delivery-fee">
             <input id="store-delivery-fee" name="deliveryFee" type="number" min="0" step="0.01" className="input" defaultValue={values.deliveryFee} />
+          </Field>
+          <Field label={`Outside ${currentCity} · fallback (₦)`} htmlFor="store-delivery-outside" hint="Used once for products without an outside-LGA fee. Blank uses your within-LGA fallback.">
+            <input id="store-delivery-outside" name="deliveryFeeOutside" type="number" min="0" max="1000000" step="0.01" className="input" defaultValue={values.deliveryFeeOutside} />
           </Field>
           <Field label="Minimum order (₦)" htmlFor="store-minimum">
             <input id="store-minimum" name="minimumOrder" type="number" min="0" step="0.01" className="input" defaultValue={values.minimumOrder} />

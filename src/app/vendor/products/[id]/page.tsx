@@ -32,6 +32,7 @@ export default async function EditProductPage({
     category_id: string | null;
     price: number;
     delivery_fee: number | null;
+    delivery_fee_outside: number | null;
     compare_at_price: number | null;
     pricing_type: string;
     sku: string | null;
@@ -81,6 +82,7 @@ export default async function EditProductPage({
     trackStock: product.track_stock,
     stockQuantity: String(product.stock_quantity),
     deliveryFee: product.delivery_fee == null ? "" : String(product.delivery_fee),
+    deliveryFeeOutside: product.delivery_fee_outside == null ? "" : String(product.delivery_fee_outside),
     isAvailable: product.is_available,
     isFeatured: product.is_featured,
     condition: product.condition ?? "",
@@ -119,7 +121,7 @@ export default async function EditProductPage({
       />
       {saved ? <Alert tone="success" title="Saved">Your product has been updated.</Alert> : null}
       <div className="mt-4">
-        <ProductForm
+        <ProductForm vendorLga={store.city}
           product={editable}
           categoryName={category?.name ?? null}
           attributes={category?.attributes ?? []}

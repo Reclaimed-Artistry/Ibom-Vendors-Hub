@@ -110,6 +110,7 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
     portion: formData.get("portion") ?? "",
     serviceDurationMinutes: formData.get("serviceDurationMinutes") || undefined,
     deliveryFee: formData.get("kind") === "service" ? undefined : formData.get("deliveryFee"),
+    deliveryFeeOutside: formData.get("kind") === "service" ? undefined : formData.get("deliveryFeeOutside"),
     images: [],
     attributes,
     specifications,
@@ -230,7 +231,7 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
         }
 
         if (!id) throw new Error("Product could not be saved");
-        await db.execute(`update products set delivery_fee = $2 where id = $1 and store_id = $3`, [id, data.deliveryFee ?? null, ctx.store.id]);
+        await db.execute(`update products set delivery_fee = $2, delivery_fee_outside = $4 where id = $1 and store_id = $3`, [id, data.deliveryFee ?? null, ctx.store.id, data.deliveryFeeOutside ?? null]);
 
         for (const [index, variant] of data.variants.entries()) {
           await db.execute(
@@ -452,6 +453,7 @@ export async function saveStoreSettingsAction(_prev: VendorState, formData: Form
     acceptsPickup: formData.get("acceptsPickup") === "on",
     acceptsOrders: formData.get("acceptsOrders") === "on",
     deliveryFee: formData.get("deliveryFee") || 0,
+    deliveryFeeOutside: formData.get("deliveryFeeOutside"),
     minimumOrder: formData.get("minimumOrder") || 0,
     deliveryAreas: formData.get("deliveryAreas") ?? "",
     prepTimeMinutes: formData.get("prepTimeMinutes") || 30,
@@ -496,7 +498,7 @@ export async function saveStoreSettingsAction(_prev: VendorState, formData: Form
                 address=$9, city=$10, state=$11, accepts_delivery=$12, accepts_pickup=$13, accepts_orders=$14,
                 delivery_fee=$15, minimum_order=$16, delivery_areas=$17, prep_time_minutes=$18,
                 logo_url=coalesce(nullif($19,''), logo_url), cover_url=coalesce(nullif($20,''), cover_url),
-                operating_hours=$21::jsonb
+                operating_hours=$21::jsonb, delivery_fee_outside=$22
           where id=$1`,
         [
           ctx.store.id,
@@ -520,6 +522,7 @@ export async function saveStoreSettingsAction(_prev: VendorState, formData: Form
           logoUrl,
           coverUrl,
           JSON.stringify(hours),
+          data.deliveryFeeOutside ?? null,
         ],
       );
       await logActivity(

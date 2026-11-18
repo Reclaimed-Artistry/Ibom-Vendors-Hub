@@ -138,6 +138,7 @@ export interface Store {
   accepts_delivery: boolean;
   accepts_pickup: boolean;
   delivery_fee: number;
+  delivery_fee_outside?: number | null;
   minimum_order: number;
   delivery_areas: string | null;
   prep_time_minutes: number;
@@ -181,6 +182,7 @@ export interface Product {
   short_description: string | null;
   price: number;
   delivery_fee: number | null;
+  delivery_fee_outside?: number | null;
   compare_at_price: number | null;
   currency: string;
   pricing_type: "fixed" | "from" | "quotation";

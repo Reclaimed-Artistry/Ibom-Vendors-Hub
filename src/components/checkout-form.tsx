@@ -1,6 +1,6 @@
 "use client";
 
-import { calculateDeliveryFee } from "@/lib/delivery-fees";
+import { calculateDeliveryFee, deliveryRate, isWithinVendorLga } from "@/lib/delivery-fees";
 
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useState } from "react";
@@ -24,6 +24,7 @@ interface StoreFulfilmentInfo {
   accepts_delivery: boolean;
   accepts_pickup: boolean;
   delivery_fee: number;
+  delivery_fee_outside: number | null;
   delivery_areas: string | null;
   prep_time_minutes: number;
 }
@@ -52,6 +53,7 @@ export function CheckoutForm({
   const [deliveryState, setDeliveryState] = useState(defaults.state || "Akwa Ibom");
   const [storeInfos, setStoreInfos] = useState<Record<string, StoreFulfilmentInfo>>({});
   const [productFees, setProductFees] = useState<Record<string, number | null>>({});
+  const [productFeesOutside, setProductFeesOutside] = useState<Record<string, number | null>>({});
   const productIdsKey = [...new Set(items.map((item) => item.productId))].sort().join(",");
   const [pickupLocation, setPickupLocation] = useState("");
   const [state, action] = useActionState<PublicState, FormData>(submitCheckoutAction as Action, {});
@@ -72,12 +74,13 @@ export function CheckoutForm({
     let cancelled = false;
     fetch(`/api/checkout-stores?slugs=${encodeURIComponent(storeSlugsKey)}&productIds=${encodeURIComponent(productIdsKey)}`)
       .then((res) => res.json())
-      .then((data: { stores?: StoreFulfilmentInfo[]; productDeliveryFees?: Record<string, number | null> }) => {
+      .then((data: { stores?: StoreFulfilmentInfo[]; productDeliveryFees?: Record<string, number | null>; productDeliveryFeesOutside?: Record<string, number | null> }) => {
         if (cancelled || !data.stores) return;
         const map: Record<string, StoreFulfilmentInfo> = {};
         for (const s of data.stores) map[s.slug] = s;
         setStoreInfos(map);
         setProductFees(data.productDeliveryFees ?? {});
+        setProductFeesOutside(data.productDeliveryFeesOutside ?? {});
 
         const defaultPickup = data.stores
           .map((s) => `${s.name}: ${[s.address, s.city, s.state ?? "Akwa Ibom"].filter(Boolean).join(", ")}`)
@@ -114,11 +117,14 @@ export function CheckoutForm({
     }
   }
   for (const store of stores.values()) {
+    const info = storeInfos[store.slug];
+    const within = isWithinVendorLga(info?.city, deliveryCity, deliveryState);
     store.fee = calculateDeliveryFee(items.filter((item) => item.storeSlug === store.slug).map((item) => ({
       kind: item.kind, quantity: item.quantity,
-      deliveryFee: Object.hasOwn(productFees, item.productId) ? productFees[item.productId] : item.productDeliveryFee,
-    })), store.fee);
+      deliveryFee: deliveryRate(within, productFees[item.productId], productFeesOutside[item.productId]),
+    })), Number(deliveryRate(within, info?.delivery_fee, info?.delivery_fee_outside ?? info?.delivery_fee) ?? store.fee));
   }
+  const ratesReady = items.every((item) => Boolean(storeInfos[item.storeSlug]) && Object.hasOwn(productFees, item.productId));
   const deliveryTotal =
     fulfilment === "delivery" ? [...stores.values()].reduce((s, v) => s + v.fee, 0) : 0;
   const total = subtotal + deliveryTotal;
@@ -298,7 +304,7 @@ export function CheckoutForm({
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
-                  label="Delivery location (Town / LGA)"
+                  label="Delivery Local Government Area (LGA)"
                   htmlFor="city"
                   error={state?.fieldErrors?.city}
                   required
@@ -435,6 +441,8 @@ export function CheckoutForm({
               <dd>{fulfilment === "delivery" ? formatMoney(deliveryTotal) : "Free"}</dd>
             </div>
           </dl>
+          {fulfilment === "delivery" ? <div className="space-y-2 rounded-xl bg-ink-50 p-3 text-xs text-ink-600"><p className="font-semibold">Delivery rates follow your selected LGA and state.</p>{[...stores.values()].map((store) => <div key={store.slug} className="flex justify-between gap-3"><span>{store.name} · {isWithinVendorLga(storeInfos[store.slug]?.city, deliveryCity, deliveryState) ? "Within" : "Outside"} {storeInfos[store.slug]?.city || "vendor’s LGA"}</span><span>{ratesReady ? formatMoney(store.fee) : "Loading…"}</span></div>)}</div> : null}
+          {!ratesReady ? <p className="text-xs text-amber-800">Loading current vendor delivery rates. If this persists, refresh checkout.</p> : null}
           <div className="flex justify-between border-t border-ink-100 pt-3 text-base font-bold">
             <span>Total to pay</span>
             <span>{formatMoney(total)}</span>
@@ -452,7 +460,7 @@ export function CheckoutForm({
             </label> : null}
           </fieldset>
 
-          <SubmitButton className="w-full" pendingLabel="Preparing payment…">
+          <SubmitButton className="w-full" disabled={!ratesReady} pendingLabel="Preparing payment…">
             <Lock className="size-4" /> Pay {formatMoney(total)}
           </SubmitButton>
           <div className="rounded-xl bg-brand-50/70 p-3 text-[11px] text-brand-900">

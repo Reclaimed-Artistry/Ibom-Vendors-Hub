@@ -21,7 +21,7 @@ export default async function NewProductPage() {
         description="Only the fields that matter to your category are shown."
         breadcrumb={<Link href="/vendor/products" className="hover:text-brand-700">← Products</Link>}
       />
-      <ProductForm
+      <ProductForm vendorLga={store.city}
         categoryName={category?.name ?? null}
         attributes={category?.attributes ?? []}
         features={category?.features ?? {}}

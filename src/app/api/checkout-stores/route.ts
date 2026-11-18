@@ -33,11 +33,12 @@ export async function GET(request: Request) {
           accepts_delivery: boolean;
           accepts_pickup: boolean;
           delivery_fee: number;
+          delivery_fee_outside: number | null;
           delivery_areas: string | null;
           prep_time_minutes: number;
         }>(
           `select slug, name, address, city, state, phone, accepts_delivery, accepts_pickup,
-                  delivery_fee, delivery_areas, prep_time_minutes
+                  delivery_fee, delivery_fee_outside, delivery_areas, prep_time_minutes
              from stores
             where slug = any($1::text[])
               and store_is_live(id)`,
@@ -45,8 +46,8 @@ export async function GET(request: Request) {
         ),
     productIds.length === 0
       ? Promise.resolve([])
-      : systemDb.query<{ id: string; delivery_fee: number | null }>(
-          `select p.id, p.delivery_fee
+      : systemDb.query<{ id: string; delivery_fee: number | null; delivery_fee_outside: number | null }>(
+          `select p.id, p.delivery_fee, p.delivery_fee_outside
              from products p
             where p.id = any($1::uuid[])
               and p.is_available = true
@@ -58,6 +59,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     stores,
     productDeliveryFees: Object.fromEntries(validProducts.map((p) => [p.id, p.delivery_fee])),
+    productDeliveryFeesOutside: Object.fromEntries(validProducts.map((p) => [p.id, p.delivery_fee_outside])),
     validProductIds: validProducts.map((p) => p.id),
   });
 }

@@ -49,6 +49,7 @@ export default async function VendorStorePage() {
     acceptsPickup: store.accepts_pickup,
     acceptsOrders: store.accepts_orders,
     deliveryFee: String(Number(store.delivery_fee ?? 0)),
+    deliveryFeeOutside: store.delivery_fee_outside == null ? "" : String(store.delivery_fee_outside),
     minimumOrder: String(Number(store.minimum_order ?? 0)),
     deliveryAreas: store.delivery_areas ?? "",
     prepTimeMinutes: String(store.prep_time_minutes ?? 30),
