@@ -1,5 +1,6 @@
 "use client";
 
+import { farmMinimumQuantity } from "@/lib/agriculture";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Check, Minus, Plus, ShoppingBag } from "lucide-react";
@@ -20,7 +21,8 @@ export function AddToCart({
   const [variantId, setVariantId] = useState<string | null>(
     product.variants?.find((variant) => variant.is_available)?.id ?? null,
   );
-  const [quantity, setQuantity] = useState(1);
+  const minimumQuantity = farmMinimumQuantity(product.attributes);
+  const [quantity, setQuantity] = useState(minimumQuantity);
   const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
   const [added, setAdded] = useState(false);
@@ -34,7 +36,7 @@ export function AddToCart({
   const total = (unitPrice + addons.reduce((sum, addon) => sum + addon.price, 0)) * quantity;
 
   const soldOut =
-    product.track_stock && (variant ? variant.stock_quantity < 1 : product.stock_quantity < 1);
+    product.track_stock && (variant ? variant.stock_quantity < minimumQuantity : product.stock_quantity < minimumQuantity);
 
   function handleAdd() {
     add({
@@ -151,9 +153,10 @@ export function AddToCart({
         </div>
       ) : null}
 
+      {product.attributes?.produce_type ? <p className="text-xs text-ink-500">Price per {product.attributes.sale_unit} · {product.attributes.pack_size} · Minimum {minimumQuantity} unit(s)</p> : null}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center rounded-xl border border-ink-200">
-          <button type="button" className="p-2.5 text-ink-600" onClick={() => setQuantity((value) => Math.max(1, value - 1))} aria-label="Decrease quantity">
+          <button type="button" className="p-2.5 text-ink-600" onClick={() => setQuantity((value) => Math.max(minimumQuantity, value - 1))} aria-label="Decrease quantity">
             <Minus className="size-4" />
           </button>
           <span className="w-8 text-center text-sm font-semibold">{quantity}</span>

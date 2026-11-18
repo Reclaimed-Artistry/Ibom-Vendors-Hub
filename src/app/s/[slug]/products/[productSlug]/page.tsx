@@ -243,7 +243,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             {Object.keys(product.attributes ?? {}).length ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 {Object.entries(product.attributes).map(([key, value]) => (
-                  <span key={key} className="badge-neutral">{key}: {value}</span>
+                  <span key={key} className="badge-neutral">{category?.attributes?.find(field => field.key === key)?.label ?? key.replaceAll("_", " ")}: {value}</span>
                 ))}
               </div>
             ) : null}

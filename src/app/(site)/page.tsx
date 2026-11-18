@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Star,
+  Sprout,
   Store,
   Truck,
   Utensils,
@@ -27,6 +28,7 @@ import { getSettings } from "@/lib/settings";
 import { formatMoney, truncate } from "@/lib/utils";
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  sprout: Sprout,
   utensils: Utensils,
   shirt: ShoppingBag,
   footprints: Package,

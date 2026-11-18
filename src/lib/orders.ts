@@ -1,3 +1,4 @@
+import { farmMinimumQuantity } from "@/lib/agriculture";
 import { FREE_STORE_ACCESS } from "@/lib/store-access-policy";
 import { calculateDeliveryFee, deliveryRate, isWithinVendorLga } from "@/lib/delivery-fees";
 import { systemDb, withSystem, type Db } from "@/lib/db";
@@ -16,6 +17,7 @@ import { workflowFor, workflowLabel } from "@/lib/storefront";
 /* -------------------------------------------------------------------------- */
 
 interface ProductRow {
+  attributes: Record<string, string>;
   product_delivery_fee: number | null;
   product_delivery_fee_outside: number | null;
   delivery_fee_outside: number | null;
@@ -82,7 +84,7 @@ export async function createCheckout(
 
   const prepared = await withSystem(async (db) => {
     const rows = await db.query<ProductRow>(
-      `select p.delivery_fee_outside as product_delivery_fee_outside, s.delivery_fee_outside, p.delivery_fee as product_delivery_fee, p.id, p.store_id, p.name, p.slug, p.kind, p.price, p.track_stock, p.stock_quantity,
+      `select p.delivery_fee_outside as product_delivery_fee_outside, s.delivery_fee_outside, p.delivery_fee as product_delivery_fee, p.id, p.store_id, p.name, p.slug, p.kind, p.price, p.attributes, p.track_stock, p.stock_quantity,
               p.is_available, p.made_to_order, p.production_days, p.prep_time_minutes,
               p.service_duration_minutes,
               s.name as store_name, s.slug as store_slug, s.status as store_status,
@@ -177,6 +179,8 @@ export async function createCheckout(
         throw new Error(`${product.name} is currently unavailable.`);
       }
 
+      const minimumUnits = farmMinimumQuantity(product.attributes);
+      if (line.quantity < minimumUnits) throw new Error(`${product.name} requires at least ${minimumUnits} selling units per order line.`);
       let unitPrice = Number(product.price);
       let variantName: string | null = null;
       let variantAttributes: Record<string, string> = {};

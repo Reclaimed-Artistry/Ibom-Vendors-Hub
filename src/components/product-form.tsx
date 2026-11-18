@@ -1,5 +1,6 @@
 "use client";
 
+import { agricultureFieldRequired } from "@/lib/agriculture";
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react";
@@ -444,6 +445,8 @@ export function ProductForm({
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 {attributes.map((attribute) => {
+                  const agriculture = attributes.some(field => field.key === "produce_type");
+                  const required = agriculture ? agricultureFieldRequired(attribute.key, attributeValues) : attribute.required;
                   const value = attributeValues[attribute.key] ?? "";
                   const update = (next: string) => setAttributeValues((current) => ({ ...current, [attribute.key]: next }));
                   if (attribute.type === "boolean") {
@@ -461,8 +464,8 @@ export function ProductForm({
                   }
                   if (attribute.type === "select") {
                     return (
-                      <Field key={attribute.key} label={attribute.label} htmlFor={`attr-${attribute.key}`} required={attribute.required}>
-                        <select id={`attr-${attribute.key}`} className="select" value={value} onChange={(event) => update(event.target.value)}>
+                      <Field key={attribute.key} label={attribute.label} htmlFor={`attr-${attribute.key}`} required={required}>
+                        <select id={`attr-${attribute.key}`} className="select" required={required} value={value} onChange={(event) => update(event.target.value)}>
                           <option value="">Choose…</option>
                           {(attribute.options ?? []).map((option) => <option key={option} value={option}>{option}</option>)}
                         </select>
@@ -471,17 +474,19 @@ export function ProductForm({
                   }
                   if (attribute.type === "textarea") {
                     return (
-                      <Field key={attribute.key} label={attribute.label} htmlFor={`attr-${attribute.key}`} required={attribute.required} className="sm:col-span-2">
-                        <textarea id={`attr-${attribute.key}`} className="textarea" value={value} onChange={(event) => update(event.target.value)} />
+                      <Field key={attribute.key} label={attribute.label} htmlFor={`attr-${attribute.key}`} required={required} className="sm:col-span-2">
+                        <textarea id={`attr-${attribute.key}`} className="textarea" required={required} value={value} onChange={(event) => update(event.target.value)} />
                       </Field>
                     );
                   }
                   return (
-                    <Field key={attribute.key} label={attribute.label} htmlFor={`attr-${attribute.key}`} required={attribute.required}>
+                    <Field key={attribute.key} label={attribute.label} htmlFor={`attr-${attribute.key}`} required={required}>
                       <input
                         id={`attr-${attribute.key}`}
                         className="input"
-                        type={attribute.type === "number" ? "number" : "text"}
+                        required={required}
+                        min={agriculture && attribute.key === "minimum_order" ? 1 : undefined}
+                        type={agriculture && attribute.key === "harvest_date" ? "date" : attribute.type === "number" ? "number" : "text"}
                         value={value}
                         onChange={(event) => update(event.target.value)}
                       />

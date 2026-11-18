@@ -1,5 +1,6 @@
 "use server";
 
+import { AGRICULTURE_SLUG, validateAgricultureAttributes } from "@/lib/agriculture";
 import { isPropertyCategory, validatePropertyAttributes } from "@/lib/property-inspections";
 
 import { revalidatePath, revalidateTag } from "next/cache";
@@ -85,6 +86,10 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
   const specifications = parseJsonField<Record<string, string>>(formData.get("specificationsJson"), {});
   const attributes = parseJsonField<Record<string, string>>(formData.get("attributesJson"), {});
 
+  if (ctx.category?.slug === AGRICULTURE_SLUG) {
+    try { validateAgricultureAttributes(attributes); } catch (error) { return { error: error instanceof Error ? error.message : "Check the farm produce details." }; }
+    formData.set("kind", "product");
+  }
   const propertyListing = isPropertyCategory(ctx.category?.slug);
   if (propertyListing) {
     try { validatePropertyAttributes(attributes); } catch (error) { return { error: error instanceof Error ? error.message : "Check the property details." }; }
