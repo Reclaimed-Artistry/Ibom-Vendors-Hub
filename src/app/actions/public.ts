@@ -64,14 +64,15 @@ export async function submitCheckoutAction(_prev: PublicState, formData: FormDat
     return { error: "Please check your bio and fulfilment details", fieldErrors: formatIssues(parsed.error) };
   }
 
-  const paymentMethod = String(formData.get("paymentMethod") ?? "paystack");
+  const paymentMethod = String(formData.get("paymentMethod") ?? "bank_transfer");
+  if (!["wallet", "bank_transfer"].includes(paymentMethod)) return { error: "Choose bank transfer or wallet payment." };
 
   try {
     const result = await createCheckout(parsed.data, {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
-    });
+    }, paymentMethod === "bank_transfer" ? "bank_transfer" : "gateway");
 
     // Wallet payment: deduct from wallet balance and confirm the order(s)
     // without touching PayStack at all.

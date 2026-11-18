@@ -94,6 +94,16 @@ function template(name: string, data: EmailData): RenderedEmail {
     : site;
 
   switch (name) {
+    case "manual_payment_review":
+      return {
+        subject: `Payment approval needed · ${data.orderReference}`,
+        heading: "A customer uploaded a payment receipt",
+        intro: `A bank-transfer receipt for ${data.storeName} is ready for review. Open your dashboard, check the exact amount in your bank account, and approve or reject the payment. A screenshot alone is not confirmation of credit.`,
+        rows: [["Order", String(data.orderReference ?? "")], ["Expected amount", money(data.amount, data.currency)]],
+        cta: { label: "Review payment receipt", href: data.link ?? url("/vendor/payment-approvals") },
+        footnote: "This payment goes directly to your bank account. It is not held in platform escrow and will not create a platform-wallet payout.",
+      };
+
     case "verify_email":
       return {
         subject: "Verify your Ibom Vendors Hub email address",

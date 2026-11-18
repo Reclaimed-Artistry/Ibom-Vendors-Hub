@@ -57,6 +57,7 @@ export async function markPaymentSuccessful(
       [reference],
     );
     if (!payment) throw new Error("Payment not found");
+    if (payment.provider === "manual" && payment.scope === "order") throw new Error("Direct bank transfers must be approved individually by the receiving vendor.");
     if (payment.status === "success") {
       return { payment, alreadyProcessed: true as const };
     }
@@ -267,6 +268,8 @@ export async function processRefund(refundId: string, adminId: string, approve: 
     });
     return { ok: true };
   }
+
+  if (payment?.provider === "manual" && payment.scope === "order") throw new Error("This transfer went directly to the vendor. Arrange and verify the refund with the vendor; it cannot be refunded from platform funds.");
 
   let gatewayReference: string | null = null;
   if (payment && payment.provider === "paystack" && paystackSecret(settings)) {

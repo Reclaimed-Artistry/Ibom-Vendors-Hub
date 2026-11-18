@@ -44,9 +44,7 @@ export function CheckoutForm({
   walletBalance?: number;
 }) {
   const { items, ready, subtotal } = useCart();
-  const [paymentMethod, setPaymentMethod] = useState<"wallet" | "paystack">(
-    walletBalance > 0 ? "wallet" : "paystack",
-  );
+  const [paymentMethod, setPaymentMethod] = useState<"wallet" | "bank_transfer">("bank_transfer");
   const [fulfilment, setFulfilment] = useState<"delivery" | "pickup">("delivery");
   const [bioAddress, setBioAddress] = useState(defaults.bioAddress ?? defaults.address ?? "");
   const [deliveryAddress, setDeliveryAddress] = useState(defaults.address ?? defaults.bioAddress ?? "");
@@ -442,66 +440,27 @@ export function CheckoutForm({
             <span>{formatMoney(total)}</span>
           </div>
 
-          {/* Payment method: wallet balance or PayStack */}
-          {walletBalance > 0 ? (
-            <div className="mt-4 space-y-2 rounded-xl border p-3">
-              <p className="text-xs font-semibold text-ink-600 uppercase tracking-wide">Pay with</p>
-              <label className="flex cursor-pointer items-center gap-2 rounded-xl border p-2.5 transition">
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value="wallet"
-                  checked={paymentMethod === "wallet"}
-                  onChange={() => setPaymentMethod("wallet")}
-                  className="mt-0.5 shrink-0"
-                  disabled={!walletCovers}
-                />
-                <div>
-                  <p className="text-sm font-semibold text-ink-900">
-                    Wallet balance
-                  </p>
-                  <p className="text-xs text-ink-500">
-                    {walletCovers
-                      ? `Covers full amount (₦${formatMoney(walletBalance)} available)`
-                      : `Insufficient balance (₦${formatMoney(walletBalance)} available)`}
-                  </p>
-                </div>
-              </label>
-              <label className="flex cursor-pointer items-center gap-2 rounded-xl border p-2.5 transition">
-                <input
-                  type="radio"
-                  name="paymentMethod"
-                  value="paystack"
-                  checked={paymentMethod === "paystack"}
-                  onChange={() => setPaymentMethod("paystack")}
-                  className="mt-0.5 shrink-0"
-                />
-                <div>
-                  <p className="text-sm font-semibold text-ink-900">PayStack</p>
-                  <p className="text-xs text-ink-500">Pay by card, bank transfer or USSD</p>
-                </div>
-              </label>
-              {!walletCovers && paymentMethod === "wallet" ? (
-                <p className="mt-1 text-xs text-red-600">
-                  Wallet balance is too low for this order. Add funds or switch to PayStack.
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            <p className="mt-3 text-xs text-ink-500 text-center">
-              Fund your wallet at <a href="/account/wallet" className="text-brand-700 font-semibold underline">Account &rarr; Wallet</a>, then pay with your balance here.
-            </p>
-          )}
+          <fieldset className="space-y-3 rounded-xl border border-ink-200 p-3">
+            <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-600">Payment method</legend>
+            <label className="flex cursor-pointer gap-3 rounded-xl bg-brand-50 p-3">
+              <input type="radio" name="paymentMethod" value="bank_transfer" checked={paymentMethod === "bank_transfer"} onChange={() => setPaymentMethod("bank_transfer")} />
+              <span><strong className="block text-sm text-ink-900">Bank transfer to vendor</strong><span className="text-xs text-ink-600">View bank details, transfer within 20 minutes, upload your receipt and await vendor approval.</span></span>
+            </label>
+            {walletBalance > 0 ? <label className="flex gap-3 rounded-xl border p-3">
+              <input type="radio" name="paymentMethod" value="wallet" checked={paymentMethod === "wallet"} onChange={() => setPaymentMethod("wallet")} disabled={!walletCovers} />
+              <span className="text-sm">Wallet · {formatMoney(walletBalance)}{!walletCovers ? " (insufficient balance)" : ""}</span>
+            </label> : null}
+          </fieldset>
 
           <SubmitButton className="w-full" pendingLabel="Preparing payment…">
             <Lock className="size-4" /> Pay {formatMoney(total)}
           </SubmitButton>
           <div className="rounded-xl bg-brand-50/70 p-3 text-[11px] text-brand-900">
             <p className="flex items-center gap-1.5 font-semibold">
-              <ShieldCheck className="size-4 shrink-0 text-brand-700" /> Delivery-Protected Escrow
+              <ShieldCheck className="size-4 shrink-0 text-brand-700" /> {paymentMethod === "bank_transfer" ? "Direct vendor transfer" : "Delivery-Protected Escrow"}
             </p>
             <p className="mt-1 text-brand-800/90">
-              Vendor settlement stays held until you confirm receipt or share your secret <strong>6-digit Delivery PIN</strong> upon handover.
+              {paymentMethod === "bank_transfer" ? "Money goes directly to the vendor, not platform escrow. Only pay the account shown on your payment portal. A receipt alone does not confirm payment; the vendor must verify the money arrived." : "Vendor settlement stays held until you confirm receipt or share your secret 6-digit Delivery PIN upon handover."}
             </p>
           </div>
         </Card>

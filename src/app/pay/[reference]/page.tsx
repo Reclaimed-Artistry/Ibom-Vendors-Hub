@@ -1,3 +1,4 @@
+import { ManualPaymentPortal } from "@/components/manual-payment-portal";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AlertCircle, LockKeyhole, ShieldCheck } from "lucide-react";
@@ -16,6 +17,8 @@ export default async function PayPage({ params }: { params: Promise<{ reference:
   const { payment, orders, plan, store } = context;
   const settings = await getSettings();
   const money = (value: number) => formatMoney(value, payment.currency, settings.currency_symbol);
+
+  if (payment.provider === "manual" && payment.scope === "order") return <ManualPaymentPortal reference={reference} payerId={payment.payer_user_id} currency={payment.currency} />;
 
   if (payment.status === "success") redirect(`/pay/callback?reference=${encodeURIComponent(reference)}`);
   if (payment.status === "refunded") {

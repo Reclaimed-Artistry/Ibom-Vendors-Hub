@@ -38,6 +38,7 @@ export default async function AccountOrderDetailPage({ params }: { params: Promi
     ),
   ]);
 
+  const manualPayment = await systemDb.maybeOne<{ reference: string; status: string }>(`select p.reference, m.status from manual_order_payments m join payments p on p.id=m.payment_id where m.order_id=$1`, [order.id]);
   const canReview = ["delivered", "completed"].includes(order.status);
   const reviewedProductIds = new Set(
     existingReviews.map((r) => r.product_id ?? "__store__"),
@@ -48,6 +49,7 @@ export default async function AccountOrderDetailPage({ params }: { params: Promi
 
   return (
     <div className="space-y-4">
+      {manualPayment ? <div className="card card-pad"><p className="font-semibold">{manualPayment.status === "approved" ? "Approved" : manualPayment.status === "awaiting_approval" ? "Awaiting payment approval" : "Bank transfer payment"}</p><p className="mt-1 text-sm text-ink-500">Paid directly to the vendor, not platform escrow. Any refund must be arranged with the vendor.</p><Link href={`/pay/${manualPayment.reference}`} className="btn-primary mt-3">{manualPayment.status === "approved" ? "View payment approval" : "View bank details / upload receipt"}</Link></div> : null}
       <PageHeader
         title={order.reference}
         description={`${order.store_name} · placed ${formatDateTime(order.created_at)}`}

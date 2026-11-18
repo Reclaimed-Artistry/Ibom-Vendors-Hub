@@ -64,6 +64,7 @@ export default async function VendorOrderDetailPage({ params }: { params: Promis
 
   return (
     <div className="space-y-4">
+      <Link href="/vendor/payment-approvals" className="btn-secondary">Review bank-transfer receipts</Link>
       <PageHeader
         title={order.reference}
         description={`${formatDateTime(order.created_at)} · ${titleCase(order.fulfilment_type)}`}

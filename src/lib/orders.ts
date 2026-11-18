@@ -67,6 +67,7 @@ function addonsTotal(raw: unknown): number {
 export async function createCheckout(
   input: CheckoutInput,
   customer: { id: string; email: string; fullName: string } | null,
+  paymentMethod: "gateway" | "bank_transfer" = "gateway",
 ): Promise<CheckoutResult> {
   if (!customer?.id) {
     throw new Error("Please sign in to your account before checking out.");
@@ -96,6 +97,19 @@ export async function createCheckout(
       throw new Error("One of the items in your cart is no longer available.");
     }
     const byId = new Map(rows.map((row) => [row.id, row]));
+    const banks = paymentMethod === "bank_transfer" ? await db.query<{ store_id: string; bank_name: string; account_name: string; account_number: string }>(
+      `select s.id as store_id, v.bank_name, v.account_name, v.account_number from stores s join vendor_profiles v on v.user_id = s.owner_id where s.id = any($1::uuid[])`,
+      [[...new Set(rows.map((row) => row.store_id))]],
+    ) : [];
+    if (paymentMethod === "bank_transfer") {
+      for (const row of rows) {
+        const bank = banks.find((entry) => entry.store_id === row.store_id);
+        if (!bank?.bank_name?.trim() || !bank.account_name?.trim() || !/^\d{10}$/.test(bank.account_number)) {
+          throw new Error(`${row.store_name} has not configured valid bank details yet. Please contact the vendor before paying.`);
+        }
+      }
+    }
+
 
     const variants = await db.query<{
       id: string;
@@ -381,7 +395,7 @@ export async function createCheckout(
       await db.one<{ ref: string }>(`select next_payment_reference('PAY') as ref`)
     ).ref;
 
-    const provider = paystackSecret(settings) ? "paystack" : "sandbox";
+    const provider = paymentMethod === "bank_transfer" ? "manual" : paystackSecret(settings) ? "paystack" : "sandbox";
     const payment = await db.one<{ id: string }>(
       `insert into payments
          (reference, scope, provider, checkout_reference, payer_user_id, payer_email, amount, currency,
@@ -400,12 +414,24 @@ export async function createCheckout(
       ],
     );
 
+    if (paymentMethod === "bank_transfer") {
+      for (const order of created) {
+        await db.execute(
+          `insert into manual_order_payments (order_id, payment_id, customer_id, store_id, bank_name, account_name, account_number, amount)
+           select o.id, $2, $3, o.store_id, v.bank_name, v.account_name, v.account_number, o.total
+           from orders o join stores s on s.id = o.store_id join vendor_profiles v on v.user_id = s.owner_id where o.id = $1`,
+          [order.id, payment.id, customer.id],
+        );
+        await db.execute(`update orders set platform_commission = 0, vendor_payable = 0 where id = $1`, [order.id]);
+      }
+    }
     return { checkoutReference, paymentReference, paymentId: payment.id, created, grandTotal };
   });
 
   // Start the payment *after* the transaction commits.
   let authorizationUrl = `/pay/${prepared.paymentReference}`;
   try {
+    if (paymentMethod !== "bank_transfer") {
     const init = await initializeTransaction({
       reference: prepared.paymentReference,
       amount: prepared.grandTotal,
@@ -420,6 +446,7 @@ export async function createCheckout(
       prepared.paymentId,
       authorizationUrl,
     ]);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Payment could not be initialised";
     await systemDb.execute(
@@ -448,13 +475,14 @@ export async function markOrdersPaid(
   checkoutReference: string,
   paymentId: string,
   channel?: string | null,
+  onlyOrderId?: string,
 ) {
   const orders = await db.query<Order & { store_name: string; owner_id: string; customer_email: string }>(
     `select o.*, s.name as store_name, s.owner_id
        from orders o join stores s on s.id = o.store_id
-      where o.checkout_reference = $1
+      where o.checkout_reference = $1 and ($2::uuid is null or o.id = $2)
       for update of o`,
-    [checkoutReference],
+    [checkoutReference, onlyOrderId ?? null],
   );
 
   for (const order of orders) {
@@ -476,6 +504,7 @@ export async function markOrdersPaid(
        values ($1,$2,$3,$4) on conflict (payment_id, order_id) do nothing`,
       [paymentId, order.id, order.store_id, order.total],
     );
+    if (channel !== "bank_transfer_direct") {
     await db.execute(
       `insert into platform_commissions (order_id, store_id, payment_id, rate, amount, status)
        select $1,$2,$3, $4, $5, 'accrued'
@@ -500,6 +529,8 @@ export async function markOrdersPaid(
          updated_at = now()`,
       [order.store_id, order.vendor_payable, order.platform_commission],
     );
+
+    }
 
     if (!order.stock_committed) {
       const items = await db.query<OrderItem>(

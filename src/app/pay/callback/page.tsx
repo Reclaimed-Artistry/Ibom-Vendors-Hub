@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
 import { getPaymentContext, verifyPayment } from "@/lib/payments";
@@ -18,6 +19,7 @@ export default async function PaymentCallbackPage({
   const sp = await searchParams;
   const settings = await getSettings();
   let context = sp.reference ? await getPaymentContext(sp.reference) : null;
+  if (context?.payment.provider === "manual" && context.payment.scope === "order") redirect(`/pay/${context.payment.reference}`);
   let verificationError: string | null = null;
 
   if (context && context.payment.status === "pending" && context.payment.provider === "paystack") {
