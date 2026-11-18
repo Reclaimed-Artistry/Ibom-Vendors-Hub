@@ -1,3 +1,4 @@
+import { FREE_STORE_ACCESS } from "@/lib/store-access-policy";
 import { calculateDeliveryFee, deliveryRate, isWithinVendorLga } from "@/lib/delivery-fees";
 import { systemDb, withSystem, type Db } from "@/lib/db";
 import { getSettings, paystackSecret, url } from "@/lib/settings";
@@ -89,8 +90,8 @@ export async function createCheckout(
               s.accepts_pickup, s.delivery_fee, s.minimum_order, s.access_until, s.owner_id,
               s.email as store_email, s.address as store_address, s.city as store_city,
               s.state as store_state, s.phone as store_phone, s.category_id,
-              exists (select 1 from subscriptions su where su.store_id = s.id
-                and su.status in ('active','trialing') and su.expires_at > now()) as subscription_active
+              (${FREE_STORE_ACCESS} or exists (select 1 from subscriptions su where su.store_id = s.id
+                and su.status in ('active','trialing') and su.expires_at > now())) as subscription_active
          from products p join stores s on s.id = p.store_id
         where p.id = any($1::uuid[])`,
       [productIds],

@@ -21,7 +21,7 @@ export default async function VendorOnboardingPage() {
     <div className="mx-auto max-w-2xl px-4 py-12">
       <PageHeader
         title="Finish setting up your Akwa Ibom storefront"
-        description="Your vendor account is ready — complete your business details and KYC verification to launch your storefront and start your 14-day free trial."
+        description="Your vendor account is ready — complete your business details and KYC verification to launch your storefront. Registering and owning a store is absolutely free."
       />
       <Card className="card-pad space-y-4">
         <div className="flex items-start gap-3">

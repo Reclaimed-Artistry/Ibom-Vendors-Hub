@@ -1,4 +1,5 @@
 "use client";
+import { FREE_STORE_ACCESS } from "@/lib/store-access-policy";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -45,7 +46,7 @@ export interface SubscriptionCountdownProps {
   autoRefreshOnExpire?: boolean;
 }
 
-export function SubscriptionCountdown({
+function ActiveSubscriptionCountdown({
   expiresAt,
   startedAt,
   planName,
@@ -259,4 +260,8 @@ export function SubscriptionCountdown({
       </div>
     </div>
   );
+}
+
+export function SubscriptionCountdown(props: SubscriptionCountdownProps) {
+  return FREE_STORE_ACCESS ? <p className="text-sm font-semibold text-brand-700">Store ownership is absolutely free. No subscription required.</p> : <ActiveSubscriptionCountdown {...props} />;
 }

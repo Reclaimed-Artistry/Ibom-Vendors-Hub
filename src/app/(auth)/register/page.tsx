@@ -95,7 +95,7 @@ export default async function RegisterPage({
       </div>
       <h1 className="mt-3 text-2xl font-bold tracking-tight">Create your Akwa Ibom storefront</h1>
       <p className="mt-1.5 text-sm text-ink-500">
-        Choose your unique business name, verify your Akwa Ibom address, and add the Nigerian bank account where you receive customer payouts. Includes a {settings.default_trial_days}-day free trial.
+        Choose your unique business name, verify your Akwa Ibom address, and add the Nigerian bank account where you receive customer payouts. Registering and owning a store is absolutely free — no trial countdown or subscription payment.
       </p>
 
       <div className="mt-6">

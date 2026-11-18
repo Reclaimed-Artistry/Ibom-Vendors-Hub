@@ -1,3 +1,4 @@
+import { FREE_STORE_ACCESS, FREE_STORE_MESSAGE } from "@/lib/store-access-policy";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Check, Clock, CreditCard, Lock, ShieldAlert, Sparkles } from "lucide-react";
@@ -30,6 +31,7 @@ export default async function VendorSubscriptionPage({
 }: {
   searchParams: Promise<{ suspended?: string }>;
 }) {
+  if (FREE_STORE_ACCESS) return <div className="card-pad"><PageHeader title="Your store is free" description={FREE_STORE_MESSAGE} /></div>;
   const { suspended } = await searchParams;
   const { store, effectiveExpiresAt, effectiveStartedAt, isSubscriptionExpired } = await getVendorContext();
   const [subscription, lastSub, usedTrial, plans, payments] = await Promise.all([

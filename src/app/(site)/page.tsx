@@ -140,8 +140,8 @@ export default async function HomePage() {
                 )}
                 <dl className="mt-6 grid grid-cols-3 gap-2 text-center text-white sm:gap-3">
                   <div className="rounded-xl border border-white/10 bg-white/5 p-2 sm:p-3">
-                    <dt className="whitespace-nowrap text-[clamp(8px,2.6vw,10px)] uppercase tracking-wide text-ink-300">Trial</dt>
-                    <dd className="mt-1 text-sm font-semibold">{settings.default_trial_days}d</dd>
+                    <dt className="whitespace-nowrap text-[clamp(8px,2.6vw,10px)] uppercase tracking-wide text-ink-300">Store ownership</dt>
+                    <dd className="mt-1 text-sm font-semibold">Free</dd>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-white/5 p-2 sm:p-3">
                     <dt className="whitespace-nowrap text-[clamp(8px,2.6vw,10px)] uppercase tracking-wide text-ink-300">Setup fee</dt>
@@ -314,7 +314,7 @@ export default async function HomePage() {
               <h2 className="font-display text-3xl text-white sm:text-4xl">Your business deserves its own address.</h2>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-ink-200">
                 Register in minutes and get a storefront on your own subdomain — complete with catalogue, orders, payments,
-                subscription billing and customer tracking. No code, no hosting bill, no commissions hidden in the fine print.
+                order management and customer tracking. No code, no hosting bill, no commissions hidden in the fine print.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 {!user ? (
@@ -344,8 +344,8 @@ export default async function HomePage() {
                 <dd className="mt-1 text-sm font-semibold">yourbusiness.{process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "ibomvendorshub.com"}</dd>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <dt className="text-xs text-ink-300">Free trial</dt>
-                <dd className="mt-1 text-sm font-semibold">{settings.default_trial_days} days</dd>
+                <dt className="text-xs text-ink-300">Store ownership</dt>
+                <dd className="mt-1 text-sm font-semibold">Absolutely free</dd>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <dt className="text-xs text-ink-300">Payments</dt>

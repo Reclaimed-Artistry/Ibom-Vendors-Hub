@@ -156,8 +156,8 @@ function template(name: string, data: EmailData): RenderedEmail {
         intro: `Hi ${data.name ?? "there"}, ${data.storeName ?? "your store"} is now on Ibom Vendors Hub. Start adding products and share your store link with customers.`,
         rows: [
           ["Store URL", data.storeUrl ?? ""],
-          ["Plan", data.planName ?? "Starter trial"],
-          ["Subscription ends", data.expiresAt ?? ""],
+          ["Store ownership", "Absolutely free"],
+
         ],
         cta: { label: "Open my dashboard", href: url("/vendor") },
       };

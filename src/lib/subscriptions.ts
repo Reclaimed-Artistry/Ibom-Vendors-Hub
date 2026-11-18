@@ -1,3 +1,4 @@
+import { FREE_STORE_ACCESS, FREE_STORE_MESSAGE } from "@/lib/store-access-policy";
 import { systemDb, withSystem, type Db } from "@/lib/db";
 import { getSettings, paystackSecret, url } from "@/lib/settings";
 import { initializeTransaction } from "@/lib/payments/gateway";
@@ -115,6 +116,7 @@ export async function purchaseSubscription(input: {
   payerEmail: string;
   payerUserId: string | null;
 }): Promise<PurchaseResult> {
+  if (FREE_STORE_ACCESS) throw new Error(FREE_STORE_MESSAGE);
   const settings = await getSettings();
   const current = await getStoreSubscription(input.store.id);
 
@@ -370,6 +372,7 @@ export async function adminWaiveSubscription(input: {
 /* -------------------------------------------------------------------------- */
 
 export async function runSubscriptionMaintenance() {
+  if (FREE_STORE_ACCESS) return { expired: 0, reminders: 0, emailsRetried: 0, errors: [] as string[] };
   const settings = await getSettings();
   const startedAt = new Date();
   const job = await systemDb.one<{ id: string }>(

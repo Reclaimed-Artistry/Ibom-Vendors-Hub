@@ -1,3 +1,4 @@
+import { FREE_STORE_ACCESS, FREE_STORE_MESSAGE } from "@/lib/store-access-policy";
 import { LiveDashboard } from "@/components/live-dashboard";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
@@ -78,13 +79,13 @@ export default async function VendorLayout({ children }: { children: React.React
     { href: "/vendor/customers", label: "Customers", icon: "customers", locked: isSubscriptionExpired },
     { href: "/vendor/reviews", label: "Reviews", icon: "reviews", badge: counts?.reviews || undefined, locked: isSubscriptionExpired },
     { href: "/vendor/messages", label: "Messages", icon: "messages", badge: counts?.messages || undefined, locked: isSubscriptionExpired },
-    { href: "/vendor/subscription", label: "Subscription", icon: "subscription" },
+    { href: "/vendor/subscription", label: "Free store", icon: "subscription" },
     { href: "/vendor/store", label: "Store profile", icon: "store", locked: isSubscriptionExpired },
     { href: "/vendor/settings", label: "Account settings", icon: "settings", locked: isSubscriptionExpired },
   ];
 
   const remaining = daysLeft(effectiveExpiresAt);
-  const expiringSoon = !isSubscriptionExpired && remaining > 0 && remaining <= 5;
+  const expiringSoon = !FREE_STORE_ACCESS && !isSubscriptionExpired && remaining > 0 && remaining <= 5;
   const displayPlanName =
     subscription?.plan_name ??
     (effectiveExpiresAt && !subscription ? "Admin access grant" : lastSubscription?.plan_name ?? "No active plan");
@@ -93,6 +94,7 @@ export default async function VendorLayout({ children }: { children: React.React
     <div className="min-h-screen w-full max-w-full overflow-x-clip bg-ink-50">
       <LiveDashboard />
       <VendorAnnouncements />
+      <div className="mx-auto max-w-[1440px] px-4 py-3 text-sm font-semibold text-brand-700">{FREE_STORE_MESSAGE}</div>
       <div className="mx-auto flex max-w-[1440px] gap-6 px-4 py-5 lg:px-8">
         <aside className="hidden w-64 shrink-0 lg:block">
           <div className="sticky top-5 space-y-4">
@@ -241,7 +243,7 @@ export default async function VendorLayout({ children }: { children: React.React
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm text-ink-700">
                 <p className="flex items-start gap-2">
                   <MailWarning className="mt-0.5 size-4 shrink-0 text-amber-600" />
-                  <span>Verify your email address to receive order alerts and subscription reminders.</span>
+                  <span>Verify your email address to receive order alerts and important store updates.</span>
                 </p>
                 <Link href={`/verify-email?email=${encodeURIComponent(user.email)}`} className="btn btn-secondary btn-sm">Verify email</Link>
               </div>

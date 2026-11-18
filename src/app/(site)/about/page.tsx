@@ -28,7 +28,7 @@ export default async function AboutPage() {
         <li>Get an automatic storefront address like <code>yourbusiness.{settings.main_domain}</code>.</li>
         <li>Add products, services and variations that match how you sell.</li>
         <li>Accept orders, update production stages and keep customers informed automatically.</li>
-        <li>Stay online with a simple subscription — renew in seconds.</li>
+        <li>Registering and owning a store is absolutely free — no trial countdown or subscription payment.</li>
       </ul>
       <h2>Contact</h2>
       <p>

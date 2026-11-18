@@ -1,3 +1,4 @@
+import { FREE_STORE_ACCESS } from "@/lib/store-access-policy";
 import { authCookieDomain } from "@/lib/auth-navigation";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
@@ -208,7 +209,7 @@ export const getVendorContext = cache(async (): Promise<VendorContext> => {
     (store.status === "active" || store.status === "pending") &&
     Boolean(store.access_until && new Date(store.access_until).getTime() <= Date.now());
 
-  if (overdueSub || overdueGrant) {
+  if (!FREE_STORE_ACCESS && (overdueSub || overdueGrant)) {
     await withSystem((db) => db.query(`select * from process_subscription_expiry()`));
     const refreshed = await systemDb.maybeOne<Store>(`select * from stores where id = $1`, [store.id]);
     if (refreshed) store = refreshed;
@@ -238,10 +239,11 @@ export const getVendorContext = cache(async (): Promise<VendorContext> => {
   const hasUnexpiredAccessGrant = Boolean(
     store.access_until && new Date(store.access_until).getTime() > Date.now(),
   );
-  const effectiveExpiresAt = subscription?.expires_at ?? (hasUnexpiredAccessGrant ? store.access_until : null);
+  const effectiveExpiresAt = FREE_STORE_ACCESS ? null : subscription?.expires_at ?? (hasUnexpiredAccessGrant ? store.access_until : null);
   const effectiveStartedAt = subscription?.started_at ?? null;
   const isManuallySuspended = Boolean(store.manual_suspension || store.status === "suspended");
   const isSubscriptionExpired =
+    !FREE_STORE_ACCESS &&
     !isManuallySuspended &&
     store.status !== "rejected" &&
     (store.status === "expired" || (!subscription && !hasUnexpiredAccessGrant));

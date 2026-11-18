@@ -1,3 +1,4 @@
+import { FREE_STORE_ACCESS } from "@/lib/store-access-policy";
 import { adminEmailRecipients } from "@/lib/admin-email-recipients";
 import { isUniqueViolation, systemDb, withSystem } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
@@ -339,7 +340,7 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
          values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
                  null,
                  now() + interval '48 hours',
-                 case when $16::boolean then null else now() + make_interval(days => $17) end,
+                 case when ${FREE_STORE_ACCESS} or $16::boolean then null else now() + make_interval(days => $17) end,
                  1500, 30)
          returning id, slug, status, review_deadline_at`,
         [
@@ -358,14 +359,14 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
           input.address?.trim() || null,
           settings.country,
           status,
-          Boolean(trialPlan),
+          !FREE_STORE_ACCESS && Boolean(trialPlan),
           defaultTrialDays,
         ],
       );
 
     let trialEndsAt: string | null = null;
-    let planName = "Free Trial";
-    if (trialPlan) {
+    let planName = "Free store";
+    if (!FREE_STORE_ACCESS && trialPlan) {
       const trialDays = trialPlan.trial_days > 0 ? trialPlan.trial_days : defaultTrialDays;
       planName = trialPlan.name;
       const sub = await db.one<{ id: string; expires_at: string }>(
@@ -942,7 +943,7 @@ export async function restoreStore(storeId: string, adminId: string) {
     await db.execute(
       `update stores set manual_suspension = false, suspension_reason = null,
               suspended_at = null, suspended_by = null,
-              status = case when exists (
+              status = case when ${FREE_STORE_ACCESS} or exists (
                 select 1 from subscriptions s where s.store_id = stores.id
                  and s.status in ('active','trialing') and s.expires_at > now()
               ) then 'active' else 'expired' end

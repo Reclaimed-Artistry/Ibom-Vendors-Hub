@@ -99,7 +99,7 @@ export default async function VendorOverviewPage({
 
       {welcome ? (
         <Alert tone="success" title="Your vendor account is ready">
-          Your 14-day trial has started. Add your first products so customers can find you as soon as an admin approves your storefront.
+          Registering and owning your store is absolutely free. Add your first products so customers can find you as soon as an admin approves your storefront.
         </Alert>
       ) : null}
 
@@ -169,7 +169,7 @@ export default async function VendorOverviewPage({
               status={subscription?.status ?? null}
             />
             <div className="flex flex-wrap gap-2">
-              <ButtonLink href="/vendor/subscription" size="sm" variant="secondary">Manage / extend plan</ButtonLink>
+              <ButtonLink href="/vendor/subscription" size="sm" variant="secondary">Free store details</ButtonLink>
               <Link href="/vendor/store" className="btn btn-ghost btn-sm">Edit storefront</Link>
             </div>
           </div>
