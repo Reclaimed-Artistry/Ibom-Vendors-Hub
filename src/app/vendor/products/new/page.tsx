@@ -18,10 +18,10 @@ export default async function NewProductPage() {
     <div>
       <PageHeader
         title={category?.slug === "house-agents-realtors" ? "Add a property" : "Add a product"}
-        description="Only the fields that matter to your category are shown."
+        description="Choose what you are adding, then fill in a few simple details. Examples will guide you."
         breadcrumb={<Link href="/vendor/products" className="hover:text-brand-700">← Products</Link>}
       />
-      <ProductForm vendorLga={store.city}
+      <ProductForm vendorLga={store.city} categorySlug={category?.slug ?? null}
         categoryName={category?.name ?? null}
         attributes={category?.attributes ?? []}
         features={category?.features ?? {}}

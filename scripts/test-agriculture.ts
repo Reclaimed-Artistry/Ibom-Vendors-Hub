@@ -8,12 +8,13 @@ assert.throws(()=>validateAgricultureAttributes({...basic,harvest_date:"2026-02-
 assert.throws(()=>validateAgricultureAttributes({...basic,harvest_date:"2099-01-01"}));
 assert.throws(()=>validateAgricultureAttributes({...basic,produce_type:"Eggs"}),/egg/i);
 validateAgricultureAttributes({...basic,produce_type:"Eggs",egg_details:"Large, collected 2026-11-16"});
-assert.throws(()=>validateAgricultureAttributes({...basic,produce_condition:"Live"}),/breed/i);
+assert.throws(()=>validateAgricultureAttributes({...basic,produce_condition:"Live"}),/health/i);
 validateAgricultureAttributes({...basic,produce_type:"Chicken & other poultry",produce_condition:"Live",breed_variety:"Broiler",animal_age:"8 weeks, about 2 kg",health_details:"Active, vaccination record available"});
 for(const produce_type of ["Crayfish & seafood","Catfish & other fish"]) {
- assert.throws(()=>validateAgricultureAttributes({...basic,produce_type}),/fish|seafood/i);
+ validateAgricultureAttributes({...basic,produce_type});
  validateAgricultureAttributes({...basic,produce_type,fish_preparation:"Whole smoked fish, medium size"});
 }
+validateAgricultureAttributes({produce_type:"Vegetables & fruits",sale_unit:"Basket",pack_size:"5 kg",produce_condition:"Fresh / raw"});
 assert.equal(farmMinimumQuantity(basic),2);
 assert.equal(farmMinimumQuantity({}),1);
 console.log("PASS: produce requirements, live poultry, eggs, crayfish/catfish, dates, units and minimum-order validation");

@@ -5,11 +5,11 @@ export const AGRICULTURE_ATTRIBUTES: CategoryAttribute[] = [
   { key: "produce_type", label: "Produce type", type: "select", required: true, options: ["Crayfish & seafood", "Catfish & other fish", "Chicken & other poultry", "Eggs", "Livestock", "Vegetables & fruits", "Grains, tubers & legumes", "Other farm produce"] },
   { key: "sale_unit", label: "Price is per", type: "select", required: true, options: ["Kilogram (kg)", "Gram (g)", "Litre", "Piece", "Bird / animal", "Crate", "Basket", "Bag", "Bunch", "Pack", "Other (describe pack size)"] },
   { key: "pack_size", label: "Exact weight / pack size (e.g. 1 kg, 30 eggs, 50 kg bag)", type: "text", required: true },
-  { key: "minimum_order", label: "Minimum order (number of selling units)", type: "number", required: true },
+  { key: "minimum_order", label: "Minimum order (number of selling units)", type: "number" },
   { key: "produce_condition", label: "Condition / processing", type: "select", required: true, options: ["Live", "Fresh / raw", "Chilled", "Frozen", "Dried", "Smoked", "Processed / packaged"] },
-  { key: "source_location", label: "Farm / source location (town and LGA)", type: "text", required: true },
-  { key: "storage_instructions", label: "Storage and shelf-life instructions", type: "textarea", required: true },
-  { key: "fulfilment_notes", label: "Pickup / delivery timing, packaging and handling", type: "textarea", required: true },
+  { key: "source_location", label: "Farm / source location (town and LGA)", type: "text" },
+  { key: "storage_instructions", label: "Storage and shelf-life instructions", type: "textarea" },
+  { key: "fulfilment_notes", label: "Pickup / delivery timing, packaging and handling", type: "textarea" },
   { key: "harvest_date", label: "Harvest / catch / processing date (YYYY-MM-DD, if applicable)", type: "text" },
   { key: "breed_variety", label: "Breed / species / variety", type: "text" },
   { key: "animal_age", label: "Age and typical live weight (include units)", type: "text" },
@@ -20,9 +20,8 @@ export const AGRICULTURE_ATTRIBUTES: CategoryAttribute[] = [
 
 export function agricultureFieldRequired(key: string, values: Record<string, string>): boolean {
   if (AGRICULTURE_ATTRIBUTES.find(a => a.key === key)?.required) return true;
-  if (["breed_variety", "animal_age", "health_details"].includes(key)) return values.produce_condition === "Live";
+  if (key === "health_details") return values.produce_condition === "Live";
   if (key === "egg_details") return values.produce_type === "Eggs";
-  if (key === "fish_preparation") return ["Crayfish & seafood", "Catfish & other fish"].includes(values.produce_type);
   return false;
 }
 
@@ -35,7 +34,7 @@ export function validateAgricultureAttributes(values: Record<string, string>) {
     if (value && field.options && !field.options.includes(value)) throw new Error(`Choose a valid ${field.label.toLowerCase()}.`);
     if (value && value.length > 2000) throw new Error(`${field.label} must be under 2,000 characters.`);
   }
-  const minimum = Number(values.minimum_order);
+  const minimum = Number(values.minimum_order || 1);
   if (!Number.isFinite(minimum) || minimum < 1 || minimum > 99 || !Number.isInteger(minimum)) throw new Error("Minimum order must be a whole number of selling units, between 1 and 99.");
   if (values.harvest_date) {
     const date = new Date(`${values.harvest_date}T00:00:00Z`);

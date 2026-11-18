@@ -125,7 +125,7 @@ export default async function EditProductPage({
       {isPropertyCategory(category?.slug) ? <InspectionSlotManager productId={id} slots={slots} office={store.address ?? ""}/> : null}
       {saved ? <Alert tone="success" title="Saved">Your product has been updated.</Alert> : null}
       <div className="mt-4">
-        <ProductForm vendorLga={store.city}
+        <ProductForm vendorLga={store.city} categorySlug={category?.slug ?? null}
           product={editable}
           categoryName={category?.name ?? null}
           attributes={category?.attributes ?? []}
