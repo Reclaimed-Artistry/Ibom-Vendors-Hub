@@ -94,6 +94,15 @@ function template(name: string, data: EmailData): RenderedEmail {
     : site;
 
   switch (name) {
+    case "admin_notification":
+      return {
+        subject: `Ibomvendorshub · ${data.subject ?? "New notification"}`,
+        heading: String(data.subject ?? "New notification"),
+        intro: String(data.message ?? "You have a new administrator notification."),
+        cta: { label: "View notification", href: data.link ?? url("/admin/notifications") },
+        footnote: "This is an email copy of a new admin notification. Sign in to your administrator account to view details or take action.",
+      };
+
     case "manual_payment_review":
       return {
         subject: `Payment approval needed · ${data.orderReference}`,
