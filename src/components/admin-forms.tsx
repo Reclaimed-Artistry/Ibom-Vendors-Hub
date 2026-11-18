@@ -13,7 +13,6 @@ import {
   savePlatformSettingsAction,
   sendTestEmailAction,
   suspendStoreAction,
-  verifyPaystackAction,
   waiveSubscriptionAction,
   type AdminState,
 } from "@/app/actions/admin";
@@ -332,9 +331,6 @@ export interface PlatformSettingsValues {
   paymentsEnabled: boolean;
   sandboxPayments: boolean;
   maintenanceMode: boolean;
-  paystackPublicKey: string;
-  /** Only whether one is stored — the value never leaves the server. */
-  hasPaystackSecret: boolean;
   emailFrom: string;
 }
 
@@ -367,27 +363,6 @@ export function PlatformSettingsForm({ values }: { values: PlatformSettingsValue
         </Field>
         <Field label="Grace period (days)" htmlFor="graceDays">
           <input id="graceDays" name="graceDays" type="number" min="0" className="input" defaultValue={values.graceDays} />
-        </Field>
-        <Field label="Paystack public key" htmlFor="paystackPublicKey">
-          <input id="paystackPublicKey" name="paystackPublicKey" className="input" defaultValue={values.paystackPublicKey} />
-        </Field>
-        <Field
-          label="Paystack secret key"
-          htmlFor="paystackSecretKey"
-          hint={
-            values.hasPaystackSecret
-              ? "Stored server-side and never displayed. Leave blank to keep it."
-              : "Stored server-side and never displayed."
-          }
-        >
-          <input
-            id="paystackSecretKey"
-            name="paystackSecretKey"
-            type="password"
-            className="input"
-            placeholder={values.hasPaystackSecret ? "•••••••• already stored" : "sk_test_… / sk_live_…"}
-            autoComplete="new-password"
-          />
         </Field>
         <Field label="Email from address" htmlFor="emailFrom">
           <input id="emailFrom" name="emailFrom" className="input" defaultValue={values.emailFrom} />
@@ -436,19 +411,5 @@ export function RetryEmailsButton() {
         Retry failed messages
       </SubmitButton>
     </form>
-  );
-}
-
-export function VerifyPaystackButton() {
-  const [state, formAction] = useActionState<AdminState, FormData>(verifyPaystackAction, {});
-  return (
-    <div className="space-y-2">
-      <StateNote state={state} />
-      <form action={formAction}>
-        <SubmitButton className="btn btn-secondary btn-sm" pendingLabel="Checking with Paystack…">
-          Test Paystack connection
-        </SubmitButton>
-      </form>
-    </div>
   );
 }

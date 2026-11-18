@@ -3,11 +3,10 @@ import Link from "next/link";
 import { Landmark, Mail, Search, Wallet } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { getPaymentStats, listRefunds } from "@/lib/payments";
-import { gatewayStatus, getSettings } from "@/lib/settings";
 import { systemDb } from "@/lib/db";
 import { formatMoney, formatDateTime } from "@/lib/utils";
-import { Alert, Badge, Card, CardHeader, EmptyState, PageHeader, StatCard, StatusBadge, Tabs } from "@/components/ui";
-import { RefundForm, VerifyPaystackButton } from "@/components/admin-forms";
+import { Badge, Card, CardHeader, EmptyState, PageHeader, StatCard, StatusBadge, Tabs } from "@/components/ui";
+import { RefundForm } from "@/components/admin-forms";
 import { AdminPayoutSettlementControls, AdminRefundDecisionControls } from "@/components/admin-payout-row";
 
 export const metadata: Metadata = { title: "Payments · Admin" };
@@ -38,7 +37,6 @@ export default async function AdminPaymentsPage({
   }
   const where = filters.length ? `where ${filters.join(" and ")}` : "";
 
-  const gateway = gatewayStatus(await getSettings());
 
   const [rows, stats, refunds, vendorPayouts, vendorWallets] = await Promise.all([
     systemDb.query<{
@@ -120,24 +118,6 @@ export default async function AdminPaymentsPage({
   return (
     <div className="space-y-4">
       <PageHeader title="Payments" description="Every attempt, with server-side verification, vendor escrow balances, and bank payouts." />
-
-      <Alert
-        tone={gateway.mode === "paystack" && gateway.warnings.length === 0 ? "success" : gateway.secretConfigured ? "warning" : "info"}
-        title={`Gateway: ${gateway.mode === "paystack" ? "Paystack" : "sandbox"} (${gateway.secretKind === "live" ? "live keys" : gateway.secretKind === "test" ? "test keys" : "no secret key"})`}
-      >
-        <span className="block">
-          Public key: {gateway.publicConfigured ? `${gateway.publicHint} from ${gateway.publicSource}` : "not configured"} · Secret key:{" "}
-          {gateway.secretConfigured ? `configured in ${gateway.secretSource}` : "not configured"}
-        </span>
-        {gateway.warnings.map((warning) => (
-          <span key={warning} className="mt-1 block text-xs">{warning}</span>
-        ))}
-        <span className="mt-1 block text-xs">
-          Paystack dashboard → Settings → API Keys &amp; Webhooks; the webhook URL is{" "}
-          <span className="font-mono">/api/webhooks/paystack</span> and must use the same test/live mode as the keys.
-        </span>
-        {gateway.secretConfigured ? <div className="mt-2"><VerifyPaystackButton /></div> : null}
-      </Alert>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Collected" value={formatMoney(Number(stats?.total_volume ?? 0))} hint={`${stats?.success_count ?? 0} successful payments`} icon={<Wallet className="size-4" />} />
@@ -306,7 +286,7 @@ export default async function AdminPaymentsPage({
                 <tr key={payment.reference}>
                   <td>
                     <p className="font-mono text-xs text-ink-800">{payment.reference}</p>
-                    <p className="text-[11px] text-ink-400">{payment.provider}</p>
+                    <p className="text-[11px] text-ink-400">{payment.provider === "paystack" ? "Online payment (historical)" : payment.provider}</p>
                   </td>
                   <td className="text-sm capitalize">{payment.scope}</td>
                   <td className="text-xs text-ink-600"><span className="flex items-center gap-1"><Mail className="size-3" /> {payment.payer_email}</span></td>

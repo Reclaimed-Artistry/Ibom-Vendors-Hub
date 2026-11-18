@@ -41,7 +41,7 @@ export function WalletFundForm() {
         />
       </Field>
       <p className="text-xs text-ink-500">
-        Minimum top-up is ₦100. You will be redirected to PayStack to complete the payment.
+        Online wallet top-ups are currently unavailable.
       </p>
       <SubmitButton className="btn-primary w-full" pendingLabel="Starting top-up…">
         <Banknote className="mr-2 size-4" /> Fund wallet

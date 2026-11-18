@@ -7,7 +7,7 @@ import { systemDb, withSystem } from "@/lib/db";
 import { logActivity } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
 import { retryFailedEmails, sendEmail } from "@/lib/email";
-import { emailFrom, getSettings, mailProvider, paystackSecret, url } from "@/lib/settings";
+import { emailFrom, getSettings, mailProvider, url } from "@/lib/settings";
 import {
   approveStore,
   checkSubdomain,
@@ -17,7 +17,6 @@ import {
   restoreStore,
   suspendStore,
 } from "@/lib/stores";
-import { checkPaystackCredentials } from "@/lib/payments/gateway";
 import { processRefund } from "@/lib/payments";
 import { adminGrantSubscription, adminWaiveSubscription } from "@/lib/subscriptions";
 import { formatIssues, categorySchema } from "@/lib/validation";
@@ -632,8 +631,7 @@ export async function savePlatformSettingsAction(_prev: AdminState, formData: Fo
            platform_name=$1, tagline=$2, support_email=$3, support_phone=$4, main_domain=$5,
            commission_rate=$6, default_trial_days=$7, grace_period_days=$8,
            require_vendor_approval=$9, payments_enabled=$10, sandbox_payments=$11,
-           maintenance_mode=$12, paystack_public_key=$13,
-           paystack_secret_key=coalesce(nullif($14,''), paystack_secret_key), email_from=$15, updated_at=now()
+           maintenance_mode=$12, email_from=$13, updated_at=now()
          where id = 1`,
         [
           str("platformName") || "Ibom Vendors Hub",
@@ -648,8 +646,6 @@ export async function savePlatformSettingsAction(_prev: AdminState, formData: Fo
           formData.get("paymentsEnabled") === "on",
           formData.get("sandboxPayments") === "on",
           formData.get("maintenanceMode") === "on",
-          str("paystackPublicKey") || null,
-          str("paystackSecretKey") || null,
           str("emailFrom") || null,
         ],
       );
@@ -733,35 +729,6 @@ export async function retryFailedEmailsAction() {
 /* -------------------------------------------------------------------------- */
 /* Payment gateway                                                            */
 /* -------------------------------------------------------------------------- */
-
-export async function verifyPaystackAction(_prev: AdminState, _formData: FormData): Promise<AdminState> {
-  const user = await admin();
-  const settings = await getSettings();
-  const secret = paystackSecret(settings);
-  if (!secret) {
-    return { error: "No Paystack secret key configured. Add PAYSTACK_SECRET_KEY to the environment or save one in Platform settings." };
-  }
-
-  const result = await checkPaystackCredentials(secret);
-  await logActivity({
-    actorId: user.id,
-    actorRole: "admin",
-    action: "payments.gateway_checked",
-    entityType: "platform_settings",
-    entityId: "1",
-    description: result.ok
-      ? `Paystack key accepted (${result.balances?.map((row) => `${row.currency} ${row.balance}`).join(", ") || "no balance rows"})`
-      : `Paystack key rejected — ${result.error ?? "unknown error"}`,
-    meta: { ok: result.ok, error: result.error ?? null, balances: result.balances ?? [] },
-  });
-
-  if (!result.ok) return { error: `Paystack rejected the secret key — ${result.error ?? "unknown error"}` };
-  revalidatePath("/admin/payments");
-  const balances = result.balances?.length
-    ? result.balances.map((row) => `${row.currency} ${row.balance.toLocaleString("en-NG")}`).join(" · ")
-    : "no settled balance yet";
-  return { message: `The secret key authenticates with Paystack. Account balance: ${balances}.` };
-}
 
 export async function settleVendorPayoutAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const user = await admin();

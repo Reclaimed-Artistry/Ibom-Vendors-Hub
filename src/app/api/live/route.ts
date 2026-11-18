@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { recoverAdminNotificationEmails } from "@/lib/notifications";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
@@ -17,6 +19,10 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  if (["admin", "super_admin"].includes(user.role)) {
+    after(async () => { await recoverAdminNotificationEmails(4); });
   }
 
   const unread = await systemDb.maybeOne<{ count: number; latest: string | null }>(

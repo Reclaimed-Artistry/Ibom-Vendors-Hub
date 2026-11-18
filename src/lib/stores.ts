@@ -1,3 +1,4 @@
+import { adminEmailRecipients } from "@/lib/admin-email-recipients";
 import { isUniqueViolation, systemDb, withSystem } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
 import { isReservedSubdomain, normaliseSubdomain, storefrontUrl } from "@/lib/domains";
@@ -524,7 +525,7 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
       if (row.email) adminEmails.add(row.email.toLowerCase());
     }
 
-    for (const adminEmail of adminEmails) {
+    for (const adminEmail of adminEmailRecipients([...adminEmails])) {
       await sendEmail({
         to: adminEmail,
         template: "admin_new_vendor",

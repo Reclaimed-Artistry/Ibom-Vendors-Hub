@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AlertCircle, LockKeyhole, ShieldCheck } from "lucide-react";
 import { getPaymentContext } from "@/lib/payments";
-import { getSettings } from "@/lib/settings";
+import { getSettings, onlinePaymentsEnabled } from "@/lib/settings";
 import { formatMoney } from "@/lib/utils";
 import { confirmSandboxPaymentAction } from "@/app/actions/payments";
 import { Logo } from "@/components/logo";
@@ -66,7 +66,7 @@ export default async function PayPage({ params }: { params: Promise<{ reference:
               <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
                 <p className="font-semibold">Sandbox gateway</p>
                 <p className="mt-1">
-                  No Paystack keys are configured, so this is a simulated payment. It still goes through server-side
+                  Online payment is unavailable. This is a simulated payment. It still goes through server-side
                   verification: the persisted payment record is checked and the amount is validated before any order is
                   marked paid.
                 </p>
@@ -76,8 +76,10 @@ export default async function PayPage({ params }: { params: Promise<{ reference:
                 <button className="btn-primary w-full">Pay {money(Number(payment.amount))} now</button>
               </form>
             </div>
+          ) : !onlinePaymentsEnabled ? (
+            <Alert tone="warning">Online payment is currently unavailable. Return to checkout and choose bank transfer.</Alert>
           ) : payment.authorization_url ? (
-            <a href={payment.authorization_url} className="btn-primary mt-5 w-full">Continue to Paystack</a>
+            <a href={payment.authorization_url} className="btn-primary mt-5 w-full">Continue to payment</a>
           ) : (
             <p className="mt-5 text-sm text-ink-500">This payment could not be initialised. Please return to checkout.</p>
           )}

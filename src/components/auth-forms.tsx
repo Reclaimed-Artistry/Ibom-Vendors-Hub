@@ -590,7 +590,7 @@ export function VendorRegisterForm({
           <div>
             <h3 className="text-sm font-semibold text-ink-900">Payout Bank Account (Where You Receive Payments)</h3>
             <p className="text-xs text-ink-600">
-              Customers pay securely via Paystack escrow at checkout. Once an order is delivered using the customer’s 6-digit PIN, your earnings unlock into your Available Wallet and are sent to this Nigerian bank account.
+              Customers can pay directly into your bank account by bank transfer. Verify the credit in your bank account before approving a receipt. Direct transfers do not enter a platform wallet.
             </p>
           </div>
         </div>

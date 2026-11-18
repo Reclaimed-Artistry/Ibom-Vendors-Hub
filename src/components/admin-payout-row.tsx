@@ -23,7 +23,7 @@ export function AdminPayoutSettlementControls({ payoutId }: { payoutId: string }
             name="reference"
             value={reference}
             onChange={(e) => setReference(e.target.value)}
-            placeholder="Bank / Paystack ref"
+            placeholder="Bank reference"
             className="input h-8 w-36 py-1 text-xs font-mono"
           />
           <SubmitButton className="btn-primary btn-sm" pendingLabel="Marking…">

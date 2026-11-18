@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { systemDb, withSystem } from "@/lib/db";
-import { getSettings, paystackSecret, url } from "@/lib/settings";
+import { getSettings, onlinePaymentsEnabled, paystackSecret, url } from "@/lib/settings";
 import { initializeTransaction } from "@/lib/payments/gateway";
 import { payWithWalletCheckout } from "@/lib/wallet-payments";
 import type { PublicState } from "@/app/actions/public";
@@ -25,6 +25,7 @@ export async function fundWalletAction(
   _prev: WalletState,
   formData: FormData,
 ): Promise<WalletState> {
+  if (!onlinePaymentsEnabled) return { error: "Online wallet top-ups are currently unavailable. Use vendor bank transfer at checkout." };
   const user = await getCurrentUser();
   if (!user) {
     return { error: "Please sign in to your account before funding your wallet." };

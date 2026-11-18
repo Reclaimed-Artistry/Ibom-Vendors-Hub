@@ -81,11 +81,15 @@ export function shortPlatformName(name: string) {
   return [words[0], words.slice(1).map((word) => word[0]?.toUpperCase() ?? "").join("")].join(" ");
 }
 
+export const onlinePaymentsEnabled = process.env.PAYSTACK_ENABLED === "true";
+
 export function paystackSecret(settings: PlatformSettings) {
+  if (!onlinePaymentsEnabled) return "";
   return settings.paystack_secret_key || process.env.PAYSTACK_SECRET_KEY || "";
 }
 
 export function paystackPublic(settings: PlatformSettings) {
+  if (!onlinePaymentsEnabled) return "";
   return (
     settings.paystack_public_key ||
     process.env.PAYSTACK_PUBLIC_KEY ||

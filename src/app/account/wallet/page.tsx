@@ -13,7 +13,6 @@ import {
   StatCard,
 } from "@/components/ui";
 import { getWalletBalance, getWalletTransactions } from "@/app/actions/wallet";
-import { WalletFundForm } from "./fund-form";
 
 export const metadata: Metadata = { title: "Wallet · Ibom Vendors Hub" };
 
@@ -28,7 +27,7 @@ export default async function WalletPage() {
     <div className="space-y-4">
       <PageHeader
         title="Wallet"
-        description="Top up your prepaid wallet and use it to pay for orders at checkout instead of paying with PayStack each time."
+        description="View your wallet history. Online top-ups are currently unavailable; pay vendors by bank transfer at checkout."
         actions={
           <ButtonLink href="/browse" variant="secondary" size="sm">
             Browse marketplace
@@ -70,7 +69,7 @@ export default async function WalletPage() {
       <Card>
         <CardHeader title="Fund your wallet" />
         <div className="card-pad">
-          <WalletFundForm />
+          <p className="text-sm text-ink-500">Online wallet top-ups are unavailable. Use vendor bank transfer at checkout.</p>
         </div>
       </Card>
 

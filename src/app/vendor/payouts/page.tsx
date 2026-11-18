@@ -64,7 +64,6 @@ export default async function VendorPayoutsPage() {
   const pending = Number(balance?.pending_amount ?? 0);
   const earned = Number(balance?.lifetime_earned ?? 0);
   const withdrawn = Number(balance?.lifetime_withdrawn ?? 0);
-  const commissionPct = Number(ctx.store.commission_rate ?? settings.commission_rate ?? 5);
   const hasBankAccount = Boolean(profile?.bank_name && profile?.account_number && profile?.account_name);
   const bankSummary = hasBankAccount
     ? `${profile?.bank_name} · ${profile?.account_number} (${profile?.account_name})`
@@ -74,7 +73,7 @@ export default async function VendorPayoutsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Wallet & Bank Payouts"
-        description="See how customer Paystack escrow payments unlock and manage the Nigerian bank account where you receive payouts."
+        description="Manage your Nigerian bank account for direct customer transfers. Direct transfers are not held by the platform."
       />
 
       {/* How Payments Work Explainer */}
@@ -85,17 +84,11 @@ export default async function VendorPayoutsPage() {
             <p className="text-sm font-bold text-ink-900">How Customer Payments & Your Bank Payouts Work</p>
             <ol className="list-decimal space-y-1 pl-4">
               <li>
-                <strong>Customer pays at checkout via Paystack</strong> (card, bank transfer, USSD, or mobile money) into Ibom Vendors Hub&apos;s secure Paystack escrow account.
+                <strong>Customer pays by bank transfer</strong> directly into the vendor’s bank account. Verify the credit before approving the receipt. Direct transfers do not accrue platform escrow earnings.
               </li>
-              <li>
-                <strong>Credited to Pending Escrow immediately:</strong> Your net order earnings ({100 - commissionPct}% of product subtotal after the {commissionPct}% platform fee, plus 100% of your delivery fee) appear right away in <strong>Pending Escrow</strong> below while you prepare and dispatch the order.
-              </li>
-              <li>
-                <strong>Unlocked by 6-digit Delivery / Pickup PIN:</strong> As soon as you enter the customer&apos;s 6-digit PIN upon delivery or pickup, the funds automatically move into <strong>Available for Payout</strong>.
-              </li>
-              <li>
-                <strong>Transferred to your Nigerian bank account:</strong> Request a withdrawal anytime and your funds are settled directly into your saved Nigerian bank account below.
-              </li>
+              <li><strong>Approve only after receiving funds:</strong> Receipt uploads are evidence for review, not proof that your bank account was credited.</li>
+              <li><strong>Confirm fulfilment separately:</strong> Use the customer’s delivery or pickup PIN when the order is handed over.</li>
+              <li>Wallet balances below apply only to eligible historical platform payments, not direct bank transfers.</li>
             </ol>
           </div>
         </div>

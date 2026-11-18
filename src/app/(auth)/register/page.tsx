@@ -64,7 +64,7 @@ export default async function RegisterPage({
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-brand-700" />
           <p>
             Every vendor storefront is tied to a verified account owner, has a globally unique locked business name,
-            and receives Paystack escrow payouts directly to your Nigerian bank account.
+            and accepts customer bank transfers directly into your Nigerian bank account.
           </p>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { withSystem } from "../src/lib/db";
-import { notify } from "../src/lib/notifications";
+import { notify, recoverAdminNotificationEmails } from "../src/lib/notifications";
 
 async function main() {
   assert(!process.env.DATABASE_URL || process.env.DATABASE_URL.includes("127.0.0.1"), "Local test database only");
@@ -25,6 +25,12 @@ async function main() {
     }
     await notify({ ...input, userId: customer.id, dedupeKey: `${key}-customer` });
     assert.equal((await db.query("select id from email_logs where template='admin_notification' and payload->>'subject'='Email mirror test'")).length, emails.length, "private customer alerts are not copied");
+    await db.execute("delete from email_logs where template='admin_notification' and payload->>'subject'='Email mirror test'");
+    await notify(input);
+    assert.equal((await db.query("select id from email_logs where template='admin_notification' and payload->>'subject'='Email mirror test'")).length, recipients.size, "existing notifications recover missing copies");
+    await db.execute("delete from email_logs where template='admin_notification' and payload->>'subject'='Email mirror test'");
+    await recoverAdminNotificationEmails(100);
+    assert.equal((await db.query("select id from email_logs where template='admin_notification' and payload->>'subject'='Email mirror test'")).length, recipients.size, "durable recovery includes old notifications");
     console.log("Notification email checks passed: admin account + personal copy, deduplication, body/link rendering and customer privacy.");
     throw rollback;
   }); } catch (error) { if (error !== rollback) throw error; }

@@ -18,7 +18,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
             single dashboard.
           </p>
           <ul className="mt-8 space-y-3 text-sm text-ink-200">
-            {["Category-aware dashboards", "Automatic storefront subdomain", "Subscription with live countdown", "Paystack payments & receipts"].map((item) => (
+            {["Category-aware dashboards", "Automatic storefront subdomain", "Subscription with live countdown", "Order tracking & receipts"].map((item) => (
               <li key={item} className="flex items-center gap-2">
                 <span className="flex size-5 items-center justify-center rounded-full bg-brand-500/20 text-brand-300">✓</span>
                 {item}

@@ -1,3 +1,4 @@
+import { recoverAdminNotificationEmails } from "@/lib/notifications";
 import { NextResponse } from "next/server";
 import { runSubscriptionMaintenance } from "@/lib/subscriptions";
 import { retryFailedEmails } from "@/lib/email";
@@ -24,8 +25,9 @@ async function handle(request: Request) {
   const summary = await runSubscriptionMaintenance();
   // Provider outages and undeliverable senders leave messages failed; retry them
   // here so a fix at the provider's end delivers the backlog without manual work.
+  const adminEmailRecovery = await recoverAdminNotificationEmails();
   const emailRetry = await retryFailedEmails(30);
-  return NextResponse.json({ ok: true, ...summary, emailRetry, ranAt: new Date().toISOString() });
+  return NextResponse.json({ ok: true, ...summary, emailRetry, adminEmailRecovery, ranAt: new Date().toISOString() });
 }
 
 export async function GET(request: Request) {

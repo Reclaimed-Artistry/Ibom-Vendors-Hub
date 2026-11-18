@@ -598,6 +598,9 @@ async function deliver(
       html: message.html,
       text: message.text,
     });
+    if (!info.accepted?.length || info.rejected?.length) {
+      throw new Error("Mail server did not accept the recipient");
+    }
     return info.messageId ?? null;
   }
   throw new Error("No email provider configured");

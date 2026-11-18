@@ -349,7 +349,7 @@ export default async function HomePage() {
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <dt className="text-xs text-ink-300">Payments</dt>
-                <dd className="mt-1 text-sm font-semibold">Paystack &amp; sandbox</dd>
+                <dd className="mt-1 text-sm font-semibold">Vendor bank transfer</dd>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <dt className="text-xs text-ink-300">Support</dt>
