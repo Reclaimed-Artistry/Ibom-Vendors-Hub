@@ -74,10 +74,10 @@ export default async function AdminOverviewPage() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-500" />
               <div>
-                <p className="text-sm font-semibold text-ink-900">Google sign-in is not live yet</p>
+                <p className="text-sm font-semibold text-ink-900">Google sign-in needs setup</p>
                 <p className="mt-1 max-w-2xl text-sm text-ink-600">
                   {google.enabled
-                    ? "Customers currently have to choose a password. Paste your Google OAuth client ID (and secret) once and the “Continue with Google” button appears on sign-in and sign-up — no redeploy needed."
+                    ? "Google sign-in is missing a client ID or secret. Save the missing credential in Platform settings; existing secrets do not need to be entered again."
                     : "The switch is off, so nobody can use Google to sign in. Turn it back on in Platform settings once the credentials are in place."}
                 </p>
                 <p className="mt-2 text-xs text-ink-500">

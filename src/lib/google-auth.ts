@@ -4,7 +4,7 @@ import { cookies, headers } from "next/headers";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { cache } from "react";
 import { appUrl } from "@/lib/domains";
-import { getSettings } from "@/lib/settings";
+import { systemDb } from "@/lib/db";
 
 /**
  * "Sign in with Google" — server-side authorization-code flow.
@@ -34,8 +34,16 @@ export interface GoogleCredentials {
  * win over environment variables, so the owner can (re)connect Google sign-in
  * without a redeploy; the stored kill switch disables the feature either way.
  */
+// Authentication must not use the cross-request visual settings cache. A
+// transient DB failure there can cache defaults and hide a configured provider.
+const googleSettings = cache(async () => {
+  return await systemDb.maybeOne<{ google_client_id: string | null; google_client_secret: string | null; google_signin_enabled: boolean }>(
+    `select google_client_id, google_client_secret, google_signin_enabled from platform_settings where id=1`,
+  ) ?? { google_client_id: null, google_client_secret: null, google_signin_enabled: true };
+});
+
 export const googleCredentials = cache(async (): Promise<GoogleCredentials | null> => {
-  const settings = await getSettings();
+  const settings = await googleSettings();
   if (!settings.google_signin_enabled) return null;
 
   const storedId = settings.google_client_id?.trim() ?? "";
@@ -58,7 +66,7 @@ export async function googleConfigured() {
 
 /** Everything the admin card needs, without ever returning the secret. */
 export async function googleSignInStatus() {
-  const settings = await getSettings();
+  const settings = await googleSettings();
   const credentials = await googleCredentials();
   return {
     enabled: settings.google_signin_enabled,

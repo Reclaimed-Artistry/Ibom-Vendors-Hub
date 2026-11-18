@@ -671,6 +671,8 @@ export async function saveGoogleSignInAction(_prev: AdminState, formData: FormDa
 
   revalidateTag("settings");
   revalidatePath("/admin/settings");
+  revalidatePath("/admin");
+  revalidatePath("/auth/google");
   revalidatePath("/login");
   revalidatePath("/register/customer");
 
@@ -691,7 +693,7 @@ export async function saveGoogleSignInAction(_prev: AdminState, formData: FormDa
   }
   return {
     message:
-      "Live. “Continue with Google” now appears on the sign-in and sign-up pages — check it end to end in a private window.",
+      "Configured. “Continue with Google” is enabled on sign-in and sign-up. Complete a Google sign-in to verify the client and redirect URI end to end.",
   };
 }
 

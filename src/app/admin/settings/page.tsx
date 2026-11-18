@@ -62,7 +62,7 @@ export default async function AdminSettingsPage() {
                       : "inline-flex items-center gap-1.5 rounded-full bg-ink-100 px-2.5 py-1 text-xs font-semibold text-ink-600"
                 }
               >
-                {google.live ? "Live" : google.enabled ? "Needs credentials" : "Switched off"}
+                {google.live ? "Configured" : google.enabled ? "Needs credentials" : "Switched off"}
               </span>
               <span className="text-xs text-ink-400">
                 {google.live
