@@ -1,6 +1,6 @@
 import { isUniqueViolation, systemDb, withSystem } from "@/lib/db";
 import { hashPassword } from "@/lib/auth";
-import { isReservedSubdomain, normaliseSubdomain } from "@/lib/domains";
+import { isReservedSubdomain, normaliseSubdomain, storefrontUrl } from "@/lib/domains";
 import { AKWA_IBOM_STATE, isAkwaIbomState, proofOfResidenceLabel } from "@/lib/akwa-ibom";
 import { getSettings } from "@/lib/settings";
 import { logActivity } from "@/lib/audit";
@@ -507,7 +507,7 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
       data: {
         name: input.ownerName,
         storeName: input.businessName,
-        storeUrl: url(`/s/${result.slug}`),
+        storeUrl: storefrontUrl(result.slug),
         planName: result.planName,
         reviewDeadline: deadlineLabel,
       },
@@ -530,7 +530,7 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
         template: "admin_new_vendor",
         data: {
           storeName: input.businessName,
-          storeUrl: url(`/s/${result.slug}`),
+          storeUrl: storefrontUrl(result.slug),
           name: input.ownerName,
           email,
           phone: input.phone.trim(),
@@ -677,7 +677,7 @@ export async function approveStore(storeId: string, adminId: string) {
         storeId,
         store.owner_id,
         `Storefront Approved & Open: ${store.name}`,
-        `Congratulations ${existing.owner_name}! We reviewed your uploaded registration documents and approved ${store.name}. Your storefront is now LIVE and open to customers at ${url(`/s/${store.slug}`)}.`,
+        `Congratulations ${existing.owner_name}! We reviewed your uploaded registration documents and approved ${store.name}. Your storefront is now LIVE and open to customers at ${storefrontUrl(store.slug)}.`,
         openMsg?.id ?? null,
       ],
     );
@@ -718,7 +718,7 @@ export async function approveStore(storeId: string, adminId: string) {
       data: {
         name: details.owner_name,
         storeName: details.name,
-        storeUrl: url(`/s/${details.slug}`),
+        storeUrl: storefrontUrl(details.slug),
       },
       dedupeKey: `store-approved-email:${storeId}:${Date.now()}`,
     });

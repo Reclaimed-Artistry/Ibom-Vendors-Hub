@@ -7,7 +7,7 @@ import { ArrowUpRight, Bell, Clock, ExternalLink, Lock, MailWarning, ShieldAlert
 import { getVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { storeBase } from "@/lib/storefront-base";
-import { storefrontPath } from "@/lib/domains";
+import { storefrontUrl } from "@/lib/domains";
 import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui";
 import { DashboardNav, LogoutButton, MobileNav, type DashboardNavItem } from "@/components/dashboard-nav";
@@ -154,7 +154,7 @@ export default async function VendorLayout({ children }: { children: React.React
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-ink-900">{store.name}</p>
                 <p className="truncate text-xs text-ink-500">
-                  {storefrontPath(store.slug)}
+                  {storefrontUrl(store.slug)}
                   <span className="text-ink-300"> · </span>
                   {user.email}
                 </p>

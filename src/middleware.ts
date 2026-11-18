@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isReservedSubdomain, subdomainFromHost } from "@/lib/domains";
+import { isReservedSubdomain, rootDomain, storefrontUrl, subdomainFromHost } from "@/lib/domains";
 
 const PASSTHROUGH_PREFIXES = ["/api", "/_next", "/s/", "/uploads/", "/favicon", "/images"];
 
@@ -17,6 +17,23 @@ export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const host = request.headers.get("host");
   const subdomain = subdomainFromHost(host);
+  const root = rootDomain();
+  const hostname = (host ?? "").toLowerCase();
+  const legacyStorePath = pathname.match(/^\/s\/([a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?)(\/.*)?$/);
+
+  // Only canonical website hosts redirect. Local development and preview hosts
+  // retain path-based storefront access without requiring wildcard DNS.
+  if (
+    (request.method === "GET" || request.method === "HEAD") &&
+    !root.startsWith("localhost") && !root.startsWith("127.0.0.1") &&
+    (hostname === root || hostname === `www.${root}` || Boolean(subdomain && !isReservedSubdomain(subdomain))) &&
+    legacyStorePath && !isReservedSubdomain(legacyStorePath[1])
+  ) {
+    const destination = new URL(storefrontUrl(legacyStorePath[1]));
+    destination.pathname = legacyStorePath[2] || "/";
+    destination.search = search;
+    return applyNoStoreHeaders(NextResponse.redirect(destination, 308));
+  }
 
   if (!subdomain || isReservedSubdomain(subdomain)) {
     if (pathname === "/checkout" && !request.cookies.get("ivh_session")?.value) {

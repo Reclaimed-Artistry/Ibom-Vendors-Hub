@@ -30,9 +30,10 @@ export function normaliseSubdomain(input: string) {
 /** Root domain without protocol, e.g. "ibomvendorshub.com" or "localhost:3000". */
 export function rootDomain() {
   const configured = process.env.NEXT_PUBLIC_ROOT_DOMAIN;
-  if (configured) return configured.replace(/^https?:\/\//, "").replace(/\/$/, "").toLowerCase();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return appUrl.replace(/^https?:\/\//, "").replace(/\/$/, "").toLowerCase();
+  const source = configured || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const parsed = new URL(source.includes("://") ? source : `https://${source}`);
+  // Tenant names must precede the apex domain, never storename.www.domain.com.
+  return parsed.host.toLowerCase().replace(/^www\./, "");
 }
 
 export function appUrl() {
