@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
-import { systemDb, withActor, withSystem } from "@/lib/db";
+import { systemDb, withActor, withSystem, withPublic } from "@/lib/db";
 import { getSettings, paystackSecret, url } from "@/lib/settings";
 import { initializeTransaction } from "@/lib/payments/gateway";
 import {
@@ -403,6 +403,10 @@ export async function submitBookingAction(_prev: PublicState, formData: FormData
     [storeId],
   );
   if (!store) return { error: "This store is not accepting bookings right now." };
+  const bookableStore = await withPublic((db) => db.maybeOne<{ id: string }>(
+    `select id from stores where id = $1`, [store.id],
+  ));
+  if (!bookableStore) return { error: "This store is not accepting bookings right now." };
 
   const profile = getCategoryBookingProfile(store.category_slug);
   const fieldErrors: Record<string, string> = {};

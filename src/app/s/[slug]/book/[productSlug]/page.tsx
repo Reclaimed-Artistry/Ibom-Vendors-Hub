@@ -13,7 +13,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const { store, category, live } = await resolveStore(slug);
   if (!store) notFound();
   const product = await getStoreProduct(store.id, productSlug);
-  if (!product) notFound();
+  if (!product || !product.is_available || (product.kind !== "service" && !category?.features?.serviceBooking)) notFound();
   const [base, settings, user] = await Promise.all([storeBase(slug), getSettings(), getCurrentUser()]);
   const profile = getCategoryBookingProfile(category?.slug);
 

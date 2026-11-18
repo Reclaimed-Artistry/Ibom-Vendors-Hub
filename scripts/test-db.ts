@@ -446,8 +446,8 @@ async function main() {
 
   const takenSub = await resolveAvailableSubdomain("Mamaput Kitchen", "Eket");
   check(
-    "resolveAvailableSubdomain suggests a city-qualified address when exact name is taken",
-    takenSub.available === false && Boolean(takenSub.suggestedSlug),
+    "resolveAvailableSubdomain locks an existing business name",
+    takenSub.available === false && takenSub.locked === true,
     takenSub,
   );
 

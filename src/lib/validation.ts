@@ -332,6 +332,10 @@ export const bookingSchema = z.object({
     message: "Please confirm you have read the booking requirements for this service",
   }),
   notes: z.string().trim().max(1000).optional().or(z.literal("")),
+}).superRefine((data, ctx) => {
+  if (data.meetingPreference === "customer_location" && (data.location?.trim().length ?? 0) < 5) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["location"], message: "Enter your service address, area and nearest landmark" });
+  }
 });
 
 export const orderUpdateSchema = z.object({

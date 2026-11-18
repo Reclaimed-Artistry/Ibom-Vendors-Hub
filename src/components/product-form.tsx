@@ -384,7 +384,7 @@ export function ProductForm({
             </section>
           ) : null}
 
-          {(features.madeToOrder || features.productionTracking || features.prepTime || features.serviceBooking) ? (
+          {(kind === "service" || features.madeToOrder || features.productionTracking || features.prepTime || features.serviceBooking) ? (
             <section className="card card-pad space-y-4">
               <h2 className="text-base font-semibold text-ink-900">Fulfilment details</h2>
               <div className="grid gap-4 sm:grid-cols-2">

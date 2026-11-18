@@ -114,7 +114,7 @@ export function BookingForm({
             id="location"
             name="location"
             className="input pl-9"
-            placeholder={profile.siteAddressPlaceholder}
+            placeholder={meetingPreference === "customer_location" ? "Street address, city / LGA and nearest landmark" : "Office / studio branch or instructions (optional)"}
             required={meetingPreference === "customer_location"}
           />
         </div>
