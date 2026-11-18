@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
         warnings: gateway.warnings.length,
       },
       signIn: {
-        google: (await googleConfigured()) ? "live" : settings.google_signin_enabled ? "unconfigured" : "off",
+        google: (await googleConfigured()) ? "live" : "unconfigured",
       },
       announcements: await liveAnnouncements(),
       time: new Date().toISOString(),

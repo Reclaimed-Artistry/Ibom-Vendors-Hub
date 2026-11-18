@@ -4,7 +4,6 @@ import { cookies, headers } from "next/headers";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { cache } from "react";
 import { appUrl } from "@/lib/domains";
-import { systemDb } from "@/lib/db";
 
 /**
  * "Sign in with Google" — server-side authorization-code flow.
@@ -25,59 +24,18 @@ const STATE_MAX_AGE = 600;
 export interface GoogleCredentials {
   clientId: string;
   clientSecret: string;
-  /** Where the pair came from, so the admin card can say so out loud. */
-  source: "dashboard" | "environment";
 }
 
-/**
- * Resolves the OAuth client. Credentials saved in Admin -> Platform settings
- * win over environment variables, so the owner can (re)connect Google sign-in
- * without a redeploy; the stored kill switch disables the feature either way.
- */
-// Authentication must not use the cross-request visual settings cache. A
-// transient DB failure there can cache defaults and hide a configured provider.
-const googleSettings = cache(async () => {
-  return await systemDb.maybeOne<{ google_client_id: string | null; google_client_secret: string | null; google_signin_enabled: boolean }>(
-    `select google_client_id, google_client_secret, google_signin_enabled from platform_settings where id=1`,
-  ) ?? { google_client_id: null, google_client_secret: null, google_signin_enabled: true };
-});
-
+/** OAuth credentials are managed exclusively in server-side environment variables. */
 export const googleCredentials = cache(async (): Promise<GoogleCredentials | null> => {
-  const settings = await googleSettings();
-  if (!settings.google_signin_enabled) return null;
-
-  const storedId = settings.google_client_id?.trim() ?? "";
-  const storedSecret = settings.google_client_secret?.trim() ?? "";
-  const envId = process.env.GOOGLE_CLIENT_ID?.trim() ?? "";
-  const envSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "";
-
-  // Field-by-field: a value saved in the dashboard wins, the environment fills
-  // in whatever is missing — so pasting only the client ID on a deployment that
-  // already has the secret in its environment works immediately.
-  const clientId = storedId || envId;
-  const clientSecret = storedSecret || envSecret;
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim() ?? "";
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "";
   if (!clientId || !clientSecret) return null;
-  return { clientId, clientSecret, source: storedId || storedSecret ? "dashboard" : "environment" };
+  return { clientId, clientSecret };
 });
 
 export async function googleConfigured() {
   return (await googleCredentials()) !== null;
-}
-
-/** Everything the admin card needs, without ever returning the secret. */
-export async function googleSignInStatus() {
-  const settings = await googleSettings();
-  const credentials = await googleCredentials();
-  return {
-    enabled: settings.google_signin_enabled,
-    savedClientId: settings.google_client_id ?? "",
-    hasStoredSecret: Boolean(settings.google_client_secret),
-    hasEnvSecret: Boolean(process.env.GOOGLE_CLIENT_SECRET),
-    source: credentials?.source ?? null,
-    live: credentials !== null,
-    redirectUri: googleRedirectUri(),
-    origin: appUrl(),
-  };
 }
 
 export function googleRedirectUri() {

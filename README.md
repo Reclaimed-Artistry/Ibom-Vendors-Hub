@@ -236,14 +236,15 @@ To enable it: Google Cloud Console → APIs & Services → Credentials → *Crea
 under **Authorised redirect URIs** (and `https://<your-domain>` under **Authorised JavaScript
 origins**).
 
-Paste the resulting client ID and secret into **Admin → Platform settings → Sign in with
-Google**. They are stored in `platform_settings` (secret server-side only, never echoed back to
-the browser), so connecting, rotating or switching the feature off needs no redeploy — the card
-shows whether the button is live, which credentials are in force, and the exact redirect URI to
-whitelist. `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` still work as a fallback for
-environment-driven deployments, and `GOOGLE_REDIRECT_URI` overrides the computed callback URL
-(useful for vendor subdomains, which all share the platform's callback). `/api/health` reports
-`signIn.google` as `live`, `unconfigured` or `off`.
+Save the matching `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in **Vercel → Project →
+Settings → Environment Variables**, targeting Production, then redeploy. Mark the secret
+sensitive; never use a `NEXT_PUBLIC_` prefix. Google credentials and enablement are not
+managed through the admin dashboard or database. Both variables are required for the button
+to appear; removing either and redeploying disables it. `GOOGLE_REDIRECT_URI` optionally
+overrides the computed callback URL. For production, whitelist exactly
+`https://www.ibomvendorshub.com/auth/google/callback` in Google Cloud.
+`/api/health` reports `signIn.google` as `live` (configured, not an end-to-end OAuth test)
+or `unconfigured`.
 
 ### Image storage
 

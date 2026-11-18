@@ -4,8 +4,6 @@ import { requireAdmin } from "@/lib/auth";
 import { gatewayStatus, getSettings } from "@/lib/settings";
 import { Card, CardHeader, PageHeader } from "@/components/ui";
 import { PlatformSettingsForm } from "@/components/admin-forms";
-import { GoogleSignInForm } from "@/components/google-signin-form";
-import { googleSignInStatus } from "@/lib/google-auth";
 
 export const metadata: Metadata = { title: "Platform settings · Admin" };
 
@@ -13,7 +11,6 @@ export default async function AdminSettingsPage() {
   await requireAdmin();
   const settings = await getSettings();
   const gateway = gatewayStatus(settings);
-  const google = await googleSignInStatus();
 
   return (
     <div className="space-y-4">
@@ -45,41 +42,6 @@ export default async function AdminSettingsPage() {
           </div>
         </Card>
 
-
-        <Card className="xl:col-span-2">
-          <CardHeader
-            title="Sign in with Google"
-            description="One-click sign-in for customers, vendors and admins. The button only renders when a complete OAuth client is saved."
-          />
-          <div className="card-pad space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={
-                  google.live
-                    ? "inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700"
-                    : google.enabled
-                      ? "inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700"
-                      : "inline-flex items-center gap-1.5 rounded-full bg-ink-100 px-2.5 py-1 text-xs font-semibold text-ink-600"
-                }
-              >
-                {google.live ? "Configured" : google.enabled ? "Needs credentials" : "Switched off"}
-              </span>
-              <span className="text-xs text-ink-400">
-                {google.live
-                  ? `Credentials from ${google.source === "dashboard" ? "this dashboard" : "environment variables"}${google.hasStoredSecret ? " · secret stored" : ""}`
-                  : google.enabled
-                    ? "Add the client ID and secret below, then save."
-                    : "Turn the switch back on once the credentials are in place."}
-              </span>
-            </div>
-            <GoogleSignInForm
-              savedClientId={google.savedClientId}
-              hasSecret={google.hasStoredSecret || google.hasEnvSecret}
-              enabled={google.enabled}
-              redirectUri={google.redirectUri}
-            />
-          </div>
-        </Card>
 
         <div className="space-y-4">
           <Card className="card-pad space-y-2">

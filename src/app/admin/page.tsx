@@ -6,7 +6,6 @@ import { systemDb } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { formatMoney, formatDate, timeAgo } from "@/lib/utils";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, StatCard } from "@/components/ui";
-import { googleSignInStatus } from "@/lib/google-auth";
 import { ReviewCountdown } from "@/components/review-countdown";
 
 export const metadata: Metadata = { title: "Admin overview · Ibom Vendors Hub" };
@@ -14,7 +13,6 @@ export const metadata: Metadata = { title: "Admin overview · Ibom Vendors Hub" 
 export default async function AdminOverviewPage() {
   await requireAdmin();
   const settings = await getSettings();
-  const google = await googleSignInStatus();
 
   const [stats, pendingStores, recentVendors, payments, activity] = await Promise.all([
     systemDb.maybeOne<{
@@ -67,31 +65,6 @@ export default async function AdminOverviewPage() {
         description={`Commission ${settings.commission_rate}% · trial ${settings.default_trial_days} days · ${settings.sandbox_payments ? "sandbox payments" : "live payments"}`}
       />
 
-
-      {google.live ? null : (
-        <Card className="border-amber-200 bg-amber-50/60">
-          <div className="flex flex-wrap items-start justify-between gap-3 p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-500" />
-              <div>
-                <p className="text-sm font-semibold text-ink-900">Google sign-in needs setup</p>
-                <p className="mt-1 max-w-2xl text-sm text-ink-600">
-                  {google.enabled
-                    ? "Google sign-in is missing a client ID or secret. Save the missing credential in Platform settings; existing secrets do not need to be entered again."
-                    : "The switch is off, so nobody can use Google to sign in. Turn it back on in Platform settings once the credentials are in place."}
-                </p>
-                <p className="mt-2 text-xs text-ink-500">
-                  Redirect URI to whitelist in Google Cloud Console:{" "}
-                  <code className="rounded bg-white px-1.5 py-0.5 text-[11px] text-ink-700">{google.redirectUri}</code>
-                </p>
-              </div>
-            </div>
-            <Link href="/admin/settings" className="btn-primary shrink-0">
-              Finish setup <ArrowRight className="size-4" />
-            </Link>
-          </div>
-        </Card>
-      )}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Vendors" value={stats?.stores ?? 0} hint={`${stats?.active ?? 0} active · ${stats?.pending ?? 0} pending`} icon={<Building2 className="size-4" />} />
