@@ -246,7 +246,7 @@ export function CartButton({ className }: { className?: string; base?: string })
 }
 
 export function CartDrawer({ base = "" }: { base?: string }) {
-  const { items, open, setOpen, subtotal, remove, setQuantity } = useCart();
+  const { items, count, open, setOpen, subtotal, remove, setQuantity } = useCart();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -271,7 +271,7 @@ export function CartDrawer({ base = "" }: { base?: string }) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] flex justify-end isolate"
+      className="fixed inset-0 z-[9999] isolate flex items-start justify-end p-3 pt-20 sm:p-5 sm:pt-20"
       role="dialog"
       aria-modal="true"
       aria-label="Shopping cart"
@@ -279,34 +279,43 @@ export function CartDrawer({ base = "" }: { base?: string }) {
       <button
         type="button"
         aria-label="Close cart"
-        className="fixed inset-0 bg-ink-900/55 backdrop-blur-[2px]"
+        className="fixed inset-0 bg-ink-900/30 backdrop-blur-[3px]"
         onClick={() => setOpen(false)}
       />
-      <div className="relative z-10 flex h-[100dvh] w-full max-w-md flex-col bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
-          <h2 className="text-base font-semibold text-ink-900">Your cart</h2>
+      <div className="relative z-10 flex max-h-[calc(100dvh-6rem)] w-full max-w-[360px] flex-col overflow-hidden rounded-3xl border border-white/80 bg-white shadow-[0_24px_80px_-16px_rgba(15,23,42,0.35)]">
+        <div className="flex items-center justify-between shrink-0 border-b border-ink-100 px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <span className="grid size-9 place-items-center rounded-xl bg-brand-50 text-brand-700"><ShoppingBag className="size-4" /></span>
+            <div>
+              <h2 className="text-sm font-bold text-ink-900">Your cart <span className="ml-1 rounded-full bg-ink-100 px-1.5 py-0.5 text-[10px] text-ink-500">{count}</span></h2>
+              <p className="mt-0.5 text-[11px] text-ink-400">A little closer to something good.</p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="rounded-lg p-1.5 text-ink-500 hover:bg-ink-100"
+            className="grid size-9 place-items-center rounded-full text-ink-400 transition hover:bg-ink-100 hover:text-ink-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600"
             aria-label="Close"
           >
-            <X className="size-5" />
+            <X className="size-4" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="min-h-0 overflow-y-auto overscroll-contain px-4 py-1">
           {items.length === 0 ? (
-            <p className="mt-10 text-center text-sm text-ink-500">
-              Your cart is empty. Browse the marketplace to add items.
-            </p>
+            <div className="px-5 py-8 text-center">
+              <ShoppingBag className="mx-auto mb-3 size-8 text-brand-300" />
+              <p className="text-sm font-semibold text-ink-800">Your bag is waiting</p>
+              <p className="mt-1 text-xs leading-relaxed text-ink-500">Found something you love? Add it here.</p>
+              <button type="button" onClick={() => setOpen(false)} className="mt-4 text-xs font-semibold text-brand-700 hover:underline">Keep browsing</button>
+            </div>
           ) : (
-            <ul className="space-y-4">
+            <ul className="divide-y divide-ink-100">
               {items.map((item, index) => (
-                <li key={`${item.productId}-${item.variantId ?? ""}-${index}`} className="flex gap-3">
+                <li key={`${item.productId}-${item.variantId ?? ""}-${index}`} className="flex gap-2.5 py-3">
                   <img
                     src={item.image ?? "/images/seed/product-jollof.svg"}
                     alt={item.name}
-                    className="size-16 shrink-0 rounded-lg border border-ink-100 object-cover"
+                    className="size-12 shrink-0 rounded-xl border border-ink-100 object-cover"
                   />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-ink-900">{item.name}</p>
@@ -318,11 +327,11 @@ export function CartDrawer({ base = "" }: { base?: string }) {
                       <p className="truncate text-xs text-ink-400">{item.addons.map((a) => a.name).join(", ")}</p>
                     ) : null}
                     <div className="mt-1.5 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-0.5 rounded-full bg-ink-50 p-0.5 ring-1 ring-ink-100">
                         <button
                           type="button"
                           onClick={() => setQuantity(index, item.quantity - 1)}
-                          className="rounded-md border border-ink-200 p-1 text-ink-600"
+                          className="grid size-7 place-items-center rounded-full text-ink-600 transition hover:bg-white hover:shadow-sm"
                           aria-label="Decrease quantity"
                         >
                           <Minus className="size-3" />
@@ -331,13 +340,13 @@ export function CartDrawer({ base = "" }: { base?: string }) {
                         <button
                           type="button"
                           onClick={() => setQuantity(index, item.quantity + 1)}
-                          className="rounded-md border border-ink-200 p-1 text-ink-600"
+                          className="grid size-7 place-items-center rounded-full text-ink-600 transition hover:bg-white hover:shadow-sm"
                           aria-label="Increase quantity"
                         >
                           <Plus className="size-3" />
                         </button>
                       </div>
-                      <span className="text-sm font-semibold">
+                      <span className="text-xs font-bold tabular-nums text-ink-900">
                         {formatMoney((item.price + item.addons.reduce((sum, a) => sum + a.price, 0)) * item.quantity)}
                       </span>
                     </div>
@@ -345,8 +354,8 @@ export function CartDrawer({ base = "" }: { base?: string }) {
                   <button
                     type="button"
                     onClick={() => remove(index)}
-                    className="shrink-0 self-start text-ink-400 hover:text-red-600"
-                    aria-label="Remove item"
+                    className="-mr-1 grid size-7 shrink-0 place-items-center self-start rounded-full text-ink-300 transition hover:bg-red-50 hover:text-red-600"
+                    aria-label={`Remove ${item.name}`}
                   >
                     <Trash2 className="size-4" />
                   </button>
@@ -355,13 +364,14 @@ export function CartDrawer({ base = "" }: { base?: string }) {
             </ul>
           )}
         </div>
-        <div className="border-t border-ink-100 bg-white px-5 py-4">
-          <div className="mb-3 flex items-center justify-between text-sm">
+        {items.length > 0 ? <div className="shrink-0 border-t border-ink-100 bg-ink-50/70 px-4 py-3">
+          <div className="mb-1 flex items-center justify-between text-sm">
             <span className="text-ink-500">Subtotal</span>
             <span className="text-base font-bold">{formatMoney(subtotal)}</span>
           </div>
-          <Link href={`${base}/checkout`} className="btn-primary w-full" onClick={() => setOpen(false)}>
-            Checkout
+          <p className="mb-3 text-[10px] text-ink-400">Delivery calculated at checkout</p>
+          <Link href={`${base}/checkout`} className="btn-primary w-full rounded-xl !py-2.5 !text-sm" onClick={() => setOpen(false)}>
+            Continue to checkout
           </Link>
           <Link
             href={`${base}/cart`}
@@ -370,7 +380,7 @@ export function CartDrawer({ base = "" }: { base?: string }) {
           >
             View full cart
           </Link>
-        </div>
+        </div> : null}
       </div>
     </div>,
     document.body,
