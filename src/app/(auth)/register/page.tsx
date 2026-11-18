@@ -30,14 +30,14 @@ export default async function RegisterPage({
     return (
       <div className="space-y-6">
         <div className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-800">
-          <Lock className="size-3.5" /> Account required first
+          <Lock className="size-3.5" /> Free store ownership
         </div>
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-ink-900">
             Sign in or create an account first
           </h1>
           <p className="mt-2 text-sm leading-6 text-ink-600">
-            To open a storefront on Ibom Vendors Hub, first sign in with your Google account or create your account.
+            Registering and owning a store on Ibomvendorshub is absolutely free. To open your storefront, first sign in with your Google account or create your account.
             Once you are signed in, you&apos;ll immediately get the option to create your verified Akwa Ibom storefront.
           </p>
         </div>

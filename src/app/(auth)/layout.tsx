@@ -14,11 +14,11 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         <div className="relative max-w-md">
           <h2 className="font-display text-4xl leading-tight text-white">One login. Every part of your business.</h2>
           <p className="mt-4 text-sm leading-7 text-ink-300">
-            Manage your catalogue, accept orders, track production, invoice customers and renew your subscription from a
+            Manage your catalogue, accept orders, track production, invoice customers and run your free store from a
             single dashboard.
           </p>
           <ul className="mt-8 space-y-3 text-sm text-ink-200">
-            {["Category-aware dashboards", "Automatic storefront subdomain", "Subscription with live countdown", "Order tracking & receipts"].map((item) => (
+            {["Category-aware dashboards", "Automatic storefront subdomain", "Absolutely free store ownership", "Order tracking & receipts"].map((item) => (
               <li key={item} className="flex items-center gap-2">
                 <span className="flex size-5 items-center justify-center rounded-full bg-brand-500/20 text-brand-300">✓</span>
                 {item}
