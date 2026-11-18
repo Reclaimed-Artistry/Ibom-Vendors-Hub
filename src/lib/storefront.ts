@@ -157,6 +157,8 @@ export async function getStoreById(storeId: string, actorEmail?: string | null) 
 }
 
 export interface MarketplaceQuery {
+  /** Homepage discovery includes every live listing, interleaved by vendor. */
+  showcaseAll?: boolean;
   search?: string;
   categorySlug?: string;
   sort?: "newest" | "price_asc" | "price_desc" | "rating";
@@ -186,7 +188,7 @@ export async function searchMarketplace(query: MarketplaceQuery) {
           : "p.created_at desc";
 
   const params: unknown[] = [];
-  let where = "where p.is_available = true";
+  let where = "where p.is_available = true and store_is_live(s.id)";
   if (query.search) {
     params.push(`%${query.search}%`);
     where += ` and (p.name ilike $${params.length} or p.description ilike $${params.length}
@@ -220,8 +222,8 @@ export async function searchMarketplace(query: MarketplaceQuery) {
          join stores s on s.id = p.store_id
          left join store_categories c on c.id = s.category_id
          ${where}
-         order by ${order}
-         limit ${limit} offset ${offset}`,
+         order by ${query.showcaseAll ? "row_number() over (partition by p.store_id order by p.is_featured desc, p.created_at desc, p.id), s.name, s.id" : `${order}, p.id`}
+         ${query.showcaseAll ? "" : `limit ${limit} offset ${offset}`}`,
       params,
     );
     return { products, total: count.count };
@@ -244,7 +246,7 @@ export async function getMarketplaceStores(query: {
   const limit = Math.min(query.limit ?? 12, 48);
   const offset = query.offset ?? 0;
   const params: unknown[] = [];
-  let where = "where true";
+  let where = "where store_is_live(s.id)";
   if (query.categorySlug) {
     params.push(query.categorySlug);
     where += ` and c.slug = $${params.length}`;
@@ -253,7 +255,8 @@ export async function getMarketplaceStores(query: {
     params.push(`%${query.search}%`);
     where += ` and (s.name ilike $${params.length} or s.description ilike $${params.length} or s.city ilike $${params.length})`;
   }
-  if (query.featuredOnly) where += " and s.is_featured = true";
+  // Every approved, publicly live store is eligible for featured placement.
+  // featuredOnly is retained for callers but no longer requires a manual flag.
 
   return withPublic(async (db) => {
     const count = await db.one<{ count: number }>(
@@ -335,8 +338,8 @@ export async function getMarketplaceHighlights() {
       `select s.*, c.name as category_name, c.slug as category_slug,
               (select count(*)::int from products p where p.store_id = s.id and p.is_available) as product_count
          from stores s left join store_categories c on c.id = s.category_id
-        order by s.is_featured desc, s.rating_avg desc, s.created_at desc
-        limit 8`,
+        where store_is_live(s.id)
+        order by s.created_at desc, s.id`,
     );
     return { stats, featured };
   });

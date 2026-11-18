@@ -52,7 +52,7 @@ export default async function HomePage() {
     getSettings(),
     getCategoriesWithCounts(),
     getMarketplaceHighlights(),
-    searchMarketplace({ sort: "rating", limit: 8 }),
+    searchMarketplace({ showcaseAll: true }),
   ]);
 
   const featuredSlides = highlights.featured.map((store) => ({
@@ -206,7 +206,7 @@ export default async function HomePage() {
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Featured storefronts</p>
-              <h2 className="mt-2 font-display text-2xl text-ink-900 sm:text-3xl">Vendors customers keep coming back to</h2>
+              <h2 className="mt-2 font-display text-2xl text-ink-900 sm:text-3xl">Discover every approved storefront</h2>
             </div>
             <Link href="/stores" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-800 hover:text-brand-900">
               All vendors <ArrowRight className="size-4" />
@@ -224,7 +224,7 @@ export default async function HomePage() {
             </div>
           ) : null}
           <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {highlights.featured.slice(0, 6).map((store) => (
+            {highlights.featured.map((store) => (
               <Link key={store.id} href={`/s/${store.slug}`} className="group card flex h-80 min-w-0 flex-col overflow-hidden">
                 <div className="relative h-28 shrink-0 overflow-hidden">
                   <StoreImage kind="cover" src={store.cover_url} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -256,18 +256,18 @@ export default async function HomePage() {
       <section className="container-page py-14">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Trending now</p>
-            <h2 className="mt-2 font-display text-2xl text-ink-900 sm:text-3xl">Popular this week</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Products & services</p>
+            <h2 className="mt-2 font-display text-2xl text-ink-900 sm:text-3xl">Discover what our vendors offer</h2>
           </div>
-          <Link href="/browse?sort=rating" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-800 hover:text-brand-900">
-            See all products <ArrowRight className="size-4" />
+          <Link href="/browse" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-800 hover:text-brand-900">
+            Explore products & services <ArrowRight className="size-4" />
           </Link>
         </div>
         {featuredProducts.products.length === 0 ? (
           <div className="mt-7 rounded-2xl border border-dashed border-ink-200 bg-ink-50 p-8 text-center">
             <p className="font-display text-xl text-ink-900">The shelves are being stocked.</p>
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-500">
-              Products appear here as soon as vendors publish them. Browse the categories above to see what is live right now.
+              Products and services appear here as soon as approved vendors publish them. Browse the categories above to see what is live right now.
             </p>
             <Link href="/browse" className="btn-secondary mt-5 inline-flex">
               Browse the marketplace
@@ -281,6 +281,7 @@ export default async function HomePage() {
                 <img
                   src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"}
                   alt={product.name}
+                  loading="lazy"
                   className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
                 {product.compare_at_price ? (
