@@ -1,3 +1,4 @@
+import { CategoryIcon } from "@/components/category-icon";
 import { StoreImage } from "@/components/store-image";
 import { FeaturedStoreCarousel } from "@/components/featured-store-carousel";
 import Link from "next/link";
@@ -5,45 +6,17 @@ import {
   ArrowRight,
   BadgeCheck,
   Clock,
-  Droplets,
-  Hammer,
-  HardHat,
   MapPin,
   Package,
-  Paintbrush,
-  Scissors,
   ShieldCheck,
-  ShoppingBag,
   Star,
-  Sprout,
   Store,
   Truck,
-  Utensils,
-  Wrench,
-  Zap,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { getCategoriesWithCounts, getMarketplaceHighlights, searchMarketplace } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
 import { formatMoney, truncate } from "@/lib/utils";
-
-const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  sprout: Sprout,
-  utensils: Utensils,
-  shirt: ShoppingBag,
-  footprints: Package,
-  cpu: Package,
-  sparkles: Star,
-  hammer: Hammer,
-  zap: Zap,
-  droplets: Droplets,
-  paintbrush: Paintbrush,
-  "hard-hat": HardHat,
-  wrench: Wrench,
-  scissors: Scissors,
-  briefcase: Store,
-  "shopping-bag": ShoppingBag,
-};
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -182,16 +155,13 @@ export default async function HomePage() {
         </div>
         <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {categories.map((category) => {
-            const Icon = ICONS[category.icon ?? ""] ?? Store;
             return (
               <Link
                 key={category.id}
                 href={`/browse?category=${category.slug}`}
-                className="group card flex items-start gap-3 p-4 transition-colors hover:border-brand-300"
+                className="group card flex items-center gap-4 rounded-2xl border-ink-100 bg-gradient-to-br from-white to-[#faf9f6] p-4 transition-all duration-300 hover:border-[#d8cba9] hover:shadow-[0_12px_30px_-18px_rgba(55,65,45,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700"
               >
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 group-hover:bg-brand-100">
-                  <Icon className="size-5" />
-                </span>
+                <CategoryIcon name={category.icon} />
                 <div>
                   <p className="text-sm font-semibold text-ink-900">{category.name}</p>
                   <p className="mt-0.5 text-xs text-ink-400">{category.store_count} vendor{category.store_count === 1 ? "" : "s"}</p>
