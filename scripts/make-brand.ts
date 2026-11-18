@@ -10,7 +10,7 @@
  *   tsx scripts/make-brand.ts
  */
 import sharp from "sharp";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 
 const SOURCE = "assets/brand/logo-source.png";
 const OUT = "public/brand";
@@ -70,6 +70,22 @@ async function main() {
 
     await sharp(tile).png({ compressionLevel: 9 }).toFile(name);
   }
+
+  // Explicit public favicons work on every storefront origin, including
+  // browsers that request /favicon.ico without inspecting page metadata.
+  const smallIcon = await sharp("src/app/icon.png").resize(32, 32).png().toBuffer();
+  writeFileSync(`${OUT}/favicon-32.png`, smallIcon);
+  // ICO container with a PNG-encoded image (supported by modern browsers).
+  const icoHeader = Buffer.alloc(22);
+  icoHeader.writeUInt16LE(1, 2); // icon type
+  icoHeader.writeUInt16LE(1, 4); // one image
+  icoHeader[6] = 32;
+  icoHeader[7] = 32;
+  icoHeader.writeUInt16LE(1, 10);
+  icoHeader.writeUInt16LE(32, 12);
+  icoHeader.writeUInt32LE(smallIcon.length, 14);
+  icoHeader.writeUInt32LE(22, 18);
+  writeFileSync("public/favicon.ico", Buffer.concat([icoHeader, smallIcon]));
 
   // Social card: brand-dark canvas with the complete lockup centred on a white card.
   const canvas = { width: 1200, height: 630 };

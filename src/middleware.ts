@@ -3,6 +3,7 @@ import { isReservedSubdomain, rootDomain, storefrontUrl, subdomainFromHost } fro
 
 // Platform routes must never be rewritten into non-existent tenant pages.
 const PLATFORM_ROUTES = /^\/(checkout|cart|pay|login|logout|register|forgot-password|reset-password|auth|account|vendor|admin|track|forbidden)(?:\/|$)/;
+const PLATFORM_ICON_PATHS = new Set(["/icon.png", "/apple-icon.png", "/favicon.ico"]);
 const PASSTHROUGH_PREFIXES = ["/api", "/_next", "/s/", "/uploads/", "/favicon", "/images", "/brand/"];
 
 function applyNoStoreHeaders(response: NextResponse) {
@@ -49,6 +50,10 @@ export function middleware(request: NextRequest) {
     const response = NextResponse.next({ request: { headers } });
     response.headers.set("x-ivh-root", "1");
     return applyNoStoreHeaders(response);
+  }
+
+  if (PLATFORM_ICON_PATHS.has(pathname)) {
+    return NextResponse.next();
   }
 
   if (PASSTHROUGH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
