@@ -1,3 +1,4 @@
+import { StoreStockCarousel } from "@/components/store-stock-carousel";
 import { StoreImage } from "@/components/store-image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -49,6 +50,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
     );
   }
 
+  const availableStock = products.filter((product) => product.kind === "service" || !product.track_stock || product.stock_quantity > 0);
   const featured = products.filter((product) => product.is_featured).slice(0, 4);
   const showcase = featured.length ? featured : products.slice(0, 4);
 
@@ -90,6 +92,24 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
           </div>
         </div>
       </section>
+
+      {availableStock.length > 0 ? (
+        <section className="container-page pb-8" aria-label="Store catalogue highlights">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="font-display text-xl text-ink-900">Explore our products &amp; services</h2>
+            <Link href={`${base}/products`} className="text-sm font-semibold text-brand-800">View all →</Link>
+          </div>
+          <StoreStockCarousel items={availableStock.map((product) => ({
+            id: product.id,
+            href: product.kind === "service" ? `${base}/book/${product.slug}` : `${base}/products/${product.slug}`,
+            name: product.name,
+            image: product.images?.[0]?.url || null,
+            summary: product.short_description || product.description || "",
+            price: product.pricing_type === "quotation" ? "Request quote" : `${product.pricing_type === "from" ? "From " : ""}${money(product.price)}`,
+            service: product.kind === "service",
+          }))} />
+        </section>
+      ) : null}
 
       <div className="container-page grid gap-8 pb-12 lg:grid-cols-[1fr_320px]">
         <div className="space-y-8">

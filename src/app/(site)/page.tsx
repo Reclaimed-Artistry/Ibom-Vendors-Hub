@@ -1,3 +1,4 @@
+import { StoreImage } from "@/components/store-image";
 import { FeaturedStoreCarousel } from "@/components/featured-store-carousel";
 import Link from "next/link";
 import {
@@ -222,8 +223,31 @@ export default async function HomePage() {
               </Link>
             </div>
           ) : null}
-          <div className="mx-auto mt-7 max-w-xl">
-            <FeaturedStoreCarousel stores={featuredSlides} />
+          <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {highlights.featured.slice(0, 6).map((store) => (
+              <Link key={store.id} href={`/s/${store.slug}`} className="group card flex h-80 min-w-0 flex-col overflow-hidden">
+                <div className="relative h-28 shrink-0 overflow-hidden">
+                  <StoreImage kind="cover" src={store.cover_url} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <span className="absolute left-3 right-3 top-3 w-fit max-w-[calc(100%-1.5rem)] truncate rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-ink-700">
+                    {store.category_name}
+                  </span>
+                </div>
+                <div className="flex min-h-0 flex-1 flex-col p-4">
+                  <div className="flex items-start gap-3">
+                    <StoreImage kind="logo" src={store.logo_url} alt="" className="size-11 shrink-0 rounded-xl border border-ink-100 bg-white object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink-900">{store.name}</p>
+                      <p className="truncate text-xs text-ink-400">{store.city}, {store.state}</p>
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-gold-600">
+                      <Star className="size-3.5 fill-current" /> {store.rating_avg || "New"}
+                    </span>
+                  </div>
+                  <p className="mt-3 h-12 shrink-0 line-clamp-2 text-sm leading-6 text-ink-500">{store.tagline ?? truncate(store.description, 110)}</p>
+                  <p className="mt-auto pt-3 text-xs font-medium text-brand-800">{store.product_count} listings · view storefront →</p>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
