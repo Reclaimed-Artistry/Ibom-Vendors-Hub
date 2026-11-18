@@ -1,3 +1,4 @@
+import { authCookieDomain } from "@/lib/auth-navigation";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -7,7 +8,8 @@ import crypto from "node:crypto";
 import { systemDb, withSystem, type Actor } from "@/lib/db";
 import type { SessionUser, Store } from "@/lib/types";
 
-const COOKIE = "ivh_session";
+const COOKIE = "ivh_session_shared";
+const LEGACY_COOKIE = "ivh_session";
 const SESSION_DAYS = 30;
 
 async function isHttpsRequest(): Promise<boolean> {
@@ -65,9 +67,11 @@ export async function createSessionToken(user: SessionPayload) {
 export async function setSessionCookie(token: string) {
   const store = await cookies();
   const secure = await isHttpsRequest();
+  const domain = authCookieDomain((await headers()).get("host"));
   store.set(COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
+    ...(domain ? { domain } : {}),
     secure,
     path: "/",
     maxAge: SESSION_DAYS * 86_400,
@@ -77,12 +81,16 @@ export async function setSessionCookie(token: string) {
 export async function clearSessionCookie() {
   const store = await cookies();
   const secure = await isHttpsRequest();
-  store.set(COOKIE, "", {
+  const domain = authCookieDomain((await headers()).get("host"));
+  store.set(LEGACY_COOKIE, "", { path: "/", maxAge: 0, httpOnly: true, secure, sameSite: "lax" });
+  // A tombstone also overrides any legacy host-only cookie on sibling hosts.
+  store.set(COOKIE, "signed-out", {
     httpOnly: true,
     sameSite: "lax",
+    ...(domain ? { domain } : {}),
     secure,
     path: "/",
-    maxAge: 0,
+    maxAge: SESSION_DAYS * 86_400,
   });
 }
 
@@ -98,7 +106,8 @@ interface UserRow {
 }
 
 export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
-  const token = (await cookies()).get(COOKIE)?.value;
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE)?.value || cookieStore.get(LEGACY_COOKIE)?.value;
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, secretKey());

@@ -1,5 +1,7 @@
 "use server";
 
+import { redirect } from "next/navigation";
+
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
 import { systemDb, withActor, withSystem, withPublic } from "@/lib/db";
@@ -67,6 +69,7 @@ export async function submitCheckoutAction(_prev: PublicState, formData: FormDat
   const paymentMethod = String(formData.get("paymentMethod") ?? "bank_transfer");
   if (!["wallet", "bank_transfer"].includes(paymentMethod)) return { error: "Choose bank transfer or wallet payment." };
 
+  let paymentPortal: string | null = null;
   try {
     const result = await withSystem(async () => {
     const checkout = await createCheckout(parsed.data, {
@@ -89,10 +92,14 @@ export async function submitCheckoutAction(_prev: PublicState, formData: FormDat
       };
     }
 
-    return { redirectUrl: result.authorizationUrl };
+    paymentPortal = result.authorizationUrl;
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Checkout failed. Please try again." };
   }
+  // Server navigation guarantees the authenticated portal opens after commit;
+  // it does not depend on a client effect or form-state hydration.
+  if (paymentPortal) redirect(paymentPortal);
+  return { error: "Could not open the payment portal. Please try again." };
 }
 
 /* -------------------------------------------------------------------------- */

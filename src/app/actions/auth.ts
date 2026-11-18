@@ -1,5 +1,6 @@
 "use server";
 
+import { safeAuthNext } from "@/lib/auth-navigation";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
@@ -121,8 +122,8 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   revalidatePath("/", "layout");
 
   const destination =
-    next && next.startsWith("/")
-      ? next
+    safeAuthNext(next)
+      ? safeAuthNext(next)!
       : effectiveRole === "vendor"
         ? "/vendor"
         : effectiveRole === "customer"
@@ -252,8 +253,8 @@ export async function registerCustomerAction(_prev: ActionState, formData: FormD
     });
     await setSessionCookie(token);
     revalidatePath("/", "layout");
-    if (nextRaw && nextRaw.startsWith("/")) {
-      redirect(nextRaw);
+    if (safeAuthNext(nextRaw)) {
+      redirect(safeAuthNext(nextRaw)!);
     }
     const verify = (await devLinks()) ? `?verify=${result.verificationToken}` : "";
     redirect(`/account${verify}`);

@@ -1,3 +1,4 @@
+import { safeAuthNext } from "@/lib/auth-navigation";
 import Link from "next/link";
 import { LoginForm } from "@/components/auth-forms";
 import { Alert } from "@/components/ui";
@@ -29,7 +30,7 @@ export default async function LoginPage({
   const params = await searchParams;
   const user = await getCurrentUser();
   if (user) {
-    if (params.next && params.next.startsWith("/")) redirect(params.next);
+    if (safeAuthNext(params.next)) redirect(safeAuthNext(params.next)!);
     redirect(user.role === "vendor" ? "/vendor" : user.role === "customer" ? "/account" : "/admin");
   }
 

@@ -1,5 +1,6 @@
+import { authCookieDomain, safeAuthNext } from "@/lib/auth-navigation";
 import crypto from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { cache } from "react";
 import { appUrl } from "@/lib/domains";
@@ -77,11 +78,7 @@ export function googleRedirectUri() {
 }
 
 /** Only same-origin paths may be used as a post-login destination. */
-export function safeNext(next: string | null | undefined): string | null {
-  if (!next) return null;
-  if (!next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return null;
-  return next;
-}
+export const safeNext = safeAuthNext;
 
 /** Creates the CSRF state, stores it in an HttpOnly cookie and returns the consent URL. */
 export async function beginGoogleSignIn(next?: string | null) {
@@ -90,6 +87,7 @@ export async function beginGoogleSignIn(next?: string | null) {
   const store = await cookies();
   store.set(GOOGLE_STATE_COOKIE, destination ? `${state}|${destination}` : state, {
     httpOnly: true,
+    domain: authCookieDomain((await headers()).get("host")),
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
@@ -170,7 +168,7 @@ export async function completeGoogleSignIn(
 
   const store = await cookies();
   const cookie = store.get(GOOGLE_STATE_COOKIE)?.value ?? "";
-  store.delete(GOOGLE_STATE_COOKIE);
+  store.set(GOOGLE_STATE_COOKIE, "", { path: "/", domain: authCookieDomain((await headers()).get("host")), maxAge: 0, httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
   const [expectedState, ...rest] = cookie.split("|");
   const next = safeNext(rest.join("|") || null);
   if (!state || !expectedState || !equalState(state, expectedState)) {

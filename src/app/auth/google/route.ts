@@ -1,3 +1,4 @@
+import { googleNextForHost } from "@/lib/auth-navigation";
 import { NextResponse } from "next/server";
 import { beginGoogleSignIn, googleConfigured } from "@/lib/google-auth";
 import { appUrl } from "@/lib/domains";
@@ -10,6 +11,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${appUrl()}/login?oauth=not_configured`);
   }
   const next = new URL(request.url).searchParams.get("next");
-  const url = await beginGoogleSignIn(next);
+  const url = await beginGoogleSignIn(googleNextForHost(new URL(request.url).host, next));
   return NextResponse.redirect(url);
 }

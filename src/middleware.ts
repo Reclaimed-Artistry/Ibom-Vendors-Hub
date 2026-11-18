@@ -38,7 +38,7 @@ export function middleware(request: NextRequest) {
   }
 
   if (!subdomain || isReservedSubdomain(subdomain) || PLATFORM_ROUTES.test(pathname)) {
-    if (pathname === "/checkout" && !request.cookies.get("ivh_session")?.value) {
+    if (pathname === "/checkout" && !(request.cookies.get("ivh_session_shared")?.value || request.cookies.get("ivh_session")?.value)) {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = "/login";
       loginUrl.search = `?next=${encodeURIComponent(pathname + search)}`;
