@@ -19,6 +19,8 @@ try {
   const host = "glow-beauty.ibomvendorshub.com";
   const rewrite = middleware(new NextRequest(`https://${host}/products`, { headers: { host } }));
   assert(rewrite.headers.get("x-middleware-rewrite")?.endsWith("/s/glow-beauty/products"));
+  const avatar = middleware(new NextRequest(`https://${host}/brand/store-avatar-placeholder.svg`, { headers: { host } }));
+  assert.equal(avatar.headers.get("x-middleware-rewrite"), null, "branding assets must load directly on store subdomains");
   for (const preview of ["localhost:3000", "project.vercel.app", "3000-sandbox.e2b.app"]) {
     const result = middleware(new NextRequest(`http://${preview}/s/glow-beauty`, { headers: { host: preview } }));
     assert.equal(result.headers.get("location"), null);

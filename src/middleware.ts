@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isReservedSubdomain, rootDomain, storefrontUrl, subdomainFromHost } from "@/lib/domains";
 
-const PASSTHROUGH_PREFIXES = ["/api", "/_next", "/s/", "/uploads/", "/favicon", "/images"];
+const PASSTHROUGH_PREFIXES = ["/api", "/_next", "/s/", "/uploads/", "/favicon", "/images", "/brand/"];
 
 function applyNoStoreHeaders(response: NextResponse) {
   response.headers.set("Cache-Control", "private, no-cache, no-store, max-age=0, must-revalidate");
