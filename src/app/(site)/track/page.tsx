@@ -1,3 +1,4 @@
+import { StoreImage } from "@/components/store-image";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Clock, Package, Truck } from "lucide-react";
 import { withPublic } from "@/lib/db";
@@ -92,7 +93,7 @@ export default async function TrackPage({
           <Card className="card-pad">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-start gap-3">
-                <img src={result.store.logo_url ?? ""} alt="" className="size-12 rounded-xl border border-ink-100 object-cover" />
+                <StoreImage kind="logo" src={result.store.logo_url} alt="" className="size-12 rounded-xl border border-ink-100 object-cover" />
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">{result.store.name}</p>
                   <p className="text-lg font-bold text-ink-900">{result.order.reference}</p>

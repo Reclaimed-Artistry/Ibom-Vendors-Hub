@@ -1,3 +1,4 @@
+import { StoreImage } from "@/components/store-image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
@@ -41,7 +42,7 @@ export default async function StorefrontLayout({
       <header className="sticky top-0 z-40 border-b border-ink-100 bg-white/95 backdrop-blur">
         <div className="container-page flex h-16 items-center justify-between gap-3">
           <Link href={base || "/"} className="flex min-w-0 items-center gap-2.5">
-            <img src={store.logo_url ?? "/images/seed/logo-mamaput-kitchen.svg"} alt="" className="size-10 rounded-xl border border-ink-100 object-cover" />
+            <StoreImage kind="logo" src={store.logo_url} alt="" className="size-10 rounded-xl border border-ink-100 object-cover" />
             <span className="min-w-0">
               <span className="block truncate text-sm font-bold text-ink-900 sm:text-base">{store.name}</span>
               <span className="flex items-center gap-1 text-[11px] text-ink-400">

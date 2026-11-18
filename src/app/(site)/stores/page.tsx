@@ -1,3 +1,4 @@
+import { StoreImage } from "@/components/store-image";
 import Link from "next/link";
 import { MapPin, Star } from "lucide-react";
 import { getCategoriesWithCounts, getMarketplaceStores } from "@/lib/storefront";
@@ -41,21 +42,21 @@ export default async function StoresPage({
       ) : (
         <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {stores.map((store) => (
-            <Link key={store.id} href={`/s/${store.slug}`} className="group card overflow-hidden">
-              <div className="h-28 overflow-hidden">
-                <img src={store.cover_url ?? "/images/seed/cover-mamaput-kitchen.svg"} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            <Link key={store.id} href={`/s/${store.slug}`} className="group card flex h-80 min-w-0 flex-col overflow-hidden">
+              <div className="h-28 shrink-0 overflow-hidden">
+                <StoreImage kind="cover" src={store.cover_url} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
               </div>
-              <div className="p-4">
+              <div className="flex min-h-0 flex-1 flex-col p-4">
                 <div className="flex items-start gap-3">
-                  <img src={store.logo_url ?? ""} alt="" className="size-11 rounded-xl border border-ink-100 bg-white object-cover" />
+                  <StoreImage kind="logo" src={store.logo_url} alt="" className="size-11 shrink-0 rounded-xl border border-ink-100 bg-white object-cover" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-ink-900">{store.name}</p>
-                    <p className="flex items-center gap-1 text-xs text-ink-400"><MapPin className="size-3" /> {store.city}, {store.state}</p>
+                    <p className="flex min-w-0 items-center gap-1 truncate text-xs text-ink-400"><MapPin className="size-3" /> {store.city}, {store.state}</p>
                   </div>
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-gold-600"><Star className="size-3 fill-current" /> {store.rating_avg || "New"}</span>
                 </div>
-                <p className="mt-3 line-clamp-2 text-sm leading-6 text-ink-500">{store.tagline ?? truncate(store.description, 100)}</p>
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+                <p className="mt-3 h-12 shrink-0 line-clamp-2 text-sm leading-6 text-ink-500">{store.tagline ?? truncate(store.description, 100)}</p>
+                <div className="mt-auto flex min-w-0 items-center gap-2 pt-3 text-[11px] [&>span:first-child]:max-w-[55%] [&>span:first-child]:truncate">
                   <Badge tone="neutral">{store.category_name}</Badge>
                   <span className="text-ink-400">{store.product_count} listings</span>
                   <span className="ml-auto font-semibold text-brand-800">Visit →</span>

@@ -1,3 +1,4 @@
+import { StoreImage } from "@/components/store-image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Clock, Mail, MapPin, Phone, Star, Truck, Package, Store as StoreIcon, CalendarClock, FileText, ClipboardCheck, CheckCircle2 } from "lucide-react";
@@ -56,13 +57,13 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
       {/* Cover */}
       <section className="relative">
         <div className="h-56 w-full overflow-hidden bg-ink-800 sm:h-72">
-          <img src={store.cover_url ?? "/images/seed/cover-mamaput-kitchen.svg"} alt="" className="size-full object-cover" />
+          <StoreImage kind="cover" src={store.cover_url} alt="" className="size-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-ink-900/70 via-ink-900/10 to-transparent" />
         </div>
         <div className="container-page relative -mt-16 pb-6">
           <div className="flex flex-wrap items-end justify-between gap-4 rounded-2xl bg-white p-4 shadow-lg">
             <div className="flex min-w-0 flex-wrap items-end gap-4">
-              <img src={store.logo_url ?? "/images/seed/logo-mamaput-kitchen.svg"} alt={store.name} className="size-24 rounded-2xl border-4 border-white bg-white object-cover shadow-lg" />
+              <StoreImage kind="logo" src={store.logo_url} alt={store.name} className="size-24 rounded-2xl border-4 border-white bg-white object-cover shadow-lg" />
               <div className="min-w-0 flex-1 pb-1">
                 <h1 className="break-words font-display text-2xl text-ink-900 sm:text-3xl">{store.name}</h1>
                 <p className="text-sm text-ink-500">{store.tagline}</p>
