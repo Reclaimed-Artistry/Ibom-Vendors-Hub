@@ -373,6 +373,7 @@ export async function acceptQuotationAction(_prev: PublicState, formData: FormDa
 export async function submitBookingAction(_prev: PublicState, formData: FormData): Promise<PublicState> {
   const storeId = String(formData.get("storeId") ?? "");
   const parsed = bookingSchema.safeParse({
+    meetingPreference: formData.get("meetingPreference"),
     productId: formData.get("productId"),
     customerName: formData.get("customerName"),
     customerEmail: formData.get("customerEmail"),
@@ -406,11 +407,17 @@ export async function submitBookingAction(_prev: PublicState, formData: FormData
   const profile = getCategoryBookingProfile(store.category_slug);
   const fieldErrors: Record<string, string> = {};
 
-  if (profile.requiresSiteAddress && (!parsed.data.location || parsed.data.location.trim().length < 5)) {
+  if (parsed.data.meetingPreference === "customer_location" && (!parsed.data.location || parsed.data.location.trim().length < 5)) {
     fieldErrors.location = "Please enter the job site address, area/LGA and nearest landmark";
   }
 
-  const extraAnswers: Array<{ key: string; label: string; value: string }> = [];
+  const extraAnswers: Array<{ key: string; label: string; value: string }> = [{
+    key: "meeting_preference",
+    label: "Service meeting location",
+    value: parsed.data.meetingPreference === "customer_location"
+      ? "Professional visits customer at their home / office / venue"
+      : "Customer visits professional at their office / studio",
+  }];
   for (const field of profile.extraFields) {
     const rawVal = String(formData.get(`extra_${field.key}`) ?? "").trim();
     if (field.required && !rawVal) {
@@ -425,7 +432,7 @@ export async function submitBookingAction(_prev: PublicState, formData: FormData
   }
 
   const product = await systemDb.maybeOne<{ id: string; name: string; service_duration_minutes: number | null }>(
-    `select id, name, service_duration_minutes from products where id = $1 and store_id = $2`,
+    `select id, name, service_duration_minutes from products where id = $1 and store_id = $2 and is_available and (kind = 'service' or exists (select 1 from stores s join store_categories c on c.id = s.category_id where s.id = products.store_id and c.features->>'serviceBooking' = 'true'))`,
     [parsed.data.productId, store.id],
   );
   if (!product) return { error: "That service is no longer available." };

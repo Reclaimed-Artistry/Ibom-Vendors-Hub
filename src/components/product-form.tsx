@@ -213,10 +213,10 @@ export function ProductForm({
               />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Type" htmlFor="kind">
+              <Field label="Offering type" htmlFor="kind" hint="Choose a service to show Book now instead of a shopping cart. Customers can request a visit or come to your office / studio.">
                 <select id="kind" name="kind" className="select" value={kind} onChange={(event) => setKind(event.target.value)}>
                   <option value="product">Product</option>
-                  <option value="service">Service</option>
+                  <option value="service">Professional service — Book now</option>
                 </select>
               </Field>
               <Field label="Store category" htmlFor="categoryId" hint={categoryName ? `Store category: ${categoryName}` : undefined}>

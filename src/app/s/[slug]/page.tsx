@@ -60,11 +60,11 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
           <div className="absolute inset-0 bg-gradient-to-t from-ink-900/70 via-ink-900/10 to-transparent" />
         </div>
         <div className="container-page relative -mt-16 pb-6">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="flex items-end gap-4">
+          <div className="flex flex-wrap items-end justify-between gap-4 rounded-2xl bg-white p-4 shadow-lg">
+            <div className="flex min-w-0 flex-wrap items-end gap-4">
               <img src={store.logo_url ?? "/images/seed/logo-mamaput-kitchen.svg"} alt={store.name} className="size-24 rounded-2xl border-4 border-white bg-white object-cover shadow-lg" />
-              <div className="pb-1">
-                <h1 className="font-display text-2xl text-ink-900 sm:text-3xl">{store.name}</h1>
+              <div className="min-w-0 flex-1 pb-1">
+                <h1 className="break-words font-display text-2xl text-ink-900 sm:text-3xl">{store.name}</h1>
                 <p className="text-sm text-ink-500">{store.tagline}</p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-ink-500">
                   <span className="inline-flex items-center gap-1 font-semibold text-gold-600">
@@ -135,7 +135,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
             </div>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               {showcase.map((product) => (
-                <Link key={product.id} href={`${base}/products/${product.slug}`} className="group card overflow-hidden">
+                <Link key={product.id} href={product.kind === "service" ? `${base}/book/${product.slug}` : `${base}/products/${product.slug}`} className="group card overflow-hidden">
                   <div className="relative aspect-[4/3] overflow-hidden bg-ink-100">
                     <img src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"} alt={product.name} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     {product.made_to_order ? (
@@ -150,6 +150,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
                         {product.pricing_type === "quotation" ? "Request quote" : `${product.pricing_type === "from" ? "From " : ""}${money(product.price)}`}
                       </span>
                       {product.service_duration_minutes ? <span className="text-[11px] text-ink-400">{product.service_duration_minutes} min</span> : null}
+                      {product.kind === "service" ? <span className="rounded-lg bg-brand-800 px-3 py-2 text-xs font-semibold text-white">Book now →</span> : null}
                     </div>
                   </div>
                 </Link>

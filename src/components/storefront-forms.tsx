@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { CheckCircle2, ClipboardCheck, MapPin, Wrench } from "lucide-react";
 import { SubmitButton } from "@/components/submit-button";
 import { Alert, Field } from "@/components/ui";
@@ -31,6 +31,7 @@ export function BookingForm({
   defaultPhone?: string;
 }) {
   const [state, action] = useActionState<PublicState, FormData>(submitBookingAction, {});
+  const [meetingPreference, setMeetingPreference] = useState("");
   const today = new Date().toISOString().slice(0, 10);
   const profile = getCategoryBookingProfile(categorySlug);
 
@@ -93,11 +94,19 @@ export function BookingForm({
         <input id="customerEmail" name="customerEmail" type="email" className="input" defaultValue={defaultEmail} required />
       </Field>
 
+      <Field label="Where would you like the service?" htmlFor="meetingPreference" error={state?.fieldErrors?.meetingPreference} required>
+        <select id="meetingPreference" name="meetingPreference" className="select" value={meetingPreference} onChange={(event) => setMeetingPreference(event.target.value)} required>
+          <option value="">Choose a meeting option</option>
+          <option value="customer_location">The professional should come to my home / office / venue</option>
+          <option value="vendor_location">I will visit the professional&apos;s office / studio</option>
+        </select>
+      </Field>
+
       <Field
-        label={profile.siteAddressLabel}
+        label={meetingPreference === "customer_location" ? "Your service address, area and nearest landmark" : "Office / studio location or meeting instructions"}
         htmlFor="location"
         error={state?.fieldErrors?.location}
-        required={profile.requiresSiteAddress}
+        required={meetingPreference === "customer_location"}
       >
         <div className="relative">
           <MapPin className="pointer-events-none absolute left-3 top-3 size-4 text-ink-400" />
@@ -106,7 +115,7 @@ export function BookingForm({
             name="location"
             className="input pl-9"
             placeholder={profile.siteAddressPlaceholder}
-            required={profile.requiresSiteAddress}
+            required={meetingPreference === "customer_location"}
           />
         </div>
       </Field>

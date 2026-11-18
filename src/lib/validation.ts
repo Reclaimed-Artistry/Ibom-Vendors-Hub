@@ -318,6 +318,7 @@ export const quotationResponseSchema = z.object({
 });
 
 export const bookingSchema = z.object({
+  meetingPreference: z.enum(["customer_location", "vendor_location"], { message: "Choose where you would like the service" }),
   productId: z.string().uuid(),
   customerName: z.string().trim().min(2).max(120),
   customerEmail: email,

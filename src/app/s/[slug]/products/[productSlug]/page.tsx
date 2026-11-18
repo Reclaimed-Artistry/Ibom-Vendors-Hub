@@ -149,7 +149,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             {(() => {
               const bookingProfile = getCategoryBookingProfile(category?.slug);
               const showBooking = product.kind === "service" || Boolean(features.serviceBooking);
-              const showCart = features.cart !== false;
+              const showCart = product.kind !== "service" && features.cart !== false;
               const showQuote = Boolean(features.quotations) && product.pricing_type !== "quotation";
 
               if (!live) {
@@ -197,7 +197,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                       variant={showCart || product.pricing_type === "quotation" ? "secondary" : "primary"}
                       className="w-full"
                     >
-                      {bookingProfile.ctaLabel}
+                      {product.kind === "service" ? "Book now" : bookingProfile.ctaLabel}
                     </ButtonLink>
                   ) : null}
 
