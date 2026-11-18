@@ -94,6 +94,16 @@ function template(name: string, data: EmailData): RenderedEmail {
     : site;
 
   switch (name) {
+    case "order_fulfilment_time":
+      return {
+        subject: `${data.status === "pickup" ? "Pickup time" : "Expected arrival"} · ${data.orderReference}`,
+        heading: data.status === "pickup" ? "Your vendor shared a pickup time" : "Your vendor shared an arrival estimate",
+        intro: `${data.storeName} updated the expected time for your order.`,
+        rows: [["Order", String(data.orderReference)], [data.status === "pickup" ? "Come for pickup" : "Arrival at your location", String(data.eta)], ["Message", String(data.note || "—")], ...(data.status === "pickup" ? [["Pickup location", String(data.pickupLocation || "See your order for the vendor’s address")]] as Array<[string, string]> : [])],
+        cta: { label: "View your order", href: data.link ?? url("/account/orders") },
+        footnote: "Times are estimates in Nigeria time (WAT, UTC+1), not confirmation that delivery or pickup has happened.",
+      };
+
     case "admin_notification":
       return {
         subject: `Ibomvendorshub · ${data.subject ?? "New notification"}`,

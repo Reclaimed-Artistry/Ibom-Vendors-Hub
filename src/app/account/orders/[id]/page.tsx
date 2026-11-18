@@ -1,3 +1,5 @@
+import { OrderTimingRefresh } from "@/components/order-timing-form";
+import { formatNigeriaTime } from "@/lib/order-timing";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -49,6 +51,14 @@ export default async function AccountOrderDetailPage({ params }: { params: Promi
 
   return (
     <div className="space-y-4">
+      <OrderTimingRefresh />
+      {order.fulfilment_expected_at ? <div className="rounded-2xl border border-brand-200 bg-brand-50 p-5">
+        <h2 className="text-lg font-bold text-brand-900">{order.fulfilment_type === "pickup" ? "Come for pickup" : "Expected arrival at your location"}</h2>
+        <p className="mt-2 text-xl font-semibold text-brand-800">{formatNigeriaTime(order.fulfilment_expected_at)}</p>
+        {order.fulfilment_timing_note ? <p className="mt-2 whitespace-pre-wrap text-sm text-ink-700">{order.fulfilment_timing_note}</p> : null}
+        {order.fulfilment_type === "pickup" && order.pickup_location ? <p className="mt-2 text-sm text-ink-600">Pickup location: {order.pickup_location}</p> : null}
+        <p className="mt-2 text-xs text-ink-500">Estimated time shared by {order.store_name}. All times are Nigeria time (WAT). This is not a delivery confirmation.</p>
+      </div> : null}
       {manualPayment ? <div className="card card-pad"><p className="font-semibold">{manualPayment.status === "approved" ? "Approved" : manualPayment.status === "awaiting_approval" ? "Awaiting payment approval" : "Bank transfer payment"}</p><p className="mt-1 text-sm text-ink-500">Paid directly to the vendor, not platform escrow. Any refund must be arranged with the vendor.</p><Link href={`/pay/${manualPayment.reference}`} className="btn-primary mt-3">{manualPayment.status === "approved" ? "View payment approval" : "View bank details / upload receipt"}</Link></div> : null}
       <PageHeader
         title={order.reference}

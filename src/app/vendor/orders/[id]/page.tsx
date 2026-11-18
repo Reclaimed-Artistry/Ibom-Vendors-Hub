@@ -1,3 +1,5 @@
+import { OrderTimingForm } from "@/components/order-timing-form";
+import { formatNigeriaTime } from "@/lib/order-timing";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -206,6 +208,14 @@ export default async function VendorOrderDetailPage({ params }: { params: Promis
               ) : null}
             </div>
           </Card>
+
+          {["delivery", "pickup"].includes(order.fulfilment_type) ? <Card>
+            <CardHeader title={order.fulfilment_type === "pickup" ? "Customer pickup time" : "Customer arrival estimate"} description="Share the expected date and time with the customer by notification and email." />
+            <div className="card-pad space-y-3">
+              {order.fulfilment_expected_at ? <p className="text-sm font-semibold text-brand-800">Shared time: {formatNigeriaTime(order.fulfilment_expected_at)}</p> : null}
+              {!["cancelled", "rejected", "completed", "delivered", "refunded"].includes(order.status) ? <OrderTimingForm orderId={order.id} pickup={order.fulfilment_type === "pickup"} expectedAt={order.fulfilment_expected_at} note={order.fulfilment_timing_note} /> : <p className="text-sm text-ink-500">This order is closed.</p>}
+            </div>
+          </Card> : null}
 
           {actions.length > 0 ? (
             <Card>

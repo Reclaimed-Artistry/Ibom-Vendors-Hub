@@ -258,6 +258,8 @@ export interface Order {
   delivery_notes: string | null;
   customer_notes: string | null;
   scheduled_for: string | null;
+  fulfilment_expected_at: string | null;
+  fulfilment_timing_note: string | null;
   estimated_completion_date: string | null;
   estimated_dispatch_date: string | null;
   estimated_delivery_date: string | null;
