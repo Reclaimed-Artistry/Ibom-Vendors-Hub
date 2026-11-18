@@ -627,9 +627,13 @@ export async function adminMessageAction(_prev: AdminState, formData: FormData):
  */
 export async function saveGoogleSignInAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const user = await admin();
-  const clientId = String(formData.get("clientId") ?? "").trim();
+  const submittedClientId = String(formData.get("clientId") ?? "").trim();
+  const existing = await systemDb.maybeOne<{ google_client_id: string | null }>(`select google_client_id from platform_settings where id=1`);
+  const clientId = submittedClientId || existing?.google_client_id?.trim() || process.env.GOOGLE_CLIENT_ID?.trim() || "";
   const clientSecret = String(formData.get("clientSecret") ?? "").trim();
   const enabled = formData.get("enabled") === "on";
+
+  if (enabled && !clientId) return { error: "Add the Google OAuth client ID to enable sign-in. Existing secrets are preserved; there is no need to enter them again." };
 
   if (clientId && !clientId.endsWith(".apps.googleusercontent.com")) {
     return {
@@ -649,8 +653,7 @@ export async function saveGoogleSignInAction(_prev: AdminState, formData: FormDa
   await systemDb.execute(
     `update platform_settings
         set google_client_id = $1,
-            google_client_secret = case when $1::text is null then null
-                                        else coalesce(nullif($2, ''), google_client_secret) end,
+            google_client_secret = coalesce(nullif($2, ''), google_client_secret),
             google_signin_enabled = $3,
             updated_at = now()
       where id = 1`,
@@ -684,7 +687,7 @@ export async function saveGoogleSignInAction(_prev: AdminState, formData: FormDa
     google_signin_enabled: boolean;
   }>(`select google_client_id, google_client_secret, google_signin_enabled from platform_settings where id = 1`);
 
-  if (!saved?.google_client_id) return { message: "Google sign-in credentials cleared." };
+  if (!saved?.google_client_id) return { message: "Saved. Existing secrets have been preserved. Add a client ID before enabling Google sign-in." };
   if (!saved.google_signin_enabled) {
     return { message: "Saved, but the button stays hidden while this switch is off." };
   }

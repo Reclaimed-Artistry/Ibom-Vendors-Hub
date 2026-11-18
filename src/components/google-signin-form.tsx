@@ -37,7 +37,7 @@ export function GoogleSignInForm({
         <Field
           label="Client ID"
           htmlFor="googleClientId"
-          hint="Google Cloud Console → APIs & Services → Credentials → OAuth client ID (Web application)."
+          hint="Google Cloud Console → APIs & Services → Credentials → OAuth client ID (Web application). Blank keeps your existing ID; use the switch to disable sign-in."
         >
           <input
             id="googleClientId"
