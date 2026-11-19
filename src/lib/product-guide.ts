@@ -49,6 +49,10 @@ export function productQuestions(slug: string | null | undefined, selection: str
   if (slug === "transport-logistics") return [{key:"route_capacity",label:"Which areas and load sizes do you cover?",placeholder:"e.g. Uyo local delivery, parcels up to 5 kg; request a route quote"}];
   if (slug === "events-rentals") return [{key:"rental_terms",label:"What does the price cover?",placeholder:"e.g. 50 chairs for one day; delivery separate; confirm event date first"}];
   if (slug === "automobiles-vehicle-sales") return [{key:"vehicle_details",label:"Year, mileage, condition and location",placeholder:"e.g. 2015, 120,000 km, used, Uyo; inspections by arrangement"}];
+  if (slug === "household-products") return [
+    {key:"size_quantity",label:"What size or quantity does the buyer get?",placeholder:"e.g. 5 litres, a 6 ft mattress, or a pack of 6 cups"},
+    {key:"item_details",label:"Material, colour, condition or model details",placeholder:"e.g. New stainless steel, silver, lids included; add care or safety instructions"},
+  ];
   if (kind === "service") return [{key:"service_area",label:"Where do you offer this service?",placeholder:"e.g. My studio in Uyo, or customer visits within Uyo"}];
   if (slug === "food-restaurants") return [{key:"portion_size",label:"What portion or quantity is included?",placeholder:selection === "Cake" ? "e.g. 8-inch cake, serves 12" : "e.g. One takeaway pack, serves 1"}];
   if (["fashion-clothing","shoes-footwear"].includes(slug ?? "")) return [{key:"sizes_colours",label:"Which sizes and colours are available?",placeholder:"e.g. Sizes 38–44, black and brown"}];

@@ -18,6 +18,7 @@
     "test:seo:http": "tsx scripts/test-seo-http.ts",
     "test:media": "tsx scripts/test-media-migration.ts && tsx scripts/test-vendor-media.ts && tsx scripts/test-video-autoplay.tsx",
     "test:media:http": "tsx scripts/test-vendor-media-http.ts",
+    "test:categories": "tsx scripts/test-product-guide.ts && tsx scripts/test-expanded-categories.ts && npm run test:multi-categories && tsx scripts/test-household-products.ts",
     "test:multi-categories": "tsx scripts/test-category-migration.ts && tsx scripts/test-multi-categories.ts && tsx scripts/test-category-forms.tsx",
     "test:multi-categories:http": "tsx scripts/test-multi-categories-http.ts",
     "test": "npm run typecheck && npm run test:db",

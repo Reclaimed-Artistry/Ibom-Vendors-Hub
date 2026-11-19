@@ -38,12 +38,12 @@ async function main() {
   assert(["localhost","127.0.0.1"].includes(new URL(BASE).hostname),"Never submit fixture actions to production");
   assert(["localhost","127.0.0.1"].includes(new URL(process.env.DATABASE_URL ?? "postgres://postgres@127.0.0.1:5544/postgres").hostname),"Local database only");
   process.env.AUTH_SECRET = process.env.CATEGORY_TEST_AUTH_SECRET ?? "local-category-preview-auth-secret-only";
-  const userId=randomUUID(),storeId=randomUUID(),otherStoreId=randomUUID(),otherUserId=randomUUID();
+  const userId=randomUUID(),storeId=randomUUID(),otherStoreId=randomUUID(),otherUserId=randomUUID(),registrationUserId=randomUUID();
   const slug=`category-http-${randomUUID()}`;
   const email=`${slug}@example.test`;
   const taxonomy=await systemDb.query<StoreCategory>(`select * from store_categories where is_active`);
   const category=(slug:string)=>{const found=taxonomy.find(row=>row.slug===slug);assert(found,slug);return found;};
-  const fashion=category("fashion-clothing"),packaging=category("branding-packaging"),property=category("house-agents-realtors"),beauty=category("beauty-personal-care");
+  const fashion=category("fashion-clothing"),packaging=category("branding-packaging"),property=category("house-agents-realtors"),beauty=category("beauty-personal-care"),household=category("household-products");
   const enquiry=taxonomy.find(row=>row.features.inquiryOnly);assert(enquiry);
   let sectionId="",foreignSectionId="",foreignProductId="";
   try {
@@ -53,6 +53,7 @@ async function main() {
         await db.execute(`insert into stores(id,owner_id,category_id,name,slug,email,phone,description,address,city,state,status,visibility,manual_suspension,accepts_orders,accepts_pickup)
           values($1,$2,$3,$4,$5,$6,$7,'Local category HTTP fixture','10 Fixture Road, Uyo','Uyo','Akwa Ibom','active','public',false,true,true)`,[store,id,fashion.id,`HTTP Fixture ${storeSlug}`,storeSlug,`${storeSlug}@example.test`,"08031234567"]);
       }
+      await db.execute(`insert into users(id,email,full_name,role,email_verified_at) values($1,$2,'Registration Category Tester','customer',now())`,[registrationUserId,`register-${slug}@example.test`]);
       sectionId=(await db.one<{id:string}>(`insert into product_categories(store_id,name,slug) values($1,'My section','my-section') returning id`,[storeId])).id;
       foreignSectionId=(await db.one<{id:string}>(`insert into product_categories(store_id,name,slug) values($1,'Foreign section','foreign-section') returning id`,[otherStoreId])).id;
       foreignProductId=(await db.one<{id:string}>(`insert into products(store_id,name,slug,price) values($1,'Foreign product','foreign-product',1000) returning id`,[otherStoreId])).id;
@@ -103,6 +104,22 @@ async function main() {
     assert.equal((await systemDb.one(`select count(*)::int n from product_images where product_id=$1`,[boxes.id])).n,1);
     const invalidProperty=await saveListing("Invalid property",property.id);assert.equal(invalidProperty.status,200);assert(invalidProperty.text.includes("Choose For rent or For sale"));
     const moreClothes=await saveListing("Clothes in mixed property store",fashion.id);assert.equal(moreClothes.status,303,"unrelated listings do not require property details");
+    const householdAttributes={offering_type:"Cooking pots / casseroles",size_quantity:"3 pots, 2 L, 3 L and 5 L",item_details:"New stainless steel, lids included"};
+    const householdResult=await saveListing("HTTP household pots",household.id,{trackStock:"true",stockQuantity:"8",attributesJson:JSON.stringify(householdAttributes)});
+    assert.equal(householdResult.status,303,householdResult.text.slice(-500));
+    const pots=await systemDb.one<{id:string;slug:string;kind:string;pricing_type:string;marketplace_category_id:string;category_id:string;attributes:Record<string,string>;track_stock:boolean;stock_quantity:number}>(`select * from products where store_id=$1 and name='HTTP household pots'`,[storeId]);
+    assert.equal(pots.kind,"product");assert.equal(pots.pricing_type,"fixed");assert.equal(pots.marketplace_category_id,household.id);assert.equal(pots.category_id,sectionId);
+    assert.deepEqual(pots.attributes,householdAttributes);assert.equal(pots.track_stock,true);assert.equal(pots.stock_quantity,8);
+    assert.equal((await systemDb.one(`select count(*)::int n from store_category_assignments where store_id=$1 and category_id=$2`,[storeId,household.id])).n,1,"household listing adds the store's new business line");
+    const householdEditPage=await http(`/vendor/products/${pots.id}`,cookie);assert.equal(householdEditPage.status,200);
+    const householdEditForm=form(householdEditPage.text,"marketplaceCategoryId");
+    assert.equal(householdEditForm.get("marketplaceCategoryId"),household.id);
+    assert.equal(JSON.parse(String(householdEditForm.get("attributesJson"))).offering_type,householdAttributes.offering_type);
+    householdEditForm.set("description","Revised household pot set description");
+    assert.equal((await http(`/vendor/products/${pots.id}`,cookie,householdEditForm)).status,303);
+    const editedPots=await systemDb.one(`select marketplace_category_id,category_id,attributes,stock_quantity,description from products where id=$1`,[pots.id]);
+    assert.equal(editedPots.marketplace_category_id,household.id);assert.equal(editedPots.category_id,sectionId);assert.deepEqual(editedPots.attributes,householdAttributes);
+    assert.equal(editedPots.stock_quantity,8);assert.equal(editedPots.description,"Revised household pot set description");
     const appointmentResult=await saveListing("HTTP appointment",beauty.id,{kind:"service"});assert.equal(appointmentResult.status,303);
     const inquiryResult=await saveListing("HTTP enquiry",enquiry.id,{kind:"service"});assert.equal(inquiryResult.status,303);
     const propertyResult=await saveListing("HTTP property",property.id,{kind:"service",attributesJson:JSON.stringify({listing_type:"For rent",property_type:"Flat / apartment",property_location:"10 Test Road in Uyo",price_period:"Per year",inspection_fee:"0"})});assert.equal(propertyResult.status,303);
@@ -133,9 +150,18 @@ async function main() {
     assert(!unavailableBookingPage.text.includes('name="meetingPreference"'), "enquiry-only listing has no appointment form");
     page=await http(`/s/${slug}/products/${clothes.slug}`,cookie);assert.equal(page.status,200);assert(page.text.includes("Add to cart"));assert(!page.text.includes("Book inspection"));
     page=await http(`/s/${slug}/products/${inquiry.slug}`,cookie);assert.equal(page.status,200);assert(!page.text.includes("Add to cart"));assert(page.text.includes("not an instant confirmed reservation"));
-    for(const cat of [fashion,packaging]) {
+    page=await http(`/s/${slug}/products/${pots.slug}`,cookie);assert.equal(page.status,200);assert(page.text.includes("Add to cart"));assert(!page.text.includes("Book inspection"));assert(!page.text.includes("Book now"));
+    for(const cat of [fashion,packaging,household]) {
       const listing=await http(`/stores?category=${cat.slug}&q=${encodeURIComponent(`HTTP Fixture ${slug}`)}`,cookie);assert.equal(listing.status,200);assert(listing.text.includes(`HTTP Fixture ${slug}`));
     }
+    const householdBrowse=await http(`/browse?category=${household.slug}&kind=product&q=${encodeURIComponent(`HTTP Fixture ${slug}`)}`,cookie);
+    assert.equal(householdBrowse.status,200);assert(householdBrowse.text.includes("HTTP household pots"));assert(!householdBrowse.text.includes("HTTP clothes"));
+    const registrationCookie=`ivh_session_shared=${await createSessionToken({sub:registrationUserId,email:`register-${slug}@example.test`,role:"customer",name:"Registration Category Tester"})}`;
+    const registerPage=await http("/register",registrationCookie);assert.equal(registerPage.status,200);
+    const registerDom=new JSDOM(registerPage.text);
+    assert(registerDom.window.document.querySelector(`#categorySlug option[value="${household.slug}"]`),"signed-in storefront registration offers Household Products");
+    registerDom.window.close();
+    console.log("PASS: household products persist through real create/edit forms, expand business categories and appear in registration, vendor discovery, product filters and Add to cart pages");
     assert((await http("/vendor/orders/export",cookie)).text.includes("Reference"));
     console.log("PASS: real booking actions use listing category, block forged enquiry/property requests, preserve clothing carts and render multi-category discovery");
     // Exercise aggregate category SQL in admin pages as well.
@@ -146,9 +172,10 @@ async function main() {
   } finally {
     await withSystem(async db=>{
       await db.execute(`delete from stores where id=any($1::uuid[])`,[[storeId,otherStoreId]]);
-      await db.execute(`delete from users where id=any($1::uuid[])`,[[userId,otherUserId]]);
+      await db.execute(`delete from users where id=any($1::uuid[])`,[[userId,otherUserId,registrationUserId]]);
     });
     assert.equal((await systemDb.one(`select count(*)::int n from stores where id=any($1::uuid[])`,[[storeId,otherStoreId]])).n,0);
+    assert.equal((await systemDb.one(`select count(*)::int n from users where id=any($1::uuid[])`,[[userId,otherUserId,registrationUserId]])).n,0);
   }
   console.log("PASS: local HTTP fixtures cleaned up");
 }

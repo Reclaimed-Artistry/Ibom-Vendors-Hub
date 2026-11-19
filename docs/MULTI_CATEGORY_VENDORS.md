@@ -25,12 +25,20 @@ Legacy product inserts default to the store's primary category. Legacy product e
 
 Public category filtering/counts, store summaries, category sitemaps, product structured data, booking profiles, checkout guards, inspection scheduling and vendor order workflows use the new model. Mixed orders combine stages for the ordered items' categories, rather than inheriting an unrelated store primary category. Delivery verification/payment safeguards are unchanged.
 
+## Household Products
+
+Migration `0032_household_products_category.sql` adds **Household Products** (`household-products`) as an active physical-goods category. It is available during registration, in store business-category settings, in both product editors, and in marketplace/vendor-directory filters.
+
+The guided editor includes broad item-type choices covering kitchenware/cookware, appliances, cleaning and laundry supplies, bathroom/paper goods, bedding/textiles, furniture/storage/decor, lighting/electrical accessories, tools/safety, garden, baby and pet household items. **Other** supports products not explicitly named. Two optional questions collect size/quantity and material/colour/condition/model details; the normal stock, variants, delivery and pickup controls remain available.
+
+These are listing choices, **not fabricated sale inventory**. Vendors provide their own product names, descriptions, prices, stock and media. The category supports ordinary carts/checkout, not property inspections or enquiry-only reservations. Existing household listings under General Retail or Electronics are not automatically moved; vendors can change their marketplace category without changing their private catalogue section or order history.
+
 ## Checks
 
 With the local database running and migrations applied:
 
 ```sh
-npm run test:multi-categories
+npm run test:categories  # includes multi-category regressions and household checks
 npm run typecheck
 npm run lint
 npm run test:db
@@ -38,7 +46,7 @@ npm run test:seo
 npm run build
 ```
 
-The multi-category test suite rebuilds an isolated in-memory pre-feature schema to test migration/backfill; tests real registration, discovery, counts, category ownership/RLS, mixed-store checkout/inspection behavior and order snapshots using rollback-only local fixtures; and exercises both editors and registration caution behavior in a DOM environment.
+The category test suite rebuilds an isolated in-memory pre-feature schema to test migration/backfill and household-category replay without changing existing data; checks guide coverage and database/definition parity; tests real registration, discovery, counts, category ownership/RLS, mixed-store checkout/inspection behavior, household variant/stock checks and pickup/delivery order snapshots using rollback-only local fixtures; and exercises both editors and registration caution behavior in a DOM environment.
 
 For actual Next.js production-server form submissions, start a **local** production server with a local test-only authentication secret:
 

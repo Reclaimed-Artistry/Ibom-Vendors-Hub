@@ -82,6 +82,7 @@ Other seeded vendors: `ima@royalfashion.test`, `victor@victorshoes.test`,
 npm run typecheck     # tsc --noEmit
 npm run test          # typecheck + database/RLS checks
 npm run test:db       # RLS isolation, payment integrity, retention checks
+npm run test:categories # category guides, migrations, forms, discovery + household checkout
 npm run test:smoke    # HTTP smoke test (needs the app running)
 npm run build         # production build
 npm run db:migrate    # apply supabase/migrations/*.sql

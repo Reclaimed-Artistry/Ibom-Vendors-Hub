@@ -16,7 +16,7 @@ async function main() {
   const { VendorRegisterForm } = await import("../src/components/auth-forms");
   const categories = await systemDb.query<StoreCategory>(`select * from store_categories where is_active order by sort_order,name`);
   const find = (slug: string) => { const category = categories.find(item => item.slug === slug); assert(category); return category; };
-  const fashion = find("fashion-clothing"), packaging = find("branding-packaging"), property = find("house-agents-realtors"), farm = find("agriculture-livestock");
+  const fashion = find("fashion-clothing"), packaging = find("branding-packaging"), property = find("house-agents-realtors"), farm = find("agriculture-livestock"), household = find("household-products");
   const root = createRoot(dom.window.document.getElementById("test-root")!);
   const query = <T extends Element>(selector: string) => { const element = dom.window.document.querySelector<T>(selector); assert(element, selector); return element; };
   const changeSelect = async (selector: string, value: string) => {
@@ -41,7 +41,13 @@ async function main() {
   assert.equal(payload.get("categorySlug"),packaging.slug);
   assert.deepEqual(payload.getAll("categorySlugs"),[packaging.slug,fashion.slug]);
   assert.equal(dom.window.document.querySelectorAll('input[type="checkbox"]:checked').length,2);
-  console.log("PASS: accessible checkbox multi-selection, primary changes, retained selections and repeated FormData values");
+  const householdCheckbox = [...dom.window.document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(input => input.parentElement?.textContent?.includes(household.name));
+  assert(householdCheckbox); await click(householdCheckbox);
+  await changeSelect("#categorySlug",household.slug);
+  payload = new dom.window.FormData(query<HTMLFormElement>("form"));
+  assert.equal(payload.get("categorySlug"),household.slug);
+  assert.deepEqual(payload.getAll("categorySlugs"),[household.slug,packaging.slug,fashion.slug]);
+  console.log("PASS: accessible checkbox multi-selection, household primary/additional categories, retained selections and repeated FormData values");
 
   const product = { id: "11111111-1111-4111-8111-111111111111", name:"Existing dress",description:"Original description",shortDescription:"",kind:"product",categoryId:"22222222-2222-4222-8222-222222222222",marketplaceCategoryId:fashion.id,price:"2500",compareAtPrice:"",pricingType:"fixed",sku:"DRESS-1",trackStock:false,stockQuantity:"0",isAvailable:true,isFeatured:false,condition:"",brand:"",model:"",warrantyInfo:"",warrantyMonths:"",madeToOrder:false,productionDays:"",prepTimeMinutes:"",portion:"",serviceDurationMinutes:"",attributes:{},specifications:{},variants:[{name:"Large",price:"2500",stockQuantity:"2"}],addons:[],images:[{id:"photo-one",url:"/images/seed/product-jollof.svg"}] };
   const props = { product, vendorLga:"Uyo",categorySlug:fashion.slug,categoryName:fashion.name,attributes:fashion.attributes,features:fashion.features,categories:[{id:product.categoryId,name:"Private section"}],marketplaceCategories:categories,businessCategoryIds:[fashion.id] };
@@ -67,6 +73,23 @@ async function main() {
   await changeSelect("#marketplaceCategoryId",farm.id);
   assert(query<HTMLSelectElement>("#guide-sale_unit"));
   assert(!dom.window.document.querySelector("#guide-inspection_fee"));
+  await changeSelect("#marketplaceCategoryId",household.id);
+  assert(query<HTMLSelectElement>("#offering").options.length >= 102, "household choices plus prompt and Other");
+  for (const choice of ["Cooking pots / casseroles","Laundry detergent / soap","Refrigerators / freezers","Bedsheets / pillowcases","Other"]) {
+    await changeSelect("#offering",choice);
+    payload = new dom.window.FormData(query<HTMLFormElement>("form"));
+    assert.equal(payload.get("kind"),"product",choice);
+    assert.equal(payload.get("pricingType"),"fixed");
+    assert.equal(JSON.parse(String(payload.get("attributesJson"))).offering_type,choice);
+    assert(query<HTMLInputElement>("#guide-size_quantity"));
+    assert(query<HTMLInputElement>("#guide-item_details"));
+    assert(!dom.window.document.querySelector("#guide-service_area"));
+    assert(!dom.window.document.querySelector("#guide-inspection_fee"));
+    assert(!dom.window.document.querySelector("#guide-sale_unit"));
+  }
+  assert.equal(query<HTMLTextAreaElement>("#guide-description").value,"Unsaved description must survive a category change");
+  assert.equal(payload.get("categoryId"),product.categoryId);
+  assert.equal(JSON.parse(String(payload.get("variantsJson")))[0].name,"Large");
   await changeSelect("#marketplaceCategoryId",fashion.id);
   assert(!dom.window.document.querySelector("#guide-inspection_fee"));
   assert(!dom.window.document.querySelector("#guide-sale_unit"));
@@ -81,11 +104,19 @@ async function main() {
   assert(query<HTMLInputElement>('[name="name"]').value === product.name);
   assert(text().includes("Property listing"));
   assert(query<HTMLSelectElement>("#kind").disabled);
-  await changeSelect("#marketplaceCategoryId",packaging.id);
+  await changeSelect("#marketplaceCategoryId",household.id);
   assert(!query<HTMLSelectElement>("#kind").disabled);
+  assert.equal(query<HTMLSelectElement>("#kind").value,"product");
+  payload = new dom.window.FormData(query<HTMLFormElement>("form"));
+  assert.equal(payload.get("marketplaceCategoryId"),household.id);
+  assert.equal(payload.get("pricingType"),"fixed");
+  assert(text().includes("Variants"));
+  assert(dom.window.document.querySelector('input[name="trackStock"]'));
+  assert(!text().includes("Property listing"));
+  await changeSelect("#marketplaceCategoryId",packaging.id);
   assert.equal(new dom.window.FormData(query<HTMLFormElement>("form")).get("marketplaceCategoryId"),packaging.id);
   assert.equal(query<HTMLSelectElement>("#categoryId").value,product.categoryId);
-  console.log("PASS: full editor marketplace/category-specific controls stay independent of private catalogue sections");
+  console.log("PASS: household guided/full editors default to physical products with price, stock and variants; catalogue sections stay independent");
 
   // Preserve the existing incomplete-registration caution and jump target.
   dom.window.HTMLElement.prototype.scrollIntoView = () => {};
@@ -93,7 +124,8 @@ async function main() {
   await act(async () => { query<HTMLFormElement>("form").dispatchEvent(new dom.window.Event("submit",{bubbles:true,cancelable:true})); });
   assert(text().includes("required fields are still empty"));
   assert(namedButtons("Primary business category"));
-  await changeSelect("#categorySlug",fashion.slug);
+  await changeSelect("#categorySlug",household.slug);
+  assert.equal(new dom.window.FormData(query<HTMLFormElement>("form")).get("categorySlug"),household.slug);
   const caution = dom.window.document.querySelector('[role="alert"]');
   assert(caution && !caution.textContent?.includes("Primary business category"),"caution clears after choosing a category");
   assert(query<HTMLSelectElement>("#categorySlug").getAttribute("class")?.includes("select"));

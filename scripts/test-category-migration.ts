@@ -1,8 +1,9 @@
-/** Rebuild a fresh in-memory pre-feature database, then test the 0030 backfill. */
+/** Fresh migration chain, 0030 backfill and additive/idempotent 0032 household taxonomy. */
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
+import { EXPANDED_CATEGORIES } from "../src/lib/expanded-categories";
 
 async function main() {
   const db = await PGlite.create();
@@ -36,6 +37,31 @@ async function main() {
     await db.query(`insert into products(store_id,name,slug,price) values($1,'Legacy client insert','legacy-client-insert',100)`,[store]);
     assert.equal((await db.query<{marketplace_category_id:string}>(`select marketplace_category_id from products where slug='legacy-client-insert'`)).rows[0].marketplace_category_id,category);
     console.log("PASS: fresh migration chain and 0030 backfill preserve stores, primary categories, uncategorised data, catalogue sections, attributes, prices, images and variants; legacy insert defaults work");
+
+    const householdMigration="0032_household_products_category.sql";
+    for(const filename of readdirSync(dir).filter(file=>file.endsWith(".sql")&&file>migration&&file<householdMigration).sort()) await db.exec(readFileSync(`${dir}/${filename}`,"utf8"));
+    const previousCategories=(await db.query(`select * from store_categories order by slug`)).rows;
+    const snapshot=async()=>{
+      const data:Record<string,unknown>={};
+      for(const table of ["stores","products","product_categories","product_images","product_variants","orders","order_items"]) data[table]=(await db.query(`select * from ${table} order by id`)).rows;
+      data.assignments=(await db.query(`select * from store_category_assignments order by store_id,category_id`)).rows;
+      return data;
+    };
+    const before=await snapshot();
+    const sql=readFileSync(`${dir}/${householdMigration}`,"utf8");
+    await db.exec(sql);
+    const household=(await db.query<{id:string;slug:string;name:string;description:string;icon:string;features:Record<string,boolean>;sort_order:number;is_active:boolean}>(`select * from store_categories where slug='household-products'`)).rows[0];
+    assert(household);
+    const definition=EXPANDED_CATEGORIES[household.slug];
+    for(const key of ["name","description","icon","features"] as const) assert.deepEqual(household[key],definition[key],key);
+    assert.equal(household.sort_order,28);assert.equal(household.is_active,true);
+    assert.equal((await db.query(`select * from store_categories`)).rows.length,previousCategories.length+1);
+    await db.exec(sql);
+    const replayed=(await db.query<{id:string}>(`select id from store_categories where slug='household-products'`)).rows;
+    assert.deepEqual(replayed,[{id:household.id}],"replay retains the same household category ID and does not duplicate it");
+    assert.deepEqual((await db.query(`select * from store_categories where slug<>'household-products' order by slug`)).rows,previousCategories,"existing category settings are untouched");
+    assert.deepEqual(await snapshot(),before,"no inventory, recategorisation or changes to existing stores, media, sections, variants or orders");
+    console.log("PASS: fresh chain through 0032, household definition/retail parity, stable category on replay and no invented stock or changes to existing data");
   } finally {await db.close();}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
