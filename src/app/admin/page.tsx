@@ -1,3 +1,4 @@
+import { BUSINESS_CATEGORY_NAMES_SQL } from "@/lib/business-categories";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Building2, CalendarClock, CreditCard, Flag, ShoppingBag, Users, Wallet } from "lucide-react";
@@ -42,7 +43,7 @@ export default async function AdminOverviewPage() {
          (select count(*)::int from refunds where status = 'requested') as open_refunds`,
     ),
     systemDb.query<{ id: string; name: string; slug: string; owner_name: string; owner_email: string; category_name: string | null; created_at: string; review_deadline_at: string | null }>(
-      `select s.id, s.name, s.slug, u.full_name as owner_name, u.email as owner_email, c.name as category_name, s.created_at, s.review_deadline_at
+      `select s.id, s.name, s.slug, u.full_name as owner_name, u.email as owner_email, ${BUSINESS_CATEGORY_NAMES_SQL} as category_name, s.created_at, s.review_deadline_at
          from stores s join users u on u.id = s.owner_id left join store_categories c on c.id = s.category_id
         where s.status = 'pending' order by s.created_at limit 6`,
     ),

@@ -1,3 +1,4 @@
+import { BUSINESS_CATEGORY_NAMES_SQL } from "@/lib/business-categories";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
@@ -55,7 +56,7 @@ export default async function AdminMessagesPage({
             s.created_at as store_created_at, s.review_deadline_at,
             s.city as store_city, s.state as store_state, s.address as store_address,
             s.logo_url as store_logo_url, s.cover_url as store_cover_url,
-            c.name as category_name,
+            ${BUSINESS_CATEGORY_NAMES_SQL} as category_name,
             u.full_name as owner_name, u.email as owner_email, u.phone as owner_phone,
             vp.nin, vp.proof_of_residence_type, vp.proof_of_residence_url,
             vp.cac_registered, vp.cac_number, vp.kyc_status,

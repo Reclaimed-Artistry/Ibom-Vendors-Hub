@@ -1,3 +1,4 @@
+import { getBusinessCategories } from "@/lib/business-categories";
 import { FREE_STORE_ACCESS } from "@/lib/store-access-policy";
 import { authCookieDomain } from "@/lib/auth-navigation";
 import { cache } from "react";
@@ -187,6 +188,7 @@ export interface VendorContext {
   isManuallySuspended: boolean;
   isAccountSuspended: boolean;
   category: import("@/lib/types").StoreCategory | null;
+  categories: import("@/lib/types").StoreCategory[];
 }
 
 /** Vendor dashboard context: guarantees the user owns a store and immediately enforces overdue subscription expiry. */
@@ -249,12 +251,9 @@ export const getVendorContext = cache(async (): Promise<VendorContext> => {
     (store.status === "expired" || (!subscription && !hasUnexpiredAccessGrant));
   const isAccountSuspended = isSubscriptionExpired || isManuallySuspended || store.status === "rejected";
 
-  const category = store.category_id
-    ? await systemDb.maybeOne<import("@/lib/types").StoreCategory>(
-        `select * from store_categories where id = $1`,
-        [store.category_id],
-      )
-    : null;
+  const categories = await getBusinessCategories(systemDb, store.id);
+  const category = categories.find((item) => item.id === store.category_id) ?? null;
+  store.business_categories = categories;
 
   return {
     user,
@@ -267,6 +266,7 @@ export const getVendorContext = cache(async (): Promise<VendorContext> => {
     isManuallySuspended,
     isAccountSuspended,
     category,
+    categories,
   };
 });
 

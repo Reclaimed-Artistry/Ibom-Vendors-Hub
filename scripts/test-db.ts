@@ -97,10 +97,10 @@ async function main() {
 
   console.log("\nPublic visibility");
   const publicStores = await withPublic((db) => db.query<{ id: string }>(`select id from stores`));
-  const systemStores = await systemDb.query<{ id: string }>(`select id from stores`);
-  check("anonymous visitors see fewer stores than the system", publicStores.length < systemStores.length, {
+  const liveStores = await systemDb.query<{ id: string }>(`select id from stores where store_is_live(id)`);
+  check("anonymous visitors see exactly the live stores", publicStores.length === liveStores.length && publicStores.every(row => liveStores.some(live => live.id === row.id)), {
     public: publicStores.length,
-    system: systemStores.length,
+    live: liveStores.length,
   });
   if (expired) {
     check("expired storefront is hidden from the marketplace", !publicStores.some((row) => row.id === expired.id));

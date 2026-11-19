@@ -1,6 +1,8 @@
 "use client";
 
 import { uploadSingleProductImage } from "@/lib/product-image-upload";
+import { MarketplaceCategoryField } from "@/components/business-category-fields";
+import { productGuide } from "@/lib/product-guide";
 import { GuidedProductForm } from "@/components/guided-product-form";
 import { agricultureFieldRequired } from "@/lib/agriculture";
 import { useActionState, useState } from "react";
@@ -9,7 +11,7 @@ import { CheckCircle2, ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react"
 import { saveProductAction, type VendorState } from "@/app/actions/vendor";
 import { Alert, Field } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
-import type { CategoryAttribute, CategoryFeatures } from "@/lib/types";
+import type { CategoryAttribute, CategoryFeatures, StoreCategory } from "@/lib/types";
 
 export interface EditableVariant {
   id?: string;
@@ -26,6 +28,7 @@ export interface EditableProduct {
   shortDescription: string;
   kind: string;
   categoryId: string;
+  marketplaceCategoryId?: string;
   price: string;
   deliveryFee?: string;
   deliveryFeeOutside?: string;
@@ -56,10 +59,12 @@ export interface EditableProduct {
 export function AdvancedProductForm({
   product,
   vendorLga,
-  categoryName,
-  attributes,
-  features,
+  categoryName: defaultCategoryName,
+  attributes: defaultAttributes,
+  features: defaultFeatures,
   categories,
+  marketplaceCategories,
+  businessCategoryIds,
 }: {
   product: EditableProduct;
   vendorLga: string | null;
@@ -67,9 +72,16 @@ export function AdvancedProductForm({
   attributes: CategoryAttribute[];
   features: CategoryFeatures;
   categories: Array<{ id: string; name: string }>;
+  marketplaceCategories: StoreCategory[];
+  businessCategoryIds: string[];
 }) {
   const [state, formAction] = useActionState<VendorState, FormData>(saveProductAction, {});
 
+  const [marketplaceCategoryId, setMarketplaceCategoryId] = useState(product.marketplaceCategoryId ?? "");
+  const category = marketplaceCategories.find(item => item.id === marketplaceCategoryId);
+  const categoryName = category?.name ?? defaultCategoryName;
+  const attributes = category?.attributes ?? defaultAttributes;
+  const features = category?.features ?? defaultFeatures;
   const [name, setName] = useState(product.name);
   const [categoryId, setCategoryId] = useState(product.categoryId);
   const [shortDescription, setShortDescription] = useState(product.shortDescription);
@@ -166,6 +178,16 @@ export function AdvancedProductForm({
         </Alert>
       ) : null}
 
+      <section className="card card-pad space-y-2">
+        <MarketplaceCategoryField categories={marketplaceCategories} assignedIds={businessCategoryIds} value={marketplaceCategoryId}
+          error={state.fieldErrors?.marketplaceCategoryId} onChange={id => {
+            const next = marketplaceCategories.find(item => item.id === id);
+            setMarketplaceCategoryId(id);
+            setKind(next?.features?.propertyListings || productGuide(next?.slug).service ? "service" : "product");
+            setPricingType(next?.features?.inquiryOnly ? "quotation" : "fixed");
+          }} />
+        <p className="text-xs text-ink-500">Changing this updates category-specific fields. Your name, description, photos and variants are kept; review the listing before saving.</p>
+      </section>
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <section className="card card-pad space-y-4">
@@ -190,7 +212,7 @@ export function AdvancedProductForm({
                   <option value="service">{propertyListing ? "Property — Book inspection" : "Professional service — Book now"}</option>
                 </select>
               </Field>
-              <Field label="Store category" htmlFor="categoryId" hint={categoryName ? `Store category: ${categoryName}` : undefined}>
+              <Field label="Catalogue section" htmlFor="categoryId" hint="Optional section inside your own store, such as Dresses or Gift boxes. Not a marketplace category.">
                 <select
                   id="categoryId"
                   name="categoryId"

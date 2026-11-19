@@ -11,7 +11,7 @@ import { deleteProductCategoryAction } from "@/app/actions/vendor";
 export const metadata: Metadata = { title: "Categories · Vendor dashboard" };
 
 export default async function VendorCategoriesPage() {
-  const { store, category } = await requireActiveVendorContext();
+  const { store, categories: businessCategories } = await requireActiveVendorContext();
   const rows = await systemDb.query<{ id: string; name: string; product_count: number; is_active: boolean }>(
     `select c.id, c.name, c.is_active,
             (select count(*)::int from products p where p.category_id = c.id) as product_count
@@ -22,14 +22,14 @@ export default async function VendorCategoriesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Product categories"
+        title="Catalogue sections"
         description={`Group your catalogue so customers can browse ${store.name} by section.`}
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <Card>
-            <CardHeader title="Your categories" description={`${rows.length} section${rows.length === 1 ? "" : "s"}`} />
+            <CardHeader title="Your catalogue sections" description={`${rows.length} section${rows.length === 1 ? "" : "s"}`} />
             {rows.length === 0 ? (
               <EmptyState icon={<Tags className="size-5" />} title="No categories yet" description="Create categories such as “Soups”, “Bridal” or “Phone accessories”." />
             ) : (
@@ -63,23 +63,12 @@ export default async function VendorCategoriesPage() {
             <CategoryForm />
           </Card>
 
-          {category ? (
-            <Card className="card-pad">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Platform category</p>
-              <p className="mt-1 font-semibold text-ink-900">{category.name}</p>
-              <p className="mt-1 text-sm text-ink-500">{category.description}</p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {Object.entries(category.features ?? {})
-                  .filter(([, enabled]) => enabled)
-                  .map(([feature]) => (
-                    <span key={feature} className="badge badge-neutral">{feature}</span>
-                  ))}
-              </div>
-              <p className="mt-3 text-xs text-ink-400">
-                These features are configured by the platform admin and shape the fields available on your products.
-              </p>
-            </Card>
-          ) : null}
+          <Card className="card-pad space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Marketplace business categories</p>
+            <div className="flex flex-wrap gap-1.5">{businessCategories.map(category => <Badge key={category.id} tone="info">{category.name}</Badge>)}</div>
+            <p className="text-sm text-ink-500">Your store appears in all of these business categories. Each listing chooses its own marketplace category and fields, separate from the catalogue sections here.</p>
+            <Link href="/vendor/store#categorySlug" className="btn btn-secondary btn-sm">Manage business categories</Link>
+          </Card>
         </div>
       </div>
     </div>

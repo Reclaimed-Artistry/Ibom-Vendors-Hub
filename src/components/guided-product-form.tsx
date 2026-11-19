@@ -1,5 +1,6 @@
 "use client";
 
+import { MarketplaceCategoryField } from "@/components/business-category-fields";
 import { useActionState, useState } from "react";
 import { ImagePlus, X, Check } from "lucide-react";
 import { saveProductAction, type VendorState } from "@/app/actions/vendor";
@@ -12,7 +13,14 @@ import { agricultureFieldRequired } from "@/lib/agriculture";
 import type { CategoryAttribute } from "@/lib/types";
 
 type Props = Parameters<typeof AdvancedProductForm>[0] & { categorySlug?: string | null };
-export function GuidedProductForm({ product, categorySlug, categoryName, attributes, features }: Props) {
+export function GuidedProductForm({ product, categorySlug: defaultSlug, categoryName: defaultName, attributes: defaultAttributes, features: defaultFeatures, marketplaceCategories, businessCategoryIds }: Props) {
+  const [marketplaceCategoryId, setMarketplaceCategoryId] = useState(product.marketplaceCategoryId ?? "");
+  const category = marketplaceCategories.find(item => item.id === marketplaceCategoryId);
+  const categorySlug = category?.slug ?? defaultSlug;
+  const categoryName = category?.name ?? defaultName;
+  const attributes = category?.attributes ?? defaultAttributes;
+  const features = category?.features ?? defaultFeatures;
+  const [pricingType, setPricingType] = useState(product.pricingType);
   const guide = productGuide(categorySlug);
   const farm = categorySlug === "agriculture-livestock";
   const property = Boolean(features.propertyListings);
@@ -46,7 +54,7 @@ export function GuidedProductForm({ product, categorySlug, categoryName, attribu
         : <input id={`guide-${field.key}`} className="input" type={field.type === "number" ? "number" : "text"} min={field.type === "number" ? 0 : undefined} value={value} required={required} onChange={e=>update(e.target.value)} placeholder={field.key === "pack_size" ? "e.g. 1 kg pack or crate of 30 eggs" : undefined} />}
     </Field>;
   }
-  const preserved = {categoryId:product.categoryId,shortDescription:product.shortDescription,compareAtPrice:product.compareAtPrice,pricingType:features.inquiryOnly?"quotation":property?"fixed":product.pricingType,sku:product.sku,condition:product.condition,brand:product.brand,model:product.model,warrantyInfo:product.warrantyInfo,warrantyMonths:product.warrantyMonths,prepTimeMinutes:product.prepTimeMinutes,portion:product.portion,serviceDurationMinutes:product.serviceDurationMinutes};
+  const preserved = {categoryId:product.categoryId,shortDescription:product.shortDescription,compareAtPrice:product.compareAtPrice,pricingType:features.inquiryOnly?"quotation":property?"fixed":pricingType,sku:product.sku,condition:product.condition,brand:product.brand,model:product.model,warrantyInfo:product.warrantyInfo,warrantyMonths:product.warrantyMonths,prepTimeMinutes:product.prepTimeMinutes,portion:product.portion,serviceDurationMinutes:product.serviceDurationMinutes};
   return <form action={action} className="mx-auto max-w-3xl space-y-4">
     <input type="hidden" name="productId" value={product.id ?? ""} />
     <input type="hidden" name="attributesJson" value={JSON.stringify({...values,offering_type:selection})} />
@@ -60,6 +68,16 @@ export function GuidedProductForm({ product, categorySlug, categoryName, attribu
     {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
     {state.fieldErrors ? <Alert tone="warning">{Object.values(state.fieldErrors).join(" · ")}</Alert> : null}
     <section className="card card-pad space-y-3">
+      <MarketplaceCategoryField categories={marketplaceCategories} assignedIds={businessCategoryIds} value={marketplaceCategoryId}
+        error={state.fieldErrors?.marketplaceCategoryId} onChange={id => {
+          const next = marketplaceCategories.find(item => item.id === id);
+          setMarketplaceCategoryId(id);
+          // Keep the basic form mounted so unsaved descriptions/photos survive.
+          setSelection(current => current || product.id ? "Other" : "");
+          setKind(next?.features?.propertyListings || productGuide(next?.slug).service ? "service" : "product");
+          setPricingType(next?.features?.inquiryOnly ? "quotation" : "fixed");
+        }} />
+      <p className="text-xs text-ink-500">The guide below follows this listing’s category. Your basic details and photos are kept when you change it; review category details before saving.</p>
       <p className="text-xs font-semibold uppercase tracking-wider text-brand-700">1 · {categoryName || "Your store"}</p>
       <Field label={property ? "What property do you want to list?" : "What do you want to add?"} htmlFor="offering" required>
         <select id="offering" className="select" required value={selection} onChange={e=>{

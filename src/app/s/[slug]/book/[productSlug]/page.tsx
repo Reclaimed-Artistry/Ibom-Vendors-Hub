@@ -1,3 +1,4 @@
+import { listingCategory } from "@/lib/category-policy";
 import { NO_INDEX } from "@/lib/seo";
 import { isPropertyCategory, inspectionSlots } from "@/lib/property-inspections";
 import { InspectionBookingForm } from "@/components/inspection-forms";
@@ -15,10 +16,12 @@ export const metadata = { robots: NO_INDEX, alternates: { canonical: null } };
 
 export default async function BookPage({ params }: { params: Promise<{ slug: string; productSlug: string }> }) {
   const { slug, productSlug } = await params;
-  const { store, category, live } = await resolveStore(slug);
-  if (!store || category?.features?.inquiryOnly) notFound();
+  const { store, category: primaryCategory, live } = await resolveStore(slug);
+  if (!store) notFound();
   const product = await getStoreProduct(store.id, productSlug);
-  if (!product || !product.is_available || (product.kind !== "service" && !category?.features?.serviceBooking)) notFound();
+  if (!product) notFound();
+  const category = listingCategory(product, primaryCategory);
+  if (!product.is_available || category?.features?.inquiryOnly || (product.kind !== "service" && !category?.features?.serviceBooking)) notFound();
   const [base, settings, user] = await Promise.all([storeBase(slug), getSettings(), getCurrentUser()]);
   const profile = getCategoryBookingProfile(category?.slug);
 

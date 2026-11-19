@@ -1,3 +1,4 @@
+import { getOrderCategory, orderCategory, ORDER_CATEGORIES_SQL } from "@/lib/order-categories";
 import { farmMinimumQuantity } from "@/lib/agriculture";
 import { FREE_STORE_ACCESS } from "@/lib/store-access-policy";
 import { calculateDeliveryFee, deliveryRate, isWithinVendorLga } from "@/lib/delivery-fees";
@@ -53,6 +54,8 @@ interface ProductRow {
   store_state: string | null;
   store_phone: string | null;
   category_id: string | null;
+  category_slug: string | null;
+  category_features: Record<string, boolean>;
 }
 
 export interface CheckoutResult {
@@ -91,20 +94,24 @@ export async function createCheckout(
               s.manual_suspension, s.visibility, s.accepts_orders, s.accepts_delivery,
               s.accepts_pickup, s.delivery_fee, s.minimum_order, s.access_until, s.owner_id,
               s.email as store_email, s.address as store_address, s.city as store_city,
-              s.state as store_state, s.phone as store_phone, s.category_id,
+              s.state as store_state, s.phone as store_phone, coalesce(p.marketplace_category_id,s.category_id) as category_id,
+              c.slug as category_slug, c.features as category_features,
               (${FREE_STORE_ACCESS} or exists (select 1 from subscriptions su where su.store_id = s.id
                 and su.status in ('active','trialing') and su.expires_at > now())) as subscription_active
          from products p join stores s on s.id = p.store_id
+         left join store_categories c on c.id = coalesce(p.marketplace_category_id,s.category_id)
         where p.id = any($1::uuid[])`,
       [productIds],
     );
     if (rows.length !== productIds.length) {
       throw new Error("One of the items in your cart is no longer available.");
     }
-    const property = await db.maybeOne(`select p.id from products p join stores s on s.id=p.store_id join store_categories c on c.id=s.category_id where p.id=any($1::uuid[]) and c.slug='house-agents-realtors' limit 1`, [productIds]);
-    if (property) throw new Error("Properties cannot be purchased through checkout. Open the listing and book an inspection.");
-    const enquiryListing = await db.maybeOne(`select p.id from products p join stores s on s.id=p.store_id join store_categories c on c.id=s.category_id where p.id=any($1::uuid[]) and c.features->>'inquiryOnly'='true' limit 1`, [productIds]);
-    if (enquiryListing) throw new Error("This listing requires a quotation enquiry. Ask the vendor to confirm availability and terms before ordering.");
+    if (rows.some(row => row.category_slug === "house-agents-realtors" || row.category_features?.propertyListings)) {
+      throw new Error("Properties cannot be purchased through checkout. Open the listing and book an inspection.");
+    }
+    if (rows.some(row => row.category_features?.inquiryOnly)) {
+      throw new Error("This listing requires a quotation enquiry. Ask the vendor to confirm availability and terms before ordering.");
+    }
     const byId = new Map(rows.map((row) => [row.id, row]));
     const banks = paymentMethod === "bank_transfer" ? await db.query<{ store_id: string; bank_name: string; account_name: string; account_number: string }>(
       `select s.id as store_id, v.bank_name, v.account_name, v.account_number from stores s join vendor_profiles v on v.user_id = s.owner_id where s.id = any($1::uuid[])`,
@@ -181,7 +188,7 @@ export async function createCheckout(
         throw new Error(`${product.name} is currently unavailable.`);
       }
 
-      const minimumUnits = farmMinimumQuantity(product.attributes);
+      const minimumUnits = product.category_slug === "agriculture-livestock" ? farmMinimumQuantity(product.attributes) : 1;
       if (line.quantity < minimumUnits) throw new Error(`${product.name} requires at least ${minimumUnits} selling units per order line.`);
       let unitPrice = Number(product.price);
       let variantName: string | null = null;
@@ -693,9 +700,7 @@ export async function getOrderForActor(orderId: string, actor: { id: string; rol
     occurred_at: string;
   }>(`select * from order_tracking where order_id = $1 order by occurred_at`, [orderId]);
 
-  const category = order.category_id
-    ? await systemDb.maybeOne<StoreCategory>(`select * from store_categories where id = $1`, [order.category_id])
-    : null;
+  const category = await getOrderCategory(order.id, order.category_id);
 
   return { order, items, history, tracking, category, isOwner, isCustomer, isAdmin };
 }
@@ -751,7 +756,8 @@ export async function updateOrderByVendor(input: {
   );
   if (!order) throw new Error("Order not found");
 
-  const workflow = workflowFor(ctx.category);
+  const category = await getOrderCategory(order.id, ctx.store.category_id);
+  const workflow = workflowFor(category);
   const stageKeys = workflow.map((stage) => stage.key);
   const resolve = (...options: string[]) => options.find((option) => stageKeys.includes(option)) ?? options[0];
   const isPaid = order.payment_status === "paid";
@@ -824,9 +830,9 @@ export async function updateOrderByVendor(input: {
   }
 
   if (target) {
-    if (target === order.status) throw new Error(`Order is already ${workflowLabel(ctx.category, target)}`);
+    if (target === order.status) throw new Error(`Order is already ${workflowLabel(category, target)}`);
     if (!isAfter(workflow, order.status, target) && !["cancelled", "rejected"].includes(target)) {
-      throw new Error(`You cannot move this order from ${workflowLabel(ctx.category, order.status)} to ${workflowLabel(ctx.category, target)}`);
+      throw new Error(`You cannot move this order from ${workflowLabel(category, order.status)} to ${workflowLabel(category, target)}`);
     }
     if (!isPaid && !["cancelled", "rejected"].includes(target)) {
       throw new Error("Payment has not been confirmed for this order yet");
@@ -985,7 +991,7 @@ export async function updateOrderByVendor(input: {
         storeId: order.store_id,
         type: "order_update",
         title: `Order ${order.reference} updated`,
-        body: `${ctx.store.name}: ${workflowLabel(ctx.category, target ?? order.status)}`,
+        body: `${ctx.store.name}: ${workflowLabel(category, target ?? order.status)}`,
         actionUrl: `/account/orders/${order.id}`,
         dedupeKey: `order-update:${order.id}:${target ?? input.action}:${Date.now()}`,
       },
@@ -1050,15 +1056,15 @@ export async function getVendorOrderList(storeId: string, opts: { status?: strin
     `select count(*)::int as count from orders o ${where}`,
     params,
   );
-  const rows = await systemDb.query<Order & { item_count: number }>(
-    `select o.*, (select count(*)::int from order_items i where i.order_id = o.id) as item_count
+  const rows = await systemDb.query<Order & { item_count: number; order_categories: StoreCategory[] }>(
+    `select o.*, ${ORDER_CATEGORIES_SQL} as order_categories, (select count(*)::int from order_items i where i.order_id = o.id) as item_count
        from orders o ${where}
       order by o.created_at desc
       limit ${pageSize} offset ${(page - 1) * pageSize}`,
     params,
   );
   return {
-    orders: rows,
+    orders: rows.map(row => ({ ...row, workflow_category: orderCategory(row.order_categories) })),
     total: total.count,
     page,
     pageSize,

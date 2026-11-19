@@ -1,6 +1,8 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { BusinessCategoryFields } from "@/components/business-category-fields";
+import type { StoreCategory } from "@/lib/types";
 import { useFormStatus } from "react-dom";
 import { Check, ExternalLink, FileCheck2, ShieldCheck } from "lucide-react";
 import { deleteOwnStoreAction, saveStoreSettingsAction, saveVendorKycAction, type VendorState } from "@/app/actions/vendor";
@@ -20,6 +22,8 @@ const DAYS: Array<{ key: string; label: string }> = [
 ];
 
 export interface StoreSettingsValues {
+  categorySlug: string;
+  categorySlugs: string[];
   name: string;
   tagline: string;
   description: string;
@@ -53,9 +57,11 @@ export interface VendorKycValues {
   kycNote: string | null;
 }
 
-export function StoreSettingsForm({ values }: { values: StoreSettingsValues }) {
+export function StoreSettingsForm({ values, categories }: { values: StoreSettingsValues; categories: StoreCategory[] }) {
   const [state, formAction] = useActionState<VendorState, FormData>(saveStoreSettingsAction, {});
 
+  const [categorySlug, setCategorySlug] = useState(values.categorySlug);
+  const [selected, setSelected] = useState(values.categorySlugs);
   const [currentCity, setCurrentCity] = useState(values.city || "Uyo");
   const cityOptions = AKWA_IBOM_LGAS.includes(currentCity as (typeof AKWA_IBOM_LGAS)[number])
     ? AKWA_IBOM_LGAS
@@ -105,6 +111,14 @@ export function StoreSettingsForm({ values }: { values: StoreSettingsValues }) {
             ) : null}
           </div>
         ) : null}
+      </section>
+
+      <section className="card card-pad space-y-4">
+        <h2 className="text-base font-semibold text-ink-900">Business categories</h2>
+        <BusinessCategoryFields categories={categories} primary={categorySlug} selected={selected}
+          onPrimaryChange={slug => { setCategorySlug(slug); setSelected(current => [...new Set([...current, slug])]); }}
+          onSelectedChange={setSelected} error={state.fieldErrors?.categorySlug || state.fieldErrors?.categorySlugs} />
+        <p className="text-xs text-ink-500">Changing your primary category does not recategorise existing listings. Before removing a category, move its listings to another category.</p>
       </section>
 
       <section className="card card-pad space-y-4">

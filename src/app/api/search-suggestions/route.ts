@@ -33,9 +33,11 @@ export async function GET(request: Request) {
       [pattern],
     ),
     systemDb.query<{ name: string; slug: string; city: string | null; category_name: string | null }>(
-      `select s.name, s.slug, s.city, c.name as category_name
+      `select s.name, s.slug, s.city,
+              (select string_agg(bc.name, ' · ' order by (bc.id = s.category_id) desc, bc.sort_order)
+                 from store_category_assignments a join store_categories bc on bc.id = a.category_id
+                where a.store_id = s.id) as category_name
          from stores s
-         left join store_categories c on c.id = s.category_id
         where store_is_live(s.id) and (lower(s.name) like lower($1) or lower(s.tagline) like lower($1))
         order by s.name
         limit 4`,

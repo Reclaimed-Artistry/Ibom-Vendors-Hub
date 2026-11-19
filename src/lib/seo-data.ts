@@ -36,9 +36,9 @@ export async function sitemapForHost(host: string | null): Promise<MetadataRoute
 
     const categories = await db.query<{ slug: string; product_count: number; store_count: number }>(
       `select c.slug,
-              (select count(*)::int from stores s where s.category_id = c.id and store_is_live(s.id)) as store_count,
+              (select count(*)::int from store_category_assignments a join stores s on s.id = a.store_id where a.category_id = c.id and store_is_live(s.id)) as store_count,
               (select count(*)::int from products p join stores s on s.id = p.store_id
-                where s.category_id = c.id and p.is_available and store_is_live(s.id)) as product_count
+                where coalesce(p.marketplace_category_id, s.category_id) = c.id and p.is_available and store_is_live(s.id)) as product_count
          from store_categories c where c.is_active order by c.sort_order, c.slug`,
     );
     const totals = await db.one<{ product_count: number; store_count: number }>(

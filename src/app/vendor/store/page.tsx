@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ExternalLink, Globe, Lock, ShieldCheck } from "lucide-react";
 import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
+import { getStoreCategories } from "@/lib/storefront";
 import { storeBase } from "@/lib/storefront-base";
 import { storefrontUrl } from "@/lib/domains";
 import { formatDate } from "@/lib/utils";
@@ -20,7 +21,9 @@ import type { VendorProfile } from "@/lib/types";
 export const metadata: Metadata = { title: "Store profile · Vendor dashboard" };
 
 export default async function VendorStorePage() {
-  const { user, store, category } = await requireActiveVendorContext();
+  const { user, store, category, categories: businessCategories } = await requireActiveVendorContext();
+  const availableCategories = await getStoreCategories();
+  const categories = [...availableCategories, ...businessCategories.filter(item => !availableCategories.some(active => active.id === item.id))];
   const [base, pending, profile] = await Promise.all([
     storeBase(store.slug),
     systemDb.maybeOne<{ requested_subdomain: string; status: string; created_at: string; admin_note: string | null }>(
@@ -35,6 +38,8 @@ export default async function VendorStorePage() {
   ]);
 
   const values: StoreSettingsValues = {
+    categorySlug: category?.slug ?? "",
+    categorySlugs: businessCategories.map(item => item.slug),
     name: store.name,
     tagline: store.tagline ?? "",
     description: store.description ?? "",
@@ -82,7 +87,7 @@ export default async function VendorStorePage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <StoreSettingsForm values={values} />
+          <StoreSettingsForm values={values} categories={categories} />
           <VendorKycForm kyc={kycValues} />
         </div>
 
@@ -94,7 +99,7 @@ export default async function VendorStorePage() {
             <div className="flex flex-wrap items-center gap-1.5 pt-1">
               <Badge tone={store.status === "active" ? "success" : store.status === "pending" ? "warning" : "danger"}>{store.status}</Badge>
               <Badge tone={store.visibility === "public" ? "info" : "neutral"}>{store.visibility}</Badge>
-              {category ? <span className="text-xs text-ink-500">{category.name}</span> : null}
+              {businessCategories.map(item => <span key={item.id} className="text-xs text-ink-500">{item.name}</span>)}
             </div>
             <p className="text-xs text-ink-400">Store ID {store.id.slice(0, 8)} · joined {formatDate(store.created_at)}</p>
           </Card>

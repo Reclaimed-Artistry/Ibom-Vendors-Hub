@@ -19,8 +19,8 @@ export default async function VendorProductsPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string; page?: string; category?: string; deleted?: string }>;
 }) {
-  const { store, category: storeCategory } = await requireActiveVendorContext();
-  const propertyAgency = storeCategory?.slug === "house-agents-realtors";
+  const { store, category: storeCategory, categories: businessCategories } = await requireActiveVendorContext();
+  const propertyAgency = businessCategories.length === 1 && storeCategory?.slug === "house-agents-realtors";
   const { q, status, page: pageParam, category, deleted } = await searchParams;
   const page = Math.max(1, Number(pageParam ?? 1) || 1);
 
@@ -49,12 +49,15 @@ export default async function VendorProductsPage({
       track_stock: boolean;
       kind: string;
       category_name: string | null;
+      marketplace_category_name: string | null;
       image_url: string | null;
     }>(
       `select p.id, p.name, p.price, p.is_available, p.stock_quantity, p.track_stock, p.kind,
-              c.name as category_name,
+              c.name as category_name, mc.name as marketplace_category_name,
               (select url from product_images where product_id = p.id order by sort_order limit 1) as image_url
          from products p left join product_categories c on c.id = p.category_id
+         left join stores s on s.id = p.store_id
+         left join store_categories mc on mc.id = coalesce(p.marketplace_category_id, s.category_id)
         where ${where}
         order by p.updated_at desc
         limit ${PAGE_SIZE} offset ${(page - 1) * PAGE_SIZE}`,
@@ -112,9 +115,9 @@ export default async function VendorProductsPage({
           </select>
         </label>
         <label className="w-44">
-          <span className="label">Category</span>
+          <span className="label">Catalogue section</span>
           <select name="category" defaultValue={category ?? ""} className="select">
-            <option value="">All categories</option>
+            <option value="">All sections</option>
             {categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
         </label>
@@ -135,7 +138,7 @@ export default async function VendorProductsPage({
             <thead>
               <tr>
                 <th>Product</th>
-                <th>Category</th>
+                <th>Category / section</th>
                 <th>Price</th>
                 <th>Stock</th>
                 <th>Status</th>
@@ -161,7 +164,7 @@ export default async function VendorProductsPage({
                       </div>
                     </div>
                   </td>
-                  <td className="text-sm">{product.category_name ?? <span className="text-ink-400">Uncategorised</span>}</td>
+                  <td className="text-sm"><p>{product.marketplace_category_name ?? "Uncategorised"}</p>{product.category_name ? <p className="text-xs text-ink-400">Section: {product.category_name}</p> : null}</td>
                   <td className="font-semibold">{formatMoney(Number(product.price))}</td>
                   <td>
                     {product.track_stock ? (

@@ -1,3 +1,4 @@
+import { BUSINESS_CATEGORY_NAMES_SQL } from "@/lib/business-categories";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SmartSearch } from "@/components/smart-search";
@@ -54,7 +55,7 @@ export default async function AdminVendorsPage({
       review_deadline_at: string | null;
     }>(
       `select s.id, s.name, s.slug, s.status, s.visibility, u.full_name as owner_name, u.email as owner_email,
-              c.name as category_name, p.name as plan_name, sub.expires_at,
+              ${BUSINESS_CATEGORY_NAMES_SQL} as category_name, p.name as plan_name, sub.expires_at,
               (select count(*)::int from products pr where pr.store_id = s.id) as product_count,
               (select count(*)::int from orders o where o.store_id = s.id) as order_count,
               s.created_at, s.review_deadline_at

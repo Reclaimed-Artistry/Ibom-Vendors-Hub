@@ -81,7 +81,7 @@ export default async function StoresPage({
                 </div>
                 <p className="mt-3 h-12 shrink-0 line-clamp-2 text-sm leading-6 text-ink-500">{store.tagline ?? truncate(store.description, 100)}</p>
                 <div className="mt-auto flex min-w-0 items-center gap-2 pt-3 text-[11px] [&>span:first-child]:max-w-[55%] [&>span:first-child]:truncate">
-                  <Badge tone="neutral">{store.category_name}</Badge>
+                  <Badge tone="neutral"><span title={store.category_name ?? undefined}>{store.category_name}</span></Badge>
                   <span className="text-ink-400">{store.product_count} listings</span>
                   <span className="ml-auto font-semibold text-brand-800">Visit →</span>
                 </div>

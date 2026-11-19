@@ -34,7 +34,7 @@ export async function addInspectionSlot(ownerId: string, productId: string, loca
   if (!["office", "agreed_location"].includes(meetingType) || point.trim().length < 5 || point.trim().length > 500) throw new Error("Choose a meeting type and enter its exact address / landmark (5–500 characters).");
   const endsAt = new Date(new Date(startsAt).getTime() + duration * 60000).toISOString();
   return withSystem(async db => {
-    const p = await db.maybeOne<{ store_id: string }>(`select p.store_id from products p join stores s on s.id=p.store_id join store_categories c on c.id=s.category_id where p.id=$1 and s.owner_id=$2 and c.slug=$3`, [productId, ownerId, PROPERTY_CATEGORY]);
+    const p = await db.maybeOne<{ store_id: string }>(`select p.store_id from products p join stores s on s.id=p.store_id join store_categories c on c.id=coalesce(p.marketplace_category_id,s.category_id) where p.id=$1 and s.owner_id=$2 and c.slug=$3`, [productId, ownerId, PROPERTY_CATEGORY]);
     if (!p) throw new Error("Property not found or not owned by you.");
     // One agent cannot publish overlapping availability, even on another property.
     await db.query(`select pg_advisory_xact_lock(hashtext($1))`, [p.store_id]);
@@ -59,7 +59,7 @@ export async function reserveInspection(user: { id: string; email: string; fullN
   if (notes.length > 1000) throw new Error("Keep your note within 1,000 characters.");
   const result = await withSystem(async db => {
     const slot = await db.maybeOne<{ id: string; store_id: string; product_id: string; starts_at: string; ends_at: string; meeting_type: string; meeting_point: string; owner_id: string; store_name: string; name: string; price: number; attributes: Record<string,string> }>(
-      `select t.*,s.owner_id,s.name as store_name,p.name,p.price,p.attributes from property_inspection_slots t join products p on p.id=t.product_id and p.store_id=t.store_id join stores s on s.id=t.store_id join store_categories c on c.id=s.category_id where t.id=$1 and t.is_active and t.starts_at>now() and p.is_available and c.slug=$2 for update of t`, [slotId, PROPERTY_CATEGORY]);
+      `select t.*,s.owner_id,s.name as store_name,p.name,p.price,p.attributes from property_inspection_slots t join products p on p.id=t.product_id and p.store_id=t.store_id join stores s on s.id=t.store_id join store_categories c on c.id=coalesce(p.marketplace_category_id,s.category_id) where t.id=$1 and t.is_active and t.starts_at>now() and p.is_available and c.slug=$2 for update of t`, [slotId, PROPERTY_CATEGORY]);
     if (!slot) throw new Error("That inspection slot is no longer available.");
     if (slot.owner_id === user.id) throw new Error("You cannot book an inspection with your own agency.");
     const live = await db.maybeOne(`select id from stores where id=$1 and store_is_live(id)`, [slot.store_id]);

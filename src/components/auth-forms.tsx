@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BusinessCategoryFields } from "@/components/business-category-fields";
 import { useActionState, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, ClipboardCheck, Eye, EyeOff, FileCheck2, Landmark, Loader2, Lock, MapPin, ShieldCheck } from "lucide-react";
 import {
@@ -143,6 +144,7 @@ export function VendorRegisterForm({
   const [ownerName, setOwnerName] = useState(initialUser?.fullName ?? "");
   const [phone, setPhone] = useState(initialUser?.phone ?? "");
   const [categorySlug, setCategorySlug] = useState("");
+  const [categorySelections, setCategorySelections] = useState<string[]>([]);
   const [description, setDescription] = useState("");
   const [city, setCity] = useState("Uyo");
   const [address, setAddress] = useState("");
@@ -173,7 +175,7 @@ export function VendorRegisterForm({
     businessName: "Unique business name",
     ownerName: "Owner full name",
     phone: "Phone / WhatsApp number",
-    categorySlug: "Business or artisan category",
+    categorySlug: "Primary business category",
     description: "About your business",
     address: "Physical business / pickup street address",
     nin: "National Identification Number (NIN)",
@@ -387,28 +389,15 @@ export function VendorRegisterForm({
         </Field>
       </div>
 
-      <Field label="Business or artisan category" htmlFor="categorySlug" error={state?.fieldErrors?.categorySlug} required>
-        <select
-          id="categorySlug"
-          name="categorySlug"
-          className={`select${miss("categorySlug")}`}
-          required
-          value={categorySlug}
-          onChange={(e) => setCategorySlug(e.target.value)}
-        >
-          <option value="" disabled>Choose what best describes your business or trade…</option>
-          <optgroup label="Nigerian Artisans & Technical Trades">
-            {categories.filter((cat) => isArtisanCategorySlug(cat.slug)).map((cat) => (
-              <option key={cat.slug} value={cat.slug}>{cat.name}</option>
-            ))}
-          </optgroup>
-          <optgroup label="Retail, Food, Fashion & Professional Services">
-            {categories.filter((cat) => !isArtisanCategorySlug(cat.slug)).map((cat) => (
-              <option key={cat.slug} value={cat.slug}>{cat.name}</option>
-            ))}
-          </optgroup>
-        </select>
-      </Field>
+      <BusinessCategoryFields
+        categories={categories}
+        primary={categorySlug}
+        selected={categorySelections}
+        onPrimaryChange={(slug) => { setCategorySlug(slug); setCategorySelections(current => [...new Set([...current, slug])]); }}
+        onSelectedChange={setCategorySelections}
+        error={state?.fieldErrors?.categorySlug || state?.fieldErrors?.categorySlugs}
+        className={miss("categorySlug")}
+      />
 
       {isArtisanCategorySlug(categorySlug) ? (() => {
         const artisanProfile = getCategoryBookingProfile(categorySlug);

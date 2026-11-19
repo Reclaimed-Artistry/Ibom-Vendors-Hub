@@ -1,3 +1,4 @@
+import { listingCategory } from "@/lib/category-policy";
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
 import { NO_INDEX, publicMetadata, seoDescription, storeUrl } from "@/lib/seo";
@@ -37,10 +38,11 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string; productSlug: string }> }) {
   const { slug, productSlug } = await params;
-  const { store, category, live } = await resolveStore(slug);
+  const { store, category: primaryCategory, live } = await resolveStore(slug);
   if (!store) notFound();
   const product = await getStoreProduct(store.id, productSlug);
   if (!product) notFound();
+  const category = listingCategory(product, primaryCategory);
 
   const [settings, base, reviews, user] = await Promise.all([
     getSettings(),
@@ -181,7 +183,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             {(() => {
               const bookingProfile = getCategoryBookingProfile(category?.slug);
               const showBooking = !features.inquiryOnly && (product.kind === "service" || Boolean(features.serviceBooking));
-              const showCart = !propertyListing && product.kind !== "service" && features.cart !== false;
+              const showCart = !features.inquiryOnly && !propertyListing && product.kind !== "service" && features.cart !== false;
               const showQuote = Boolean(features.quotations) && product.pricing_type !== "quotation";
 
               if (!live) {

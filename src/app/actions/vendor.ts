@@ -1,5 +1,7 @@
 "use server";
 
+import { addProductBusinessCategory, saveBusinessCategories } from "@/lib/business-categories";
+import type { StoreCategory } from "@/lib/types";
 import { AGRICULTURE_SLUG, validateAgricultureAttributes } from "@/lib/agriculture";
 import { isPropertyCategory, validatePropertyAttributes } from "@/lib/property-inspections";
 
@@ -76,7 +78,20 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
   const lockError = vendorSuspensionMessage(ctx);
   if (lockError) return { error: lockError };
   const productId = String(formData.get("productId") ?? "") || null;
-  const categoryFeatures = (ctx.category?.features ?? {}) as Record<string, boolean>;
+  if (productId && !/^[0-9a-f-]{36}$/i.test(productId)) return { error: "Product not found." };
+  // Older clients may omit the new field: retain the listing's category, not
+  // the store's (possibly changed) primary category when editing.
+  const existing = productId ? await systemDb.maybeOne<{ marketplace_category_id: string | null }>(
+    `select marketplace_category_id from products where id = $1 and store_id = $2`, [productId, ctx.store.id],
+  ) : null;
+  if (productId && !existing) return { error: "Product not found or not owned by you." };
+  const marketplaceCategoryId = String(formData.get("marketplaceCategoryId") || existing?.marketplace_category_id || ctx.store.category_id || "");
+  const validId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(marketplaceCategoryId);
+  const category = validId ? await systemDb.maybeOne<StoreCategory>(
+    `select * from store_categories where id = $1 and (is_active or $2::boolean)`, [marketplaceCategoryId, existing?.marketplace_category_id === marketplaceCategoryId],
+  ) : null;
+  if (!category) return { error: "Choose a valid marketplace category for this listing.", fieldErrors: { marketplaceCategoryId: "Choose an available marketplace category" } };
+  const categoryFeatures = (category.features ?? {}) as Record<string, boolean>;
 
   const variants = parseJsonField<Array<{ name: string; price?: string; stockQuantity?: string; attributes?: Record<string, string> }>>(
     formData.get("variantsJson"),
@@ -86,12 +101,12 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
   const specifications = parseJsonField<Record<string, string>>(formData.get("specificationsJson"), {});
   const attributes = parseJsonField<Record<string, string>>(formData.get("attributesJson"), {});
 
-  if (ctx.category?.slug === AGRICULTURE_SLUG) {
+  if (category.slug === AGRICULTURE_SLUG) {
     try { validateAgricultureAttributes(attributes); } catch (error) { return { error: error instanceof Error ? error.message : "Check the farm produce details." }; }
     formData.set("kind", "product");
   }
   if (categoryFeatures.inquiryOnly) formData.set("pricingType", "quotation");
-  const propertyListing = isPropertyCategory(ctx.category?.slug);
+  const propertyListing = isPropertyCategory(category.slug);
   if (propertyListing) {
     try { validatePropertyAttributes(attributes); } catch (error) { return { error: error instanceof Error ? error.message : "Check the property details." }; }
     formData.set("kind", "service");
@@ -104,6 +119,7 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
     shortDescription: formData.get("shortDescription") ?? "",
     kind: formData.get("kind") || "product",
     categoryId: formData.get("categoryId") ?? "",
+    marketplaceCategoryId,
     price: formData.get("price") || 0,
     compareAtPrice: formData.get("compareAtPrice") || undefined,
     pricingType: formData.get("pricingType") || "fixed",
@@ -186,6 +202,14 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
     const savedId = await withActor(
       { id: ctx.user.id, role: "vendor", email: ctx.user.email },
       async (db) => {
+        await addProductBusinessCategory(db, ctx.store.id, marketplaceCategoryId, productId);
+        // Authorise the listing before touching dependent variants/images.
+        if (productId && !await db.maybeOne(`select id from products where id = $1 and store_id = $2 for update`, [productId, ctx.store.id])) {
+          throw new Error("Product not found or not owned by you.");
+        }
+        if (data.categoryId && !await db.maybeOne(`select id from product_categories where id = $1 and store_id = $2`, [data.categoryId, ctx.store.id])) {
+          throw new Error("Choose a catalogue section belonging to your own store.");
+        }
         let id = productId;
         const values = [
           ctx.store.id,
@@ -215,6 +239,7 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
           data.prepTimeMinutes ?? null,
           data.portion || null,
           data.serviceDurationMinutes ?? null,
+          marketplaceCategoryId,
         ];
 
         if (id) {
@@ -224,8 +249,8 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
                     stock_quantity=$13, is_available=$14, is_featured=$15, condition=$16, brand=$17, model=$18,
                     warranty_info=$19, warranty_months=$20, specifications=$21::jsonb, attributes=$22::jsonb,
                     made_to_order=$23, production_days=$24, prep_time_minutes=$25, portion=$26,
-                    service_duration_minutes=$27
-              where id=$1 and store_id=$28`,
+                    service_duration_minutes=$27, marketplace_category_id=$28
+              where id=$1 and store_id=$29`,
             [id, ...values.slice(1), ctx.store.id],
           );
           // remove variants/addons then re-create (simple, predictable)
@@ -237,8 +262,8 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
                (store_id, category_id, name, slug, sku, kind, description, short_description, price,
                 compare_at_price, pricing_type, track_stock, stock_quantity, is_available, is_featured,
                 condition, brand, model, warranty_info, warranty_months, specifications, attributes,
-                made_to_order, production_days, prep_time_minutes, portion, service_duration_minutes)
-             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21::jsonb,$22::jsonb,$23,$24,$25,$26,$27)
+                made_to_order, production_days, prep_time_minutes, portion, service_duration_minutes, marketplace_category_id)
+             values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21::jsonb,$22::jsonb,$23,$24,$25,$26,$27,$28)
              returning id`,
             values,
           );
@@ -299,7 +324,7 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
             entityType: "product",
             entityId: id,
             description: `${productId ? "Updated" : "Created"} ${data.name}`,
-            meta: { price: data.price, kind: data.kind },
+            meta: { price: data.price, kind: data.kind, marketplaceCategoryId },
           },
           db,
         );
@@ -310,6 +335,10 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
     revalidatePath("/vendor");
     revalidatePath("/vendor/products");
     revalidatePath(`/vendor/products/${savedId}`);
+    revalidatePath("/vendor/store");
+    revalidatePath("/vendor/categories");
+    revalidatePath("/stores");
+    revalidatePath("/sitemap.xml");
     revalidatePath(`/s/${ctx.store.slug}`, "layout");
     revalidatePath(`/s/${ctx.store.slug}/products`);
     revalidatePath("/browse");
@@ -454,6 +483,8 @@ export async function saveStoreSettingsAction(_prev: VendorState, formData: Form
   const lockError = vendorSuspensionMessage(ctx);
   if (lockError) return { error: lockError };
   const parsed = storeSettingsSchema.safeParse({
+    categorySlug: formData.has("categorySlug") ? formData.get("categorySlug") : ctx.category?.slug,
+    categorySlugs: formData.has("categorySlug") ? formData.getAll("categorySlugs") : ctx.categories.map(item => item.slug),
     name: formData.get("name"),
     tagline: formData.get("tagline") ?? "",
     description: formData.get("description") ?? "",
@@ -508,6 +539,7 @@ export async function saveStoreSettingsAction(_prev: VendorState, formData: Form
     if (coverFile instanceof File && coverFile.size > 0) coverUrl = await uploadImage(coverFile, `stores/${ctx.store.slug}/brand`);
 
     await withActor({ id: ctx.user.id, role: "vendor", email: ctx.user.email }, async (db) => {
+      if (data.categorySlug) await saveBusinessCategories(db, ctx.store.id, data.categorySlug, data.categorySlugs ?? []);
       await db.execute(
         `update stores set name=$2, tagline=$3, description=$4, email=$5, phone=$6, whatsapp=$7, website=$8,
                 address=$9, city=$10, state=$11, accepts_delivery=$12, accepts_pickup=$13, accepts_orders=$14,
@@ -551,11 +583,17 @@ export async function saveStoreSettingsAction(_prev: VendorState, formData: Form
         "That business name is already in use and locked by another vendor. Please choose a unique business name.";
       return { error: lockMsg, fieldErrors: { name: lockMsg } };
     }
-    return { error: error instanceof Error ? error.message : "Settings could not be saved" };
+    const message = error instanceof Error ? error.message : "Settings could not be saved";
+    return { error: message, ...(/categor/i.test(message) ? { fieldErrors: { categorySlug: message } } : {}) };
   }
 
   revalidatePath("/vendor/store");
-  revalidatePath(`/s/${ctx.store.slug}`);
+  revalidatePath("/vendor/categories");
+  revalidatePath(`/s/${ctx.store.slug}`, "layout");
+  revalidatePath("/browse");
+  revalidatePath("/stores");
+  revalidatePath("/sitemap.xml");
+  revalidatePath("/");
   return { message: "Store settings saved." };
 }
 

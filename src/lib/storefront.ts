@@ -1,3 +1,4 @@
+import { BUSINESS_CATEGORIES_SQL, BUSINESS_CATEGORY_NAMES_SQL } from "@/lib/business-categories";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { withPublic, systemDb } from "@/lib/db";
@@ -35,7 +36,7 @@ export const resolveStore = cache(async (slug: string): Promise<StoreResolution>
 
   const visible = await withPublic((db) =>
     db.maybeOne<Store & { category_row: StoreCategory | null }>(
-      `select s.*, to_jsonb(c) as category_row
+      `select s.*, to_jsonb(c) as category_row, ${BUSINESS_CATEGORIES_SQL} as business_categories
          from stores s
          left join store_categories c on c.id = s.category_id
         where s.slug = $1`,
@@ -48,7 +49,7 @@ export const resolveStore = cache(async (slug: string): Promise<StoreResolution>
   // The public view returned nothing: find out why (server-side only) so we can
   // show a helpful "store offline" page instead of a 404.
   const exists = await systemDb.maybeOne<Store & { category_row: StoreCategory | null }>(
-    `select s.*, to_jsonb(c) as category_row
+    `select s.*, to_jsonb(c) as category_row, ${BUSINESS_CATEGORIES_SQL} as business_categories
        from stores s
        left join store_categories c on c.id = s.category_id
       where s.slug = $1`,
@@ -81,6 +82,8 @@ export interface ProductQuery {
 
 const PRODUCT_SELECT = `
   select p.*,
+    (select to_jsonb(mc) from store_categories mc join stores ms on ms.id = p.store_id
+      where mc.id = coalesce(p.marketplace_category_id, ms.category_id)) as marketplace_category,
     coalesce((
       select jsonb_agg(jsonb_build_object('id', i.id, 'url', i.url, 'alt', i.alt, 'sort_order', i.sort_order)
              order by i.sort_order)
@@ -207,12 +210,12 @@ export async function searchMarketplace(query: MarketplaceQuery) {
     const count = await db.one<{ count: number }>(
       `select count(*)::int as count
          from products p join stores s on s.id = p.store_id
-         left join store_categories c on c.id = s.category_id ${where}`,
+         left join store_categories c on c.id = coalesce(p.marketplace_category_id, s.category_id) ${where}`,
       params,
     );
     const products = await db.query<MarketplaceProduct>(
       `select p.*, s.name as store_name, s.slug as store_slug, s.logo_url as store_logo,
-              s.city as store_city, c.name as category_name,
+              s.city as store_city, c.name as category_name, to_jsonb(c) as marketplace_category,
               coalesce((
                 select jsonb_agg(jsonb_build_object('id', i.id, 'url', i.url, 'alt', i.alt, 'sort_order', i.sort_order)
                        order by i.sort_order)
@@ -220,7 +223,7 @@ export async function searchMarketplace(query: MarketplaceQuery) {
               ), '[]'::jsonb) as images
          from products p
          join stores s on s.id = p.store_id
-         left join store_categories c on c.id = s.category_id
+         left join store_categories c on c.id = coalesce(p.marketplace_category_id, s.category_id)
          ${where}
          order by ${query.showcaseAll ? "row_number() over (partition by p.store_id order by p.is_featured desc, p.created_at desc, p.id), s.name, s.id" : `${order}, p.id`}
          ${query.showcaseAll ? "" : `limit ${limit} offset ${offset}`}`,
@@ -249,7 +252,8 @@ export async function getMarketplaceStores(query: {
   let where = "where store_is_live(s.id)";
   if (query.categorySlug) {
     params.push(query.categorySlug);
-    where += ` and c.slug = $${params.length}`;
+    where += ` and exists (select 1 from store_category_assignments a join store_categories ac on ac.id = a.category_id
+      where a.store_id = s.id and ac.slug = $${params.length})`;
   }
   if (query.search) {
     params.push(`%${query.search}%`);
@@ -264,7 +268,7 @@ export async function getMarketplaceStores(query: {
       params,
     );
     const stores = await db.query<MarketplaceStore>(
-      `select s.*, c.name as category_name, c.slug as category_slug,
+      `select s.*, ${BUSINESS_CATEGORY_NAMES_SQL} as category_name, c.slug as category_slug, ${BUSINESS_CATEGORIES_SQL} as business_categories,
               (select count(*)::int from products p where p.store_id = s.id and p.is_available) as product_count
          from stores s
          left join store_categories c on c.id = s.category_id
@@ -281,7 +285,7 @@ export const getCategoriesWithCounts = cache(async () => {
   return withPublic(async (db) =>
     db.query<StoreCategory & { store_count: number }>(
       `select c.*,
-              (select count(distinct s.id)::int from stores s where s.category_id = c.id) as store_count
+              (select count(*)::int from store_category_assignments a join stores s on s.id = a.store_id where a.category_id = c.id and store_is_live(s.id)) as store_count
          from store_categories c
         where c.is_active = true
         order by c.sort_order, c.name`,
@@ -335,7 +339,7 @@ export async function getMarketplaceHighlights() {
          (select count(*)::int from store_categories where is_active) as categories`,
     );
     const featured = await db.query<MarketplaceStore>(
-      `select s.*, c.name as category_name, c.slug as category_slug,
+      `select s.*, ${BUSINESS_CATEGORY_NAMES_SQL} as category_name, c.slug as category_slug, ${BUSINESS_CATEGORIES_SQL} as business_categories,
               (select count(*)::int from products p where p.store_id = s.id and p.is_available) as product_count
          from stores s left join store_categories c on c.id = s.category_id
         where store_is_live(s.id)

@@ -169,6 +169,7 @@ export async function registerVendorAction(_prev: ActionState, formData: FormDat
     phone: formData.get("phone"),
     password: rawPassword || undefined,
     categorySlug: formData.get("categorySlug"),
+    categorySlugs: formData.getAll("categorySlugs"),
     description: formData.get("description"),
     city: formData.get("city"),
     state: formData.get("state") ?? AKWA_IBOM_STATE,
@@ -227,6 +228,7 @@ export async function registerVendorAction(_prev: ActionState, formData: FormDat
     if (/business name|store address/i.test(msg)) {
       return { error: msg, fieldErrors: { businessName: msg } };
     }
+    if (/categor/i.test(msg)) return { error: msg, fieldErrors: { categorySlug: msg } };
     return { error: msg };
   }
 }

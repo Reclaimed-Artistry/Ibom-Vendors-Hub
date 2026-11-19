@@ -1,3 +1,4 @@
+import { storeFeatures } from "@/lib/category-policy";
 import { StoreImage } from "@/components/store-image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -34,7 +35,7 @@ export default async function StorefrontLayout({
   const { store, category, live } = await resolveStore(slug);
   if (!store) notFound();
   const base = await storeBase(slug);
-  const features = (category?.features ?? {}) as Record<string, boolean>;
+  const features = storeFeatures(store.business_categories ?? [], category);
 
   return (
     <div className="flex min-h-screen w-full max-w-full flex-col overflow-x-clip bg-ink-50">

@@ -1,3 +1,4 @@
+import { BUSINESS_CATEGORY_NAMES_SQL } from "@/lib/business-categories";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -58,7 +59,7 @@ export default async function AdminVendorDetailPage({ params }: { params: Promis
     state: string | null;
     address: string | null;
   }>(
-    `select s.*, u.full_name as owner_name, u.email as owner_email, u.phone as owner_phone, c.name as category_name
+    `select s.*, u.full_name as owner_name, u.email as owner_email, u.phone as owner_phone, ${BUSINESS_CATEGORY_NAMES_SQL} as category_name
        from stores s join users u on u.id = s.owner_id left join store_categories c on c.id = s.category_id
       where s.id = $1`,
     [id],

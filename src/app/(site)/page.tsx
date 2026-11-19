@@ -206,7 +206,7 @@ export default async function HomePage() {
               <Link key={store.id} href={`/s/${store.slug}`} className="group card flex h-80 min-w-0 flex-col overflow-hidden">
                 <div className="relative h-28 shrink-0 overflow-hidden">
                   <StoreImage kind="cover" src={store.cover_url} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  <span className="absolute left-3 right-3 top-3 w-fit max-w-[calc(100%-1.5rem)] truncate rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-ink-700">
+                  <span title={store.category_name ?? undefined} className="absolute left-3 right-3 top-3 w-fit max-w-[calc(100%-1.5rem)] truncate rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-ink-700">
                     {store.category_name}
                   </span>
                 </div>

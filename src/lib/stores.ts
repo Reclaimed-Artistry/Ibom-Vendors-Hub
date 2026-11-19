@@ -1,3 +1,4 @@
+import { validateBusinessCategories } from "@/lib/business-categories";
 import { FREE_STORE_ACCESS } from "@/lib/store-access-policy";
 import { adminEmailRecipients } from "@/lib/admin-email-recipients";
 import { isUniqueViolation, systemDb, withSystem } from "@/lib/db";
@@ -145,6 +146,7 @@ export interface RegisterVendorInput {
   phone: string;
   password?: string;
   categorySlug: string;
+  categorySlugs?: string[];
   description: string;
   city: string;
   state: string;
@@ -191,11 +193,7 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
   const accountName = (input.accountName ?? "").trim() || null;
 
   const settings = await getSettings();
-  const category = await systemDb.maybeOne<{ id: string; slug: string; name: string }>(
-    `select id, slug, name from store_categories where slug = $1 and is_active = true`,
-    [input.categorySlug],
-  );
-  if (!category) throw new Error("Choose a valid business category");
+  // All selected categories are checked again inside the registration transaction.
 
   // Enforce strict unique business name lock — never allow two vendors to share a name
   const resolved = await resolveAvailableSubdomain(cleanBusinessTitle, input.city);
@@ -280,6 +278,8 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
   };
   try {
     result = await withSystem(async (db) => {
+      const selected = await validateBusinessCategories(db, input.categorySlug, input.categorySlugs);
+      const category = selected.primary;
       const user = existingUser
         ? await db.one<{ id: string }>(
             `update users
@@ -364,6 +364,12 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
         ],
       );
 
+    await db.execute(
+      `insert into store_category_assignments(store_id,category_id)
+       select $1, unnest($2::uuid[]) on conflict do nothing`,
+      [store.id, selected.categories.map((item) => item.id)],
+    );
+
     let trialEndsAt: string | null = null;
     let planName = "Free store";
     if (!FREE_STORE_ACCESS && trialPlan) {
@@ -398,7 +404,7 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
       ``,
       `Business Name: ${cleanBusinessTitle}`,
       `Subdomain Slug: ${chosenSlug}`,
-      `Category: ${category.name}`,
+      `Business categories: ${selected.categories.map((item) => item.name).join(", ")} (primary: ${category.name})`,
       `Owner Name: ${input.ownerName.trim()}`,
       `Owner Email: ${email}`,
       `Owner Phone / WhatsApp: ${input.phone.trim()}`,
@@ -437,6 +443,7 @@ export async function registerVendor(input: RegisterVendorInput): Promise<Regist
         description: `${input.businessName} registered (${category.name}) — awaiting 48h admin document review`,
         meta: {
           category: category.slug,
+          categories: selected.categories.map((item) => item.slug),
           slug: chosenSlug,
           reviewDeadlineAt: store.review_deadline_at,
           upgradedExistingUser: Boolean(existingUser),

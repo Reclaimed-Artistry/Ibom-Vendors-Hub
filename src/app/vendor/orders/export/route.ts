@@ -1,3 +1,5 @@
+import { ORDER_CATEGORIES_SQL, orderCategory } from "@/lib/order-categories";
+import type { StoreCategory } from "@/lib/types";
 import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { workflowLabel } from "@/lib/storefront";
@@ -10,6 +12,7 @@ function cell(value: unknown): string {
 export async function GET() {
   const { store, category } = await requireActiveVendorContext();
   const rows = await systemDb.query<{
+    order_categories: StoreCategory[];
     reference: string;
     created_at: string;
     customer_name: string;
@@ -24,9 +27,9 @@ export async function GET() {
     platform_commission: number;
     vendor_payable: number;
   }>(
-    `select reference, created_at, customer_name, customer_email, customer_phone, status, payment_status,
+    `select ${ORDER_CATEGORIES_SQL} as order_categories, reference, created_at, customer_name, customer_email, customer_phone, status, payment_status,
             fulfilment_type, subtotal, delivery_fee, total, platform_commission, vendor_payable
-       from orders where store_id = $1 order by created_at desc`,
+       from orders o where store_id = $1 order by created_at desc`,
     [store.id],
   );
 
@@ -54,7 +57,7 @@ export async function GET() {
         row.customer_name,
         row.customer_email,
         row.customer_phone,
-        workflowLabel(category, row.status),
+        workflowLabel(orderCategory(row.order_categories) ?? category, row.status),
         row.payment_status,
         row.fulfilment_type,
         row.subtotal,

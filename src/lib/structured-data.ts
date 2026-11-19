@@ -88,6 +88,7 @@ export function breadcrumbStructuredData(items: Array<{ name: string; url: strin
 }
 
 export function productStructuredData(product: Product, store: Store, category: StoreCategory | null) {
+  category = product.marketplace_category ?? category;
   const url = storeUrl(store.slug, `/products/${encodeURIComponent(product.slug)}`);
   const service = product.kind === "service";
   const images = (product.images ?? []).map((image) => webUrl(image.url, url)).filter(Boolean);

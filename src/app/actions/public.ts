@@ -396,29 +396,26 @@ export async function submitBookingAction(_prev: PublicState, formData: FormData
     return { error: "Please fix the highlighted fields", fieldErrors: formatIssues(parsed.error) };
   }
 
-  const store = await systemDb.maybeOne<{
-    id: string;
-    owner_id: string;
-    name: string;
-    category_slug: string | null;
-    inquiry_only: boolean;
+  const listing = await systemDb.maybeOne<{
+    store_id: string; owner_id: string; store_name: string;
+    id: string; name: string; service_duration_minutes: number | null;
+    category_slug: string | null; inquiry_only: boolean; property_listing: boolean;
   }>(
-    `select s.id, s.owner_id, s.name, c.slug as category_slug, coalesce((c.features->>'inquiryOnly')::boolean,false) as inquiry_only
-       from stores s
-       left join store_categories c on c.id = s.category_id
-      where s.id = $1 and s.status = 'active'`,
-    [storeId],
+    `select s.id as store_id, s.owner_id, s.name as store_name, p.id, p.name, p.service_duration_minutes,
+            c.slug as category_slug, coalesce((c.features->>'inquiryOnly')::boolean,false) as inquiry_only,
+            coalesce((c.features->>'propertyListings')::boolean,false) as property_listing
+       from products p join stores s on s.id = p.store_id
+       left join store_categories c on c.id = coalesce(p.marketplace_category_id, s.category_id)
+      where p.id = $1 and s.id = $2 and store_is_live(s.id) and p.is_available
+        and (p.kind = 'service' or c.features->>'serviceBooking' = 'true')`,
+    [parsed.data.productId, storeId],
   );
-
-  if (store?.inquiry_only) return { error: "Please send a quotation enquiry so the vendor can confirm availability and terms." };
-  if (!store) return { error: "This store is not accepting bookings right now." };
-  const bookableStore = await withPublic((db) => db.maybeOne<{ id: string }>(
-    `select id from stores where id = $1`, [store.id],
-  ));
-  if (!bookableStore) return { error: "This store is not accepting bookings right now." };
-
-  if (store.category_slug === "house-agents-realtors") return { error: "Choose an available inspection slot on the property page." };
-  const profile = getCategoryBookingProfile(store.category_slug);
+  if (!listing) return { error: "That service is no longer available or the store is not accepting bookings." };
+  if (listing.inquiry_only) return { error: "Please send a quotation enquiry so the vendor can confirm availability and terms." };
+  if (listing.property_listing || listing.category_slug === "house-agents-realtors") return { error: "Choose an available inspection slot on the property page." };
+  const store = { id: listing.store_id, owner_id: listing.owner_id, name: listing.store_name };
+  const product = listing;
+  const profile = getCategoryBookingProfile(listing.category_slug);
   const fieldErrors: Record<string, string> = {};
 
   if (parsed.data.meetingPreference === "customer_location" && (!parsed.data.location || parsed.data.location.trim().length < 5)) {
@@ -445,14 +442,8 @@ export async function submitBookingAction(_prev: PublicState, formData: FormData
     return { error: "Please complete all required service booking details", fieldErrors };
   }
 
-  const product = await systemDb.maybeOne<{ id: string; name: string; service_duration_minutes: number | null }>(
-    `select id, name, service_duration_minutes from products where id = $1 and store_id = $2 and is_available and (kind = 'service' or exists (select 1 from stores s join store_categories c on c.id = s.category_id where s.id = products.store_id and c.features->>'serviceBooking' = 'true'))`,
-    [parsed.data.productId, store.id],
-  );
-  if (!product) return { error: "That service is no longer available." };
-
   const bookingDetails = {
-    categorySlug: store.category_slug,
+    categorySlug: listing.category_slug,
     visitType: parsed.data.visitType || null,
     materialsOption: parsed.data.materialsOption || null,
     requirementsAccepted: true,

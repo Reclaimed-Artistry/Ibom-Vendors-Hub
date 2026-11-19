@@ -26,7 +26,7 @@ export default async function VendorOrdersPage({
 }: {
   searchParams: Promise<{ status?: string; q?: string; page?: string }>;
 }) {
-  const { store, category } = await requireActiveVendorContext();
+  const { store, category, categories } = await requireActiveVendorContext();
   const { status = "all", q, page } = await searchParams;
   const result = await getVendorOrderList(store.id, { status, search: q, page: Number(page ?? 1) || 1 });
   const stages = workflowFor(category);
@@ -99,7 +99,7 @@ export default async function VendorOrdersPage({
                   <td className="text-sm capitalize">{order.fulfilment_type}</td>
                   <td>
                     <StatusBadge status={order.status} />
-                    <p className="mt-1 text-[11px] text-ink-400">{workflowLabel(category, order.status)}</p>
+                    <p className="mt-1 text-[11px] text-ink-400">{workflowLabel(order.workflow_category ?? category, order.status)}</p>
                   </td>
                   <td>
                     <Badge tone={order.payment_status === "paid" ? "success" : order.payment_status === "failed" ? "danger" : "warning"}>
@@ -117,7 +117,7 @@ export default async function VendorOrdersPage({
       {result.totalPages > 1 ? <Pagination page={result.page} totalPages={result.totalPages} buildHref={buildHref} /> : null}
 
       <p className="text-xs text-ink-400">
-        Workflow stages for your category: {stages.map((stage) => stage.label).join(" → ")}
+        {categories.length > 1 ? "Each order uses the workflow for the categories of the items ordered. Open an order to see its stages." : `Workflow stages for your category: ${stages.map((stage) => stage.label).join(" → ")}`}
       </p>
     </div>
   );

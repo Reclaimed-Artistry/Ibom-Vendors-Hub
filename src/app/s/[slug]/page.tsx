@@ -1,3 +1,4 @@
+import { directBooking, listingActionLabel, storeFeatures } from "@/lib/category-policy";
 import { JsonLd } from "@/components/json-ld";
 import { storeStructuredData } from "@/lib/structured-data";
 import { StoreStockCarousel } from "@/components/store-stock-carousel";
@@ -30,7 +31,9 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
     ),
   );
   const openState = storeOpenState(store.operating_hours);
-  const features = (category?.features ?? {}) as Record<string, boolean>;
+  const businessCategories = store.business_categories ?? (category ? [category] : []);
+  const features = storeFeatures(businessCategories, category);
+  const propertyOnly = businessCategories.length === 1 && features.propertyListings;
   const money = (value: number) => formatMoney(value, settings.currency, settings.currency_symbol);
 
   if (!live) {
@@ -95,26 +98,26 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
       {availableStock.length > 0 ? (
         <section className="container-page pb-8" aria-label="Store catalogue highlights">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="font-display text-xl text-ink-900">{features.propertyListings ? "Explore properties for rent & sale" : "Explore our products & services"}</h2>
+            <h2 className="font-display text-xl text-ink-900">{propertyOnly ? "Explore properties for rent & sale" : "Explore our products & services"}</h2>
             <Link href={`${base}/products`} className="text-sm font-semibold text-brand-800">View all →</Link>
           </div>
           <StoreStockCarousel items={availableStock.map((product) => ({
             id: product.id,
-            href: !features.inquiryOnly && !features.propertyListings && product.kind === "service" ? `${base}/book/${product.slug}` : `${base}/products/${product.slug}`,
+            href: directBooking(product, category) ? `${base}/book/${product.slug}` : `${base}/products/${product.slug}`,
             name: product.name,
             image: product.images?.[0]?.url || null,
             summary: product.short_description || product.description || "",
             price: product.pricing_type === "quotation" ? "Request quote" : `${product.pricing_type === "from" ? "From " : ""}${money(product.price)}`,
-            service: !features.inquiryOnly && !features.propertyListings && product.kind === "service",
+            service: directBooking(product, category),
           }))} />
         </section>
       ) : null}
 
       <div className="container-page grid gap-8 pb-12 lg:grid-cols-[1fr_320px]">
         <div className="space-y-8">
-          {category?.attributes?.length ? (
+          {businessCategories.length ? (
             <div className="flex flex-wrap gap-2">
-              <Badge tone="info">{category.name}</Badge>
+              {businessCategories.map(item => <Badge key={item.id} tone="info">{item.name}</Badge>)}
               {features.madeToOrder ? <Badge tone="warning">Made to order</Badge> : null}
               {features.productionTracking ? <Badge tone="neutral">Production tracking</Badge> : null}
               {features.quotations ? <Badge tone="neutral">Quotations</Badge> : null}
@@ -150,12 +153,12 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
 
           <section>
             <div className="flex items-center justify-between gap-3">
-              <h2 className="font-display text-xl text-ink-900">{features.propertyListings ? "Available properties" : features.serviceBooking && !features.cart ? "Popular services" : "Featured items"}</h2>
+              <h2 className="font-display text-xl text-ink-900">{propertyOnly ? "Available properties" : features.serviceBooking && !features.cart ? "Popular services" : "Featured items"}</h2>
               <Link href={`${base}/products`} className="text-sm font-semibold text-brand-800 hover:text-brand-900">View all →</Link>
             </div>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               {showcase.map((product) => (
-                <Link key={product.id} href={!features.inquiryOnly && !features.propertyListings && product.kind === "service" ? `${base}/book/${product.slug}` : `${base}/products/${product.slug}`} className="group card overflow-hidden">
+                <Link key={product.id} href={directBooking(product, category) ? `${base}/book/${product.slug}` : `${base}/products/${product.slug}`} className="group card overflow-hidden">
                   <div className="relative aspect-[4/3] overflow-hidden bg-ink-100">
                     <img src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"} alt={product.name} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     {product.made_to_order ? (
@@ -170,7 +173,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
                         {product.pricing_type === "quotation" ? "Request quote" : `${product.pricing_type === "from" ? "From " : ""}${money(product.price)}`}
                       </span>
                       {product.service_duration_minutes ? <span className="text-[11px] text-ink-400">{product.service_duration_minutes} min</span> : null}
-                      {product.kind === "service" ? <span className="rounded-lg bg-brand-800 px-3 py-2 text-xs font-semibold text-white">{features.inquiryOnly ? "View & enquire →" : features.propertyListings ? "View property →" : "Book now →"}</span> : null}
+                      {product.kind === "service" ? <span className="rounded-lg bg-brand-800 px-3 py-2 text-xs font-semibold text-white">{listingActionLabel(product, category)}</span> : null}
                     </div>
                   </div>
                 </Link>

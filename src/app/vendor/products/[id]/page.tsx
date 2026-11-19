@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 import { requireActiveVendorContext } from "@/lib/auth";
+import { getStoreCategories } from "@/lib/storefront";
 import { systemDb } from "@/lib/db";
 import { storeBase } from "@/lib/storefront-base";
 import { Alert, PageHeader } from "@/components/ui";
@@ -23,7 +24,8 @@ export default async function EditProductPage({
 }) {
   const { id } = await params;
   const { saved } = await searchParams;
-  const { store, category } = await requireActiveVendorContext();
+  const { store, category: primaryCategory, categories: businessCategories } = await requireActiveVendorContext();
+  const availableCategories = await getStoreCategories();
 
   const product = await systemDb.maybeOne<{
     id: string;
@@ -32,6 +34,7 @@ export default async function EditProductPage({
     short_description: string | null;
     kind: string;
     category_id: string | null;
+    marketplace_category_id: string | null;
     price: number;
     delivery_fee: number | null;
     delivery_fee_outside: number | null;
@@ -57,6 +60,8 @@ export default async function EditProductPage({
     slug: string;
   }>(`select * from products where id = $1 and store_id = $2`, [id, store.id]);
   if (!product) notFound();
+  const category = businessCategories.find(item => item.id === product.marketplace_category_id) ?? primaryCategory;
+  const marketplaceCategories = category && !availableCategories.some(item => item.id === category.id) ? [...availableCategories, category] : availableCategories;
 
   const [images, variants, addons, categories] = await Promise.all([
     systemDb.query<{ id: string; url: string }>(`select id, url from product_images where product_id = $1 order by sort_order`, [id]),
@@ -78,6 +83,7 @@ export default async function EditProductPage({
     shortDescription: product.short_description ?? "",
     kind: product.kind,
     categoryId: product.category_id ?? "",
+    marketplaceCategoryId: product.marketplace_category_id ?? category?.id ?? "",
     price: String(Number(product.price)),
     compareAtPrice: product.compare_at_price ? String(Number(product.compare_at_price)) : "",
     pricingType: product.pricing_type,
@@ -131,6 +137,8 @@ export default async function EditProductPage({
           attributes={category?.attributes ?? []}
           features={category?.features ?? {}}
           categories={categories}
+          marketplaceCategories={marketplaceCategories}
+          businessCategoryIds={businessCategories.map(item => item.id)}
         />
       </div>
       <div className="mt-6 rounded-2xl border border-red-100 bg-white p-4">

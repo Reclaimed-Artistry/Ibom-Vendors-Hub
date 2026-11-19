@@ -1,5 +1,6 @@
 "use client";
 
+import { listingCategory } from "@/lib/category-policy";
 import { farmMinimumQuantity } from "@/lib/agriculture";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -21,7 +22,7 @@ export function AddToCart({
   const [variantId, setVariantId] = useState<string | null>(
     product.variants?.find((variant) => variant.is_available)?.id ?? null,
   );
-  const minimumQuantity = farmMinimumQuantity(product.attributes);
+  const minimumQuantity = listingCategory(product, store.category)?.slug === "agriculture-livestock" ? farmMinimumQuantity(product.attributes) : 1;
   const [quantity, setQuantity] = useState(minimumQuantity);
   const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
   const [notes, setNotes] = useState("");

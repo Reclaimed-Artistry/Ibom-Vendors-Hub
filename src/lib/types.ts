@@ -152,6 +152,7 @@ export interface Store {
   created_at: string;
   updated_at: string;
   category?: StoreCategory | null;
+  business_categories?: StoreCategory[];
 }
 
 export interface ProductImage {
@@ -175,7 +176,10 @@ export interface ProductVariant {
 export interface Product {
   id: string;
   store_id: string;
+  /** Private catalogue section; independent of the public marketplace category. */
   category_id: string | null;
+  marketplace_category_id?: string | null;
+  marketplace_category?: StoreCategory | null;
   name: string;
   slug: string;
   sku: string | null;
@@ -218,6 +222,7 @@ export interface Product {
 export interface OrderItem {
   id: string;
   order_id: string;
+  marketplace_category_id?: string | null;
   product_id: string | null;
   variant_id: string | null;
   kind: "product" | "service";

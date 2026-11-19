@@ -67,7 +67,8 @@ export const vendorRegisterSchema = z
     email: email.optional().or(z.literal("")),
     phone,
     password: password.optional().or(z.literal("")),
-    categorySlug: z.string().min(1, "Choose a business category"),
+    categorySlug: z.string().min(1, "Choose a primary business category"),
+    categorySlugs: z.array(z.string().trim().min(1).max(100)).max(60).default([]),
     description: z.string().trim().min(10, "Tell customers about your business (at least 10 characters)").max(4000),
     city: z.string().trim().min(2, "Select your Local Government Area / town in Akwa Ibom").max(80),
     state: akwaIbomStateSchema,
@@ -145,6 +146,7 @@ export const productSchema = z.object({
   shortDescription: z.string().trim().max(240).optional().or(z.literal("")),
   kind: z.enum(["product", "service"]).default("product"),
   categoryId: z.string().uuid().optional().or(z.literal("")),
+  marketplaceCategoryId: z.string().uuid("Choose a valid marketplace category").optional().or(z.literal("")),
   price: z.coerce.number().min(0, "Price cannot be negative").max(100_000_000),
   deliveryFee: z.preprocess((value) => value === "" || value == null ? undefined : value, z.coerce.number().min(0).max(1_000_000).optional()),
   deliveryFeeOutside: z.preprocess((value) => value === "" || value == null ? undefined : value, z.coerce.number().min(0).max(1_000_000).optional()),
@@ -191,6 +193,8 @@ export const productSchema = z.object({
 });
 
 export const storeSettingsSchema = z.object({
+  categorySlug: z.string().trim().min(1, "Choose a primary business category").optional(),
+  categorySlugs: z.array(z.string().trim().min(1).max(100)).max(60).optional(),
   name: z.string().trim().min(2, "Business name is required").max(120),
   tagline: z.string().trim().max(160).optional().or(z.literal("")),
   description: z.string().trim().max(4000).optional().or(z.literal("")),

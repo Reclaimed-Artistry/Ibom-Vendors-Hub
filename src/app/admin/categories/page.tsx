@@ -25,8 +25,8 @@ export default async function AdminCategoriesPage() {
     products: number;
   }>(
     `select c.id, c.slug, c.name, c.description, c.icon, c.is_active, c.sort_order, c.features,
-            (select count(*)::int from stores s where s.category_id = c.id) as stores,
-            (select count(*)::int from products p join stores s2 on s2.id = p.store_id where s2.category_id = c.id) as products
+            (select count(*)::int from store_category_assignments a where a.category_id = c.id) as stores,
+            (select count(*)::int from products p join stores s2 on s2.id = p.store_id where coalesce(p.marketplace_category_id, s2.category_id) = c.id) as products
        from store_categories c order by c.sort_order, c.name`,
   );
 
