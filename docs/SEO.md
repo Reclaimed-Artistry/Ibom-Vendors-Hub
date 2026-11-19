@@ -30,6 +30,16 @@ BING_SITE_VERIFICATION=
 
 Set these server environment variables in Vercel and redeploy. They generate `google-site-verification` and `msvalidate.01` meta tags. Google HTML verification verifies a URL-prefix property, **not** ownership of all vendor subdomains; prefer the Domain property. OAuth sign-in credentials are unrelated and must not be reused as verification tokens. No verification token is fabricated or assumed configured.
 
+## Permanent Google HTML verification file
+
+The owner's uploaded file is tracked at `public/google5165a16b9a302297.html` and served unchanged at:
+
+`https://www.ibomvendorshub.com/google5165a16b9a302297.html`
+
+**Leave this file in place after verification.** Do not rename it, change its contents, or remove it during cleanup or future deployments; Google can recheck it to retain ownership verification. It is a public verification token, not an account credential. No sign-in is required to retrieve it.
+
+After deployment, the owner can click **Verify** for the matching URL-prefix property in Google Search Console. Hosting the file alone does not prove that Google has completed verification, submitted the sitemaps, or indexed the site. HTML-file verification does not replace DNS verification for a Domain property.
+
 ## Checks
 
 ```bash

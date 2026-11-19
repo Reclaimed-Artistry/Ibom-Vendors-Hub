@@ -44,6 +44,15 @@ function get(path: string, host = ROOT): Promise<{ response: { status: number; h
 }
 
 async function main() {
+  // Keep the owner's uploaded verification file accessible without sign-in.
+  // Google may recheck it later, so this is a permanent public asset.
+  const verification = await get("/google5165a16b9a302297.html");
+  assert.equal(verification.response.status, 200);
+  assert(verification.response.headers.get("content-type")?.includes("text/html"));
+  assert.equal(verification.response.headers.get("location"), null);
+  assert.equal(verification.text, "google-site-verification: google5165a16b9a302297.html");
+  console.log("PASS: permanent Google HTML verification file returns the exact uploaded content without authentication or redirects");
+
   const robots = await get("/robots.txt");
   assert.equal(robots.response.status, 200);
   assert(robots.response.headers.get("content-type")?.includes("text/plain"));
