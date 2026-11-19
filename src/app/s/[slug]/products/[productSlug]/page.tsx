@@ -68,7 +68,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   return (
     <div className="container-page py-8">
       <nav className="mb-5 flex items-center gap-1.5 text-xs text-ink-400">
-        <Link href={base || "/"} className="hover:text-ink-700">{store.name}</Link>
+        <Link href={base || "/"} className="break-words hover:text-ink-700">{store.name}</Link>
         <span>/</span>
         <Link href={`${base}/products`} className="hover:text-ink-700">{features.serviceBooking ? "Services" : "Catalogue"}</Link>
         <span>/</span>
@@ -325,7 +325,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             <div className="flex items-center gap-3">
               <img src={store.logo_url ?? ""} alt="" className="size-12 rounded-xl border border-ink-100 object-cover" />
               <div>
-                <p className="text-sm font-semibold text-ink-900">{store.name}</p>
+                <p className="text-balance break-words text-sm font-semibold text-ink-900">{store.name}</p>
                 <p className="text-xs text-ink-400">{store.city}, {store.state ?? "Akwa Ibom"}</p>
               </div>
             </div>

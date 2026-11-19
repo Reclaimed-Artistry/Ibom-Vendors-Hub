@@ -44,7 +44,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   return (
     <div className="container-page max-w-4xl py-10">
       <nav className="mb-4 text-xs text-ink-400">
-        <Link href={base || "/"} className="hover:text-ink-700">{store.name}</Link> /{" "}
+        <Link href={base || "/"} className="break-words hover:text-ink-700">{store.name}</Link> /{" "}
         <Link href={`${base}/products/${product.slug}`} className="hover:text-ink-700">{product.name}</Link> /{" "}
         <span className="text-ink-600">{profile.isArtisan ? "Book artisan service" : "Book appointment"}</span>
       </nav>

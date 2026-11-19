@@ -38,7 +38,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
           <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
             <StoreIcon className="size-7" />
           </div>
-          <h1 className="mt-4 font-display text-3xl text-ink-900">{store.name} is offline</h1>
+          <h1 className="mt-4 text-balance break-words font-display text-3xl text-ink-900">{store.name} is offline</h1>
           <p className="mt-2 text-sm leading-7 text-ink-500">{reason ?? "This storefront is not available right now."}</p>
           <p className="mt-2 text-xs text-ink-400">Products, order history and customer records are safe — nothing has been deleted.</p>
           <div className="mt-6 flex flex-wrap justify-center gap-2">
@@ -64,10 +64,10 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
         </div>
         <div className="container-page relative -mt-16 pb-6">
           <div className="flex flex-wrap items-end justify-between gap-4 rounded-2xl bg-white p-4 shadow-lg">
-            <div className="flex min-w-0 flex-wrap items-end gap-4">
-              <StoreImage kind="logo" src={store.logo_url} alt={store.name} className="size-24 rounded-2xl border-4 border-white bg-white object-cover shadow-lg" />
+            <div className="flex min-w-0 flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4">
+              <StoreImage kind="logo" src={store.logo_url} alt={store.name} className="size-20 rounded-2xl border-4 border-white bg-white object-cover shadow-lg sm:size-24" />
               <div className="min-w-0 flex-1 pb-1">
-                <h1 className="break-words font-display text-2xl text-ink-900 sm:text-3xl">{store.name}</h1>
+                <h1 className="text-balance break-words hyphens-auto font-display text-xl leading-snug text-ink-900 sm:text-3xl">{store.name}</h1>
                 <p className="text-sm text-ink-500">{store.tagline}</p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-ink-500">
                   <span className="inline-flex items-center gap-1 font-semibold text-gold-600">
@@ -201,7 +201,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
           })}
 
           <section>
-            <h2 className="font-display text-xl text-ink-900">About {store.name}</h2>
+            <h2 className="text-balance break-words font-display text-xl text-ink-900">About {store.name}</h2>
             <p className="mt-2 whitespace-pre-line text-sm leading-7 text-ink-600">{store.description}</p>
           </section>
 
