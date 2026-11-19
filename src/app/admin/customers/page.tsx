@@ -4,8 +4,8 @@ import { Users, Search, Wallet } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { formatMoney, formatDate } from "@/lib/utils";
-import { Badge, Card, CardHeader, EmptyState, Field, PageHeader, StatCard } from "@/components/ui";
-import { SubmitButton } from "@/components/submit-button";
+import { Badge, Card, CardHeader, EmptyState, PageHeader, StatCard } from "@/components/ui";
+import { customerSearchPattern } from "@/lib/customer-search";
 
 export const metadata: Metadata = { title: "Customers · Admin" };
 
@@ -15,7 +15,8 @@ export default async function AdminCustomersPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   await requireAdmin();
-  const { q = "" } = await searchParams;
+  const params = await searchParams;
+  const q = typeof params.q === "string" ? params.q.trim().slice(0, 200) : "";
 
   const [stats, customers] = await Promise.all([
     systemDb.maybeOne<{ customers: number; orders: number; spend: number }>(
@@ -65,7 +66,7 @@ export default async function AdminCustomersPage({
              or lower(u.phone) like lower($1) or $1 = '')
       order by u.created_at desc
       limit 200`,
-      [`%${q.trim()}%`],
+      [customerSearchPattern(q)],
     ),
   ]);
 
@@ -75,19 +76,25 @@ export default async function AdminCustomersPage({
         title="Customers"
         description={`View registered customers and their order history. ${customers.length} of ${stats?.customers ?? 0} shown.`}
         actions={
-          <div className="flex items-end gap-2">
-            <form className="flex w-64" action={""}>
-              <Field label="Search customers" htmlFor="customer-search" hint="Name, email or phone">
-                <input
-                  id="customer-search"
-                  name="q"
-                  defaultValue={q}
-                  className="input"
-                />
-              </Field>
-              <SubmitButton className="btn-secondary btn-sm">Search</SubmitButton>
-            </form>
-          </div>
+          <form method="get" action="/admin/customers" role="search" className="w-full sm:w-auto">
+            <label htmlFor="customer-search" className="mb-1.5 block text-xs font-semibold text-ink-700">Search customers</label>
+            <div className="flex w-full items-center gap-2 sm:w-[360px]">
+              <input
+                key={q}
+                id="customer-search"
+                type="search"
+                name="q"
+                defaultValue={q}
+                placeholder="Name, email or phone"
+                maxLength={200}
+                className="input min-w-0 flex-1"
+              />
+              <button type="submit" className="btn-secondary shrink-0 gap-1.5">
+                <Search className="size-4" aria-hidden="true" />Search
+              </button>
+            </div>
+            {q ? <Link href="/admin/customers" className="mt-1.5 inline-block text-xs font-semibold text-brand-700 hover:underline">Clear search</Link> : null}
+          </form>
         }
       />
 
@@ -100,13 +107,14 @@ export default async function AdminCustomersPage({
       <Card>
         <CardHeader
           title="Customer directory"
-          description="Click a customer to view their full profile, orders and wallet activity."
+          description={q ? `Search results for “${q}”. Click a customer to view their profile.` : "Click a customer to view their full profile, orders and wallet activity."}
         />
         {customers.length === 0 ? (
           <EmptyState
             icon={<Users className="size-5" />}
             title="No customers found"
-            description={q ? "Try a different search term." : "No registered customers yet."}
+            description={q ? "Try a different name, email address or phone number." : "No registered customers yet."}
+            action={q ? <Link href="/admin/customers" className="btn-secondary">Show all customers</Link> : undefined}
           />
         ) : (
           <div className="table-wrap overflow-auto">
