@@ -6,6 +6,7 @@ async function main() {
   const db=new Client({connectionString:process.env.DATABASE_URL ?? "postgres://postgres@127.0.0.1:5544/postgres"});
   await db.connect();
   try {
+    await db.query("drop table if exists customer_search_fixture");
     await db.query("create temporary table customer_search_fixture(full_name text,email text,phone text,role text)");
     await db.query(`insert into customer_search_fixture values
       ('Ada Inyang','ada@example.test','08012345678','customer'),

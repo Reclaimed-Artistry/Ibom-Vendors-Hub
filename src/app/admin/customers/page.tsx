@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Users, Search, Wallet } from "lucide-react";
+import { Users, Wallet } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { formatMoney, formatDate } from "@/lib/utils";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, StatCard } from "@/components/ui";
 import { customerSearchPattern } from "@/lib/customer-search";
+import { CustomerSearch } from "@/components/customer-search";
 
 export const metadata: Metadata = { title: "Customers · Admin" };
 
@@ -76,25 +77,7 @@ export default async function AdminCustomersPage({
         title="Customers"
         description={`View registered customers and their order history. ${customers.length} of ${stats?.customers ?? 0} shown.`}
         actions={
-          <form method="get" action="/admin/customers" role="search" className="w-full sm:w-auto">
-            <label htmlFor="customer-search" className="mb-1.5 block text-xs font-semibold text-ink-700">Search customers</label>
-            <div className="flex w-full items-center gap-2 sm:w-[360px]">
-              <input
-                key={q}
-                id="customer-search"
-                type="search"
-                name="q"
-                defaultValue={q}
-                placeholder="Name, email or phone"
-                maxLength={200}
-                className="input min-w-0 flex-1"
-              />
-              <button type="submit" className="btn-secondary shrink-0 gap-1.5">
-                <Search className="size-4" aria-hidden="true" />Search
-              </button>
-            </div>
-            {q ? <Link href="/admin/customers" className="mt-1.5 inline-block text-xs font-semibold text-brand-700 hover:underline">Clear search</Link> : null}
-          </form>
+          <CustomerSearch customers={customers} initialQuery={q} />
         }
       />
 
