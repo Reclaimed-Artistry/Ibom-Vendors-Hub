@@ -103,6 +103,8 @@ export async function createCheckout(
     }
     const property = await db.maybeOne(`select p.id from products p join stores s on s.id=p.store_id join store_categories c on c.id=s.category_id where p.id=any($1::uuid[]) and c.slug='house-agents-realtors' limit 1`, [productIds]);
     if (property) throw new Error("Properties cannot be purchased through checkout. Open the listing and book an inspection.");
+    const enquiryListing = await db.maybeOne(`select p.id from products p join stores s on s.id=p.store_id join store_categories c on c.id=s.category_id where p.id=any($1::uuid[]) and c.features->>'inquiryOnly'='true' limit 1`, [productIds]);
+    if (enquiryListing) throw new Error("This listing requires a quotation enquiry. Ask the vendor to confirm availability and terms before ordering.");
     const byId = new Map(rows.map((row) => [row.id, row]));
     const banks = paymentMethod === "bank_transfer" ? await db.query<{ store_id: string; bank_name: string; account_name: string; account_number: string }>(
       `select s.id as store_id, v.bank_name, v.account_name, v.account_number from stores s join vendor_profiles v on v.user_id = s.owner_id where s.id = any($1::uuid[])`,

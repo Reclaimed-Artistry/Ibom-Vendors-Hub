@@ -13,7 +13,7 @@ import { getCategoryBookingProfile } from "@/lib/artisan-bookings";
 export default async function BookPage({ params }: { params: Promise<{ slug: string; productSlug: string }> }) {
   const { slug, productSlug } = await params;
   const { store, category, live } = await resolveStore(slug);
-  if (!store) notFound();
+  if (!store || category?.features?.inquiryOnly) notFound();
   const product = await getStoreProduct(store.id, productSlug);
   if (!product || !product.is_available || (product.kind !== "service" && !category?.features?.serviceBooking)) notFound();
   const [base, settings, user] = await Promise.all([storeBase(slug), getSettings(), getCurrentUser()]);

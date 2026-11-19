@@ -571,6 +571,18 @@ const DEFAULT_BOOKING_PROFILE: CategoryBookingProfile = {
 };
 
 export function getCategoryBookingProfile(categorySlug?: string | null): CategoryBookingProfile {
+  if (categorySlug === "digital-online-services") return {
+    ...DEFAULT_BOOKING_PROFILE,
+    heading: "Discuss your digital project", ctaLabel: "Request a project consultation",
+    subtitle: "Share a short brief and preferred time for an online consultation. The professional will confirm scope and availability.",
+    paymentNote: "A consultation request does not guarantee project acceptance. Agree deliverables, revisions, timeline and price with the professional.",
+    requirementsTitle: "A simple project brief",
+    requirements: ["Describe the result you need and your preferred deadline.", "Share reference links or files you have permission to use.", "Never share passwords, one-time codes, bank login details or private customer data."],
+    siteAddressLabel: "Preferred online meeting method (optional)", siteAddressPlaceholder: "e.g. Google Meet or WhatsApp call; share contact details privately",
+    visitTypes: ["Online Project Consultation", "Brief / Requirements Review"],
+    notesLabel: "What would you like help with?", notesPlaceholder: "e.g. Edit a 60-second video with captions, needed by Friday. Two revision rounds.",
+    confirmLabel: "I understand this is a consultation request; the professional will confirm scope, availability and price.",
+  };
   if (!categorySlug) return DEFAULT_BOOKING_PROFILE;
   return CATEGORY_BOOKING_PROFILES[categorySlug] ?? DEFAULT_BOOKING_PROFILE;
 }

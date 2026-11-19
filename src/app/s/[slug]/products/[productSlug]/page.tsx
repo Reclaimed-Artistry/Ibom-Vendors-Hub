@@ -155,7 +155,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           <div className="mt-6">
             {(() => {
               const bookingProfile = getCategoryBookingProfile(category?.slug);
-              const showBooking = product.kind === "service" || Boolean(features.serviceBooking);
+              const showBooking = !features.inquiryOnly && (product.kind === "service" || Boolean(features.serviceBooking));
               const showCart = !propertyListing && product.kind !== "service" && features.cart !== false;
               const showQuote = Boolean(features.quotations) && product.pricing_type !== "quotation";
 
@@ -190,11 +190,12 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                     </div>
                   ) : null}
 
+                  {features.inquiryOnly ? <p className="rounded-xl bg-brand-50 p-3 text-sm text-brand-900">Send your requirements and preferred dates. The vendor must confirm availability, final cost and terms. This is not an instant confirmed reservation.</p> : null}
                   {showCart ? (
                     <AddToCart product={product} store={store} currencySymbol={settings.currency_symbol} />
                   ) : product.pricing_type === "quotation" ? (
                     <ButtonLink href={`${base}/quote/${product.slug}`} className="w-full">
-                      Request written quotation / BOQ
+                      Request a quotation
                     </ButtonLink>
                   ) : null}
 
@@ -210,7 +211,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
                   {showQuote && !showCart ? (
                     <ButtonLink href={`${base}/quote/${product.slug}`} variant="secondary" className="w-full">
-                      Request written quotation / BOQ
+                      Request a quotation
                     </ButtonLink>
                   ) : null}
                 </div>

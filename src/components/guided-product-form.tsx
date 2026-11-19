@@ -46,7 +46,7 @@ export function GuidedProductForm({ product, categorySlug, categoryName, attribu
         : <input id={`guide-${field.key}`} className="input" type={field.type === "number" ? "number" : "text"} min={field.type === "number" ? 0 : undefined} value={value} required={required} onChange={e=>update(e.target.value)} placeholder={field.key === "pack_size" ? "e.g. 1 kg pack or crate of 30 eggs" : undefined} />}
     </Field>;
   }
-  const preserved = {categoryId:product.categoryId,shortDescription:product.shortDescription,compareAtPrice:product.compareAtPrice,pricingType:property?"fixed":product.pricingType,sku:product.sku,condition:product.condition,brand:product.brand,model:product.model,warrantyInfo:product.warrantyInfo,warrantyMonths:product.warrantyMonths,prepTimeMinutes:product.prepTimeMinutes,portion:product.portion,serviceDurationMinutes:product.serviceDurationMinutes};
+  const preserved = {categoryId:product.categoryId,shortDescription:product.shortDescription,compareAtPrice:product.compareAtPrice,pricingType:features.inquiryOnly?"quotation":property?"fixed":product.pricingType,sku:product.sku,condition:product.condition,brand:product.brand,model:product.model,warrantyInfo:product.warrantyInfo,warrantyMonths:product.warrantyMonths,prepTimeMinutes:product.prepTimeMinutes,portion:product.portion,serviceDurationMinutes:product.serviceDurationMinutes};
   return <form action={action} className="mx-auto max-w-3xl space-y-4">
     <input type="hidden" name="productId" value={product.id ?? ""} />
     <input type="hidden" name="attributesJson" value={JSON.stringify({...values,offering_type:selection})} />
@@ -80,9 +80,10 @@ export function GuidedProductForm({ product, categorySlug, categoryName, attribu
           <textarea id="guide-description" name="description" className="textarea min-h-28" defaultValue={product.description} maxLength={6000} rows={4} placeholder="What is included? What size or quantity? When will it be ready?" />
         </Field>
         <aside className="rounded-xl border border-brand-100 bg-brand-50/60 p-3 text-xs leading-relaxed text-ink-600"><strong className="text-brand-800">Example:</strong> {example}</aside>
-        <Field label={property ? "Rent / sale price (₦)" : kind === "service" ? "Your price or starting price (₦)" : "Price (₦)"} htmlFor="guide-price" required error={state.fieldErrors?.price}>
-          <input id="guide-price" name="price" type="number" min={0} step="0.01" required className="input" defaultValue={product.price} placeholder="e.g. 5000" />
+        <Field label={features.inquiryOnly ? "Guide price (₦, optional)" : property ? "Rent / sale price (₦)" : kind === "service" ? "Your price or starting price (₦)" : "Price (₦)"} htmlFor="guide-price" required={!features.inquiryOnly} error={state.fieldErrors?.price}>
+          <input id="guide-price" name="price" type="number" min={0} step="0.01" required={!features.inquiryOnly} className="input" defaultValue={product.price} placeholder="e.g. 5000" />
         </Field>
+        {features.inquiryOnly ? <p className="rounded-xl bg-brand-50 p-3 text-xs text-brand-900">Customers send an enquiry for a quotation. Dates, availability and final terms must be confirmed directly with you; this is not an instant reservation.</p> : null}
         {kind === "service" && !property ? <p className="text-xs text-ink-500">Use a starting price if the final cost depends on the job, and explain what that price includes in the description.</p> : null}
         {property && selection === "Other" ? <Field label="What type of property?" htmlFor="guide-property-type" required><input id="guide-property-type" className="input" required value={values.property_type ?? ""} onChange={e=>setValues(current=>({...current,property_type:e.target.value}))} placeholder="e.g. Event centre or farmland" /></Field> : null}
         {productQuestions(categorySlug, selection, kind).map(question=><Field key={question.key} label={question.label} htmlFor={`guide-${question.key}`} hint="Optional, but helpful for buyers."><input id={`guide-${question.key}`} className="input" value={values[question.key] ?? ""} maxLength={500} placeholder={question.placeholder} onChange={e=>setValues(current=>({...current,[question.key]:e.target.value}))} /></Field>)}

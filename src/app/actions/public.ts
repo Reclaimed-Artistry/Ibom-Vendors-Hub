@@ -401,13 +401,16 @@ export async function submitBookingAction(_prev: PublicState, formData: FormData
     owner_id: string;
     name: string;
     category_slug: string | null;
+    inquiry_only: boolean;
   }>(
-    `select s.id, s.owner_id, s.name, c.slug as category_slug
+    `select s.id, s.owner_id, s.name, c.slug as category_slug, coalesce((c.features->>'inquiryOnly')::boolean,false) as inquiry_only
        from stores s
        left join store_categories c on c.id = s.category_id
       where s.id = $1 and s.status = 'active'`,
     [storeId],
   );
+
+  if (store?.inquiry_only) return { error: "Please send a quotation enquiry so the vendor can confirm availability and terms." };
   if (!store) return { error: "This store is not accepting bookings right now." };
   const bookableStore = await withPublic((db) => db.maybeOne<{ id: string }>(
     `select id from stores where id = $1`, [store.id],

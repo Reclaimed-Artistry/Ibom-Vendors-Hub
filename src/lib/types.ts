@@ -58,6 +58,7 @@ export interface PlatformSettings {
 }
 
 export interface CategoryFeatures {
+  inquiryOnly?: boolean;
   propertyListings?: boolean;
   catalogue?: boolean;
   cart?: boolean;

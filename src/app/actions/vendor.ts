@@ -90,6 +90,7 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
     try { validateAgricultureAttributes(attributes); } catch (error) { return { error: error instanceof Error ? error.message : "Check the farm produce details." }; }
     formData.set("kind", "product");
   }
+  if (categoryFeatures.inquiryOnly) formData.set("pricingType", "quotation");
   const propertyListing = isPropertyCategory(ctx.category?.slug);
   if (propertyListing) {
     try { validatePropertyAttributes(attributes); } catch (error) { return { error: error instanceof Error ? error.message : "Check the property details." }; }
