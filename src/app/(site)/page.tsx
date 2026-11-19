@@ -1,3 +1,6 @@
+import { JsonLd } from "@/components/json-ld";
+import { publicMetadata, SITE_DESCRIPTION, siteUrl } from "@/lib/seo";
+import { websiteStructuredData } from "@/lib/structured-data";
 import { SmartSearch } from "@/components/smart-search";
 import { CategoryIcon } from "@/components/category-icon";
 import { StoreImage } from "@/components/store-image";
@@ -18,6 +21,12 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCategoriesWithCounts, getMarketplaceHighlights, searchMarketplace } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
 import { formatMoney, truncate } from "@/lib/utils";
+
+export const metadata = publicMetadata({
+  title: "Ibom Vendors Hub | Shop Akwa Ibom Businesses Online",
+  description: SITE_DESCRIPTION,
+  url: siteUrl(),
+});
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -41,6 +50,7 @@ export default async function HomePage() {
 
   return (
     <div>
+      <JsonLd data={websiteStructuredData(settings.support_email)} />
       {/* Hero */}
       <section className="relative overflow-hidden bg-ink-900">
         <div className="absolute inset-0 opacity-70" aria-hidden>
@@ -285,6 +295,7 @@ export default async function HomePage() {
                 Register in minutes and get a storefront on your own subdomain — complete with catalogue, orders, payments,
                 order management and customer tracking. No code, no hosting bill, no commissions hidden in the fine print.
               </p>
+              <Link href="/sell" className="mt-3 inline-flex text-sm font-semibold text-brand-200 underline underline-offset-4">Learn about selling online in Akwa Ibom →</Link>
               <div className="mt-6 flex flex-wrap gap-3">
                 {!user ? (
                   <>

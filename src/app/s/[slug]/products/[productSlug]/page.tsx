@@ -1,3 +1,7 @@
+import type { Metadata } from "next";
+import { JsonLd } from "@/components/json-ld";
+import { NO_INDEX, publicMetadata, seoDescription, storeUrl } from "@/lib/seo";
+import { breadcrumbStructuredData, productStructuredData } from "@/lib/structured-data";
 import { isPropertyCategory } from "@/lib/property-inspections";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -15,6 +19,21 @@ import { getCategoryBookingProfile } from "@/lib/artisan-bookings";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string; productSlug: string }> }): Promise<Metadata> {
+  const { slug, productSlug } = await params;
+  const { store, live } = await resolveStore(slug);
+  if (!store) return { title: "Store not found", robots: NO_INDEX };
+  const product = await getStoreProduct(store.id, productSlug);
+  if (!product) return { title: "Listing not found", robots: NO_INDEX };
+  return publicMetadata({
+    title: `${product.name} | ${store.name} · Ibom Vendors Hub`,
+    description: seoDescription(product.short_description || product.description, `${product.name} from ${store.name} in ${store.city || "Akwa Ibom"}. View details and contact this vendor on Ibom Vendors Hub.`),
+    url: storeUrl(store.slug, `/products/${encodeURIComponent(product.slug)}`),
+    image: product.images?.[0]?.url || store.cover_url || store.logo_url,
+    index: live,
+  });
+}
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string; productSlug: string }> }) {
   const { slug, productSlug } = await params;
@@ -67,6 +86,12 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
   return (
     <div className="container-page py-8">
+      {live ? <JsonLd data={productStructuredData(product, store, category)} /> : null}
+      <JsonLd data={breadcrumbStructuredData([
+        { name: store.name, url: storeUrl(store.slug) },
+        { name: "Catalogue", url: storeUrl(store.slug, "/products") },
+        { name: product.name, url: storeUrl(store.slug, `/products/${encodeURIComponent(product.slug)}`) },
+      ])} />
       <nav className="mb-5 flex items-center gap-1.5 text-xs text-ink-400">
         <Link href={base || "/"} className="break-words hover:text-ink-700">{store.name}</Link>
         <span>/</span>
@@ -83,7 +108,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
           {product.images && product.images.length > 1 ? (
             <div className="mt-3 grid grid-cols-4 gap-3">
               {product.images.slice(1, 5).map((img) => (
-                <img key={img.id ?? img.url} src={img.url} alt="" className="aspect-square w-full rounded-xl border border-ink-100 object-cover" />
+                <img key={img.id ?? img.url} src={img.url} alt={img.alt || `${product.name} — additional view`} className="aspect-square w-full rounded-xl border border-ink-100 object-cover" />
               ))}
             </div>
           ) : null}

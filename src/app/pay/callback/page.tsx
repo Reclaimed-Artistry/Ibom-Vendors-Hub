@@ -1,3 +1,4 @@
+import { NO_INDEX } from "@/lib/seo";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Clock, XCircle } from "lucide-react";
@@ -8,7 +9,7 @@ import { Alert } from "@/components/ui";
 import { Logo } from "@/components/logo";
 import { verifyPaymentAction } from "@/app/actions/payments";
 
-export const metadata = { title: "Payment status" };
+export const metadata = { title: "Payment status", robots: NO_INDEX };
 export const dynamic = "force-dynamic";
 
 export default async function PaymentCallbackPage({

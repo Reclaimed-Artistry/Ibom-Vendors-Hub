@@ -1,10 +1,11 @@
+import { NO_INDEX } from "@/lib/seo";
 import { redirect } from "next/navigation";
 import { CheckoutForm } from "@/components/checkout-form";
 import { getCurrentUser } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { getWalletBalance } from "@/app/actions/wallet";
 
-export const metadata = { title: "Checkout" };
+export const metadata = { title: "Checkout", robots: NO_INDEX };
 export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage() {

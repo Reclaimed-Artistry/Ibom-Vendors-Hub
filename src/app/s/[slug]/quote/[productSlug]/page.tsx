@@ -1,3 +1,4 @@
+import { NO_INDEX } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getStoreProduct, resolveStore } from "@/lib/storefront";
@@ -5,6 +6,8 @@ import { storeBase } from "@/lib/storefront-base";
 import { getCurrentUser } from "@/lib/auth";
 import { Card } from "@/components/ui";
 import { QuoteForm } from "@/components/storefront-forms";
+
+export const metadata = { robots: NO_INDEX, alternates: { canonical: null } };
 
 export default async function ProductQuotePage({ params }: { params: Promise<{ slug: string; productSlug: string }> }) {
   const { slug, productSlug } = await params;

@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { NO_INDEX, listingCanonical, listingPage, publicMetadata, storeUrl } from "@/lib/seo";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Search } from "lucide-react";
@@ -12,19 +14,38 @@ import { SmartSearch } from "@/components/smart-search";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+interface CatalogueParams { q?: string; category?: string; sort?: string; page?: string }
+
+export async function generateMetadata({ params, searchParams }: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<CatalogueParams>;
+}): Promise<Metadata> {
+  const [{ slug }, sp] = await Promise.all([params, searchParams]);
+  const { store, live } = await resolveStore(slug);
+  if (!store) return { title: "Store not found", robots: NO_INDEX };
+  const page = listingPage(sp.page);
+  return publicMetadata({
+    title: `Catalogue | ${store.name}${page > 1 ? ` — Page ${page}` : ""} · Ibom Vendors Hub`,
+    description: `Explore products and services from ${store.name} in ${store.city || "Akwa Ibom"}, Nigeria. View listing details, prices and ways to order or enquire.`,
+    url: listingCanonical(storeUrl(store.slug, "/products"), { page: sp.category || sp.q ? undefined : sp.page }),
+    image: store.cover_url || store.logo_url,
+    index: live && !sp.q && !sp.category,
+  });
+}
+
 export default async function StoreProductsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ q?: string; category?: string; sort?: string; page?: string }>;
+  searchParams: Promise<CatalogueParams>;
 }) {
   const [{ slug }, sp] = await Promise.all([params, searchParams]);
   const { store, category } = await resolveStore(slug);
   if (!store) notFound();
   const base = await storeBase(slug);
   const settings = await getSettings();
-  const page = Math.max(Number(sp.page ?? "1") || 1, 1);
+  const page = listingPage(sp.page);
   const limit = 24;
 
   const [{ products, total }, groups] = await Promise.all([

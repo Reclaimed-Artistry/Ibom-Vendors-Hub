@@ -1,3 +1,4 @@
+import { NO_INDEX } from "@/lib/seo";
 import { LiveDashboard } from "@/components/live-dashboard";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -10,7 +11,7 @@ import { CartDrawer } from "@/components/cart";
 import { Avatar } from "@/components/ui";
 import { DashboardNav, LogoutButton, MobileNav, type DashboardNavItem } from "@/components/dashboard-nav";
 
-export const metadata: Metadata = { title: "My account · Ibom Vendors Hub" };
+export const metadata: Metadata = { title: "My account · Ibom Vendors Hub", robots: NO_INDEX };
 
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser(["customer", "vendor", "admin", "super_admin"]);

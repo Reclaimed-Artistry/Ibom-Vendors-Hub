@@ -3,7 +3,13 @@ import { getCurrentUser } from "@/lib/auth";
 import { getSettings } from "@/lib/settings";
 import { normalisePhone } from "@/lib/utils";
 
-export const metadata = { title: "About" };
+import { publicMetadata, siteUrl } from "@/lib/seo";
+
+export const metadata = publicMetadata({
+  title: "About Our Akwa Ibom Marketplace · Ibom Vendors Hub",
+  description: "Meet Ibom Vendors Hub, the marketplace connecting Akwa Ibom businesses with customers. Explore local products, services and free vendor storefronts.",
+  url: siteUrl("/about"),
+});
 
 export default async function AboutPage() {
   const [user, settings] = await Promise.all([getCurrentUser(), getSettings()]);

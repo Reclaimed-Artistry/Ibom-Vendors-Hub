@@ -28,6 +28,7 @@ export async function SiteFooter() {
           <ul className="mt-3 space-y-2 text-sm text-ink-600">
             <li><Link className="hover:text-brand-800" href="/browse">All products</Link></li>
             <li><Link className="hover:text-brand-800" href="/stores">All vendors</Link></li>
+            <li><Link className="hover:text-brand-800" href="/sell">Sell online — free storefront</Link></li>
             <li><Link className="hover:text-brand-800" href="/track">Track an order</Link></li>
             {!user ? (
               <li><Link className="hover:text-brand-800" href="/register/customer">Sign in / Create account</Link></li>

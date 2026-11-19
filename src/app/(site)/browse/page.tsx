@@ -1,3 +1,7 @@
+import type { Metadata } from "next";
+import { JsonLd } from "@/components/json-ld";
+import { listingCanonical, listingPage, publicMetadata, seoDescription, siteUrl } from "@/lib/seo";
+import { breadcrumbStructuredData } from "@/lib/structured-data";
 import Link from "next/link";
 import { CheckCircle2, ClipboardCheck, Search, SlidersHorizontal } from "lucide-react";
 import { getCategoriesWithCounts, searchMarketplace } from "@/lib/storefront";
@@ -7,17 +11,31 @@ import { Badge, EmptyState, Pagination } from "@/components/ui";
 import { SmartSearch } from "@/components/smart-search";
 import { getCategoryBookingProfile, isArtisanCategorySlug } from "@/lib/artisan-bookings";
 
-export const metadata = { title: "Browse the marketplace" };
+interface BrowseParams { q?: string; category?: string; sort?: string; kind?: string; page?: string }
+
+export async function generateMetadata({ searchParams }: { searchParams: Promise<BrowseParams> }): Promise<Metadata> {
+  const sp = await searchParams;
+  const categories = await getCategoriesWithCounts();
+  const category = categories.find((item) => item.slug === sp.category);
+  const subject = category?.name || (sp.kind === "service" ? "Local Services" : "Products & Services");
+  const page = listingPage(sp.page);
+  return publicMetadata({
+    title: `${sp.q ? `Search: ${seoDescription(sp.q, "", 60)}` : `${subject} in Akwa Ibom`}${page > 1 ? ` — Page ${page}` : ""} · Ibom Vendors Hub`,
+    description: category?.description || `Browse ${subject.toLowerCase()} from verified vendors in Uyo and across Akwa Ibom, Nigeria. Compare listings, visit local storefronts and contact vendors.`,
+    url: listingCanonical(siteUrl("/browse"), { ...sp, category: category?.slug }),
+    index: !sp.q && (!sp.category || Boolean(category && category.store_count > 0)),
+  });
+}
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function BrowsePage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; sort?: string; kind?: string; page?: string }>;
+  searchParams: Promise<BrowseParams>;
 }) {
   const sp = await searchParams;
-  const page = Math.max(Number(sp.page ?? "1") || 1, 1);
+  const page = listingPage(sp.page);
   const limit = 24;
   const [{ products, total }, categories, settings] = await Promise.all([
     searchMarketplace({
@@ -32,6 +50,7 @@ export default async function BrowsePage({
     getSettings(),
   ]);
 
+  const activeCategory = categories.find((category) => category.slug === sp.category);
   const totalPages = Math.max(Math.ceil(total / limit), 1);
   const buildHref = (nextPage: number) => {
     const params = new URLSearchParams();
@@ -45,6 +64,11 @@ export default async function BrowsePage({
 
   return (
     <div className="container-page py-10">
+      {!sp.q ? <JsonLd data={breadcrumbStructuredData([
+        { name: "Ibom Vendors Hub", url: siteUrl() },
+        { name: "Marketplace", url: siteUrl("/browse") },
+        ...(activeCategory ? [{ name: activeCategory.name, url: listingCanonical(siteUrl("/browse"), { category: activeCategory.slug }) }] : []),
+      ])} /> : null}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="font-display text-3xl text-ink-900">
@@ -61,6 +85,11 @@ export default async function BrowsePage({
           className="w-full max-w-md"
         />
       </div>
+
+      {!sp.q && activeCategory ? <div className="mt-4 max-w-3xl text-sm leading-7 text-ink-600">
+        {activeCategory.description ? <p>{activeCategory.description}</p> : null}
+        <Link href={`/stores?category=${activeCategory.slug}`} className="font-semibold text-brand-800 underline">Discover {activeCategory.name.toLowerCase()} vendors in Akwa Ibom →</Link>
+      </div> : null}
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
         <Link href="/browse" className={`badge ${!sp.category ? "bg-brand-800 text-white" : "bg-white text-ink-600 border border-ink-200"}`}>

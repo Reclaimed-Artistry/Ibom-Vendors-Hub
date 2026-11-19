@@ -4,7 +4,13 @@ import { getSettings } from "@/lib/settings";
 import { getCurrentUser } from "@/lib/auth";
 import { normalisePhone } from "@/lib/utils";
 
-export const metadata = { title: "Contact support" };
+import { publicMetadata, siteUrl } from "@/lib/seo";
+
+export const metadata = publicMetadata({
+  title: "Contact Support · Ibom Vendors Hub",
+  description: "Contact the Ibom Vendors Hub team for help with your storefront, orders, bookings or account. Local support for Akwa Ibom vendors and customers.",
+  url: siteUrl("/contact"),
+});
 
 export default async function ContactPage() {
   const [settings, user] = await Promise.all([getSettings(), getCurrentUser()]);
@@ -14,7 +20,7 @@ export default async function ContactPage() {
         <div>
           <h1 className="font-display text-3xl text-ink-900">Talk to us</h1>
           <p className="mt-2 text-sm leading-7 text-ink-500">
-            Questions about a storefront, an order, or your subscription? Send a message and the {settings.platform_name} team
+            Questions about a storefront, an order, or your account? Send a message and the {settings.platform_name} team
             will reply within one business day.
           </p>
           <div className="mt-6 space-y-3 text-sm text-ink-600">

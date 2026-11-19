@@ -1,3 +1,4 @@
+import { NO_INDEX } from "@/lib/seo";
 import { Alert } from "@/components/ui";
 import { ManualPaymentPortal } from "@/components/manual-payment-portal";
 import Link from "next/link";
@@ -9,7 +10,7 @@ import { formatMoney } from "@/lib/utils";
 import { confirmSandboxPaymentAction } from "@/app/actions/payments";
 import { Logo } from "@/components/logo";
 
-export const metadata = { title: "Secure payment" };
+export const metadata = { title: "Secure payment", robots: NO_INDEX };
 
 export default async function PayPage({ params }: { params: Promise<{ reference: string }> }) {
   const { reference } = await params;

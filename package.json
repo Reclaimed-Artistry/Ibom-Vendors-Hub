@@ -14,6 +14,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "test:db": "tsx scripts/test-db.ts",
     "test:smoke": "tsx scripts/test-smoke.ts",
+    "test:seo": "tsx scripts/test-seo.ts",
+    "test:seo:http": "tsx scripts/test-seo-http.ts",
     "test": "npm run typecheck && npm run test:db",
     "vercel-build": "tsx scripts/migrate.ts && tsx scripts/bootstrap-admin.ts && next build",
     "db:bootstrap-admin": "tsx scripts/bootstrap-admin.ts",

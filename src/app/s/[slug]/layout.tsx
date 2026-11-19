@@ -8,20 +8,19 @@ import { resolveStore } from "@/lib/storefront";
 import { storeBase } from "@/lib/storefront-base";
 import { Logo } from "@/components/logo";
 import { CustomerAnnouncements } from "@/components/announcement-strip";
+import { NO_INDEX, publicMetadata, seoDescription, storeUrl } from "@/lib/seo";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
-  const { store } = await resolveStore(slug);
-  if (!store) return { title: "Store not found" };
-  return {
-    title: `${store.name} — ${store.tagline ?? "Online store"}`,
-    description: store.description ?? undefined,
-    openGraph: {
-      title: store.name,
-      description: store.tagline ?? store.description ?? undefined,
-      images: store.cover_url ? [store.cover_url] : undefined,
-    },
-  };
+  const { store, category, live } = await resolveStore(slug);
+  if (!store) return { title: "Store not found", robots: NO_INDEX };
+  return publicMetadata({
+    title: `${store.name} · ${store.city || "Akwa Ibom"} | Ibom Vendors Hub`,
+    description: seoDescription(store.description || store.tagline, `Explore ${category?.name.toLowerCase() || "products and services"} from ${store.name} in ${store.city || "Akwa Ibom"}, Nigeria.`),
+    url: storeUrl(store.slug),
+    image: store.cover_url || store.logo_url,
+    index: live,
+  });
 }
 
 export default async function StorefrontLayout({

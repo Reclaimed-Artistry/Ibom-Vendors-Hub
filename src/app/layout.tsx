@@ -1,19 +1,23 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { CartProvider } from "@/components/cart";
+import { PUBLIC_ROBOTS, SITE_DESCRIPTION, siteUrl, siteVerification } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: {
     default: "Ibom Vendors Hub — Every business. One address.",
     template: "%s · Ibom Vendors Hub",
   },
-  description:
-    "Ibom Vendors Hub is the multi-vendor marketplace for Akwa Ibom businesses. Discover restaurants, fashion designers, shoemakers, electronics stores and professional services — each with its own storefront.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  description: SITE_DESCRIPTION,
+  metadataBase: new URL(siteUrl()),
+  robots: PUBLIC_ROBOTS,
+  verification: siteVerification(),
   openGraph: {
     title: "Ibom Vendors Hub",
     description: "Every Akwa Ibom business, one address. Shop, book and track orders from verified local vendors.",
     type: "website",
+    locale: "en_NG",
+    siteName: "Ibom Vendors Hub",
     images: [
       {
         url: "/brand/og-image.png",

@@ -1,6 +1,7 @@
+import { NO_INDEX } from "@/lib/seo";
 import Link from "next/link";
 
-export const metadata = { title: "Access denied" };
+export const metadata = { title: "Access denied", robots: NO_INDEX };
 
 export default function ForbiddenPage() {
   return (

@@ -1,6 +1,7 @@
+import { NO_INDEX } from "@/lib/seo";
 import { CartView } from "@/components/cart-view";
 
-export const metadata = { title: "Your cart" };
+export const metadata = { title: "Your cart", robots: NO_INDEX };
 
 export default function CartPage() {
   return (

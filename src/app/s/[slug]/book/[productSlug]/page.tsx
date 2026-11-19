@@ -1,3 +1,4 @@
+import { NO_INDEX } from "@/lib/seo";
 import { isPropertyCategory, inspectionSlots } from "@/lib/property-inspections";
 import { InspectionBookingForm } from "@/components/inspection-forms";
 import Link from "next/link";
@@ -9,6 +10,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { Card } from "@/components/ui";
 import { BookingForm } from "@/components/storefront-forms";
 import { getCategoryBookingProfile } from "@/lib/artisan-bookings";
+
+export const metadata = { robots: NO_INDEX, alternates: { canonical: null } };
 
 export default async function BookPage({ params }: { params: Promise<{ slug: string; productSlug: string }> }) {
   const { slug, productSlug } = await params;

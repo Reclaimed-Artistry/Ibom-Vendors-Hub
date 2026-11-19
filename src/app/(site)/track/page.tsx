@@ -1,3 +1,4 @@
+import { NO_INDEX } from "@/lib/seo";
 import { StoreImage } from "@/components/store-image";
 import Link from "next/link";
 import { AlertTriangle, CheckCircle2, Clock, Package, Truck } from "lucide-react";
@@ -6,7 +7,7 @@ import { formatDateTime, formatMoney, titleCase } from "@/lib/utils";
 import { Badge, Card, Field, StatusBadge } from "@/components/ui";
 import { getSettings } from "@/lib/settings";
 
-export const metadata = { title: "Track an order" };
+export const metadata = { title: "Track an order", robots: NO_INDEX };
 
 interface TrackPayload {
   order: {

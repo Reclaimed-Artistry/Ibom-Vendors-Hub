@@ -1,3 +1,5 @@
+import { JsonLd } from "@/components/json-ld";
+import { storeStructuredData } from "@/lib/structured-data";
 import { StoreStockCarousel } from "@/components/store-stock-carousel";
 import { StoreImage } from "@/components/store-image";
 import Link from "next/link";
@@ -56,6 +58,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
 
   return (
     <div>
+      <JsonLd data={storeStructuredData(store, category)} />
       {/* Cover */}
       <section className="relative">
         <div className="h-56 w-full overflow-hidden bg-ink-800 sm:h-72">

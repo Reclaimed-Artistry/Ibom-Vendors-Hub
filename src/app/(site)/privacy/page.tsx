@@ -1,6 +1,12 @@
 import { getSettings } from "@/lib/settings";
 
-export const metadata = { title: "Privacy policy" };
+import { publicMetadata, siteUrl } from "@/lib/seo";
+
+export const metadata = publicMetadata({
+  title: "Privacy policy · Ibom Vendors Hub",
+  description: "Learn how Ibom Vendors Hub handles personal information for customer accounts, vendor storefronts, orders and support.",
+  url: siteUrl("/privacy"),
+});
 
 export default async function PrivacyPage() {
   const settings = await getSettings();

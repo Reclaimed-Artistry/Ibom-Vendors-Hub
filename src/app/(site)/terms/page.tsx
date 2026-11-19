@@ -1,6 +1,12 @@
 import { getSettings } from "@/lib/settings";
 
-export const metadata = { title: "Terms of service" };
+import { publicMetadata, siteUrl } from "@/lib/seo";
+
+export const metadata = publicMetadata({
+  title: "Terms of service · Ibom Vendors Hub",
+  description: "Read the terms for using Ibom Vendors Hub as a customer or vendor, including storefronts, orders, bookings and marketplace responsibilities.",
+  url: siteUrl("/terms"),
+});
 
 export default async function TermsPage() {
   const settings = await getSettings();

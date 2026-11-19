@@ -1,3 +1,4 @@
+import { NO_INDEX } from "@/lib/seo";
 import { LiveDashboard } from "@/components/live-dashboard";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -7,7 +8,7 @@ import { systemDb } from "@/lib/db";
 import { DashboardNav, LogoutButton, MobileNav, type DashboardNavItem } from "@/components/dashboard-nav";
 import { Logo } from "@/components/logo";
 
-export const metadata: Metadata = { title: "Admin · Ibom Vendors Hub" };
+export const metadata: Metadata = { title: "Admin · Ibom Vendors Hub", robots: NO_INDEX };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAdmin();

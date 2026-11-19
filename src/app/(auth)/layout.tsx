@@ -1,6 +1,9 @@
+import { NO_INDEX } from "@/lib/seo";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { getSettings } from "@/lib/settings";
+
+export const metadata = { robots: NO_INDEX };
 
 export default async function AuthLayout({ children }: { children: React.ReactNode }) {
   const settings = await getSettings();

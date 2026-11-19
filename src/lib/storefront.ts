@@ -143,14 +143,14 @@ export async function getStoreProducts(query: ProductQuery): Promise<{ products:
   });
 }
 
-export async function getStoreProduct(storeId: string, productSlug: string): Promise<Product | null> {
+export const getStoreProduct = cache(async (storeId: string, productSlug: string): Promise<Product | null> => {
   return withPublic(async (db) =>
     db.maybeOne<Product>(
       `${PRODUCT_SELECT} where p.store_id = $1 and p.slug = $2 and p.is_available = true`,
       [storeId, productSlug],
     ),
   );
-}
+});
 
 export async function getStoreById(storeId: string, actorEmail?: string | null) {
   return withPublic(async (db) => db.maybeOne<Store>(`select * from stores where id = $1`, [storeId]));
@@ -277,7 +277,7 @@ export async function getMarketplaceStores(query: {
   });
 }
 
-export async function getCategoriesWithCounts() {
+export const getCategoriesWithCounts = cache(async () => {
   return withPublic(async (db) =>
     db.query<StoreCategory & { store_count: number }>(
       `select c.*,
@@ -287,7 +287,7 @@ export async function getCategoriesWithCounts() {
         order by c.sort_order, c.name`,
     ),
   );
-}
+});
 
 /** Taxonomy changes rarely; cached across requests and invalidated on save. */
 export const getStoreCategories = cache(

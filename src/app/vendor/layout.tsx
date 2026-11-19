@@ -1,3 +1,4 @@
+import { NO_INDEX } from "@/lib/seo";
 import { FREE_STORE_ACCESS, FREE_STORE_MESSAGE } from "@/lib/store-access-policy";
 import { LiveDashboard } from "@/components/live-dashboard";
 import type { Metadata } from "next";
@@ -17,7 +18,7 @@ import { VendorAnnouncements } from "@/components/announcement-strip";
 import { SubscriptionCountdown } from "@/components/subscription-countdown";
 import { ReviewCountdown } from "@/components/review-countdown";
 
-export const metadata: Metadata = { title: "Vendor dashboard · Ibom Vendors Hub" };
+export const metadata: Metadata = { title: "Vendor dashboard · Ibom Vendors Hub", robots: NO_INDEX };
 
 function daysLeft(expiresAt: string | null): number {
   if (!expiresAt) return 0;
