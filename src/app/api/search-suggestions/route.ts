@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       `select p.name, p.slug, p.price, s.name as store_name, s.slug as store_slug, p.kind
          from products p
          join stores s on s.id = p.store_id
-        where p.is_active and s.is_live
+        where p.is_available and store_is_live(s.id)
           and (lower(p.name) like lower($1) or lower(p.description) like lower($1))
         order by p.created_at desc
         limit 6`,
@@ -35,14 +35,14 @@ export async function GET(request: Request) {
     systemDb.query<{ name: string; slug: string; city: string | null; category_name: string | null }>(
       `select s.name, s.slug, s.city, c.name as category_name
          from stores s
-         left join categories c on c.id = s.category_id
-        where s.is_live and (lower(s.name) like lower($1) or lower(s.tagline) like lower($1))
+         left join store_categories c on c.id = s.category_id
+        where store_is_live(s.id) and (lower(s.name) like lower($1) or lower(s.tagline) like lower($1))
         order by s.name
         limit 4`,
       [pattern],
     ),
     systemDb.query<{ name: string; slug: string }>(
-      `select name, slug from categories where is_active and lower(name) like lower($1) order by name limit 4`,
+      `select name, slug from store_categories where is_active and lower(name) like lower($1) order by name limit 4`,
       [pattern],
     ),
   ]);
