@@ -1,8 +1,8 @@
-import { PartyPopper, Hotel, Truck, Blocks, GraduationCap, Printer, Car, Laptop, Wine, Building2, ChefHat, Shirt, Footprints, MonitorSmartphone, Gem, Hammer, Zap, Droplets, PaintRoller, HardHat, Wrench, Sparkles, BriefcaseBusiness, ShoppingBasket, Sprout, Store, type LucideIcon } from "lucide-react";
+import { PartyPopper, Hotel, Truck, Blocks, GraduationCap, Printer, Car, Laptop, Wine, Package, Building2, ChefHat, Shirt, Footprints, MonitorSmartphone, Gem, Hammer, Zap, Droplets, PaintRoller, HardHat, Wrench, Sparkles, BriefcaseBusiness, ShoppingBasket, Sprout, Store, type LucideIcon } from "lucide-react";
 
 const ICONS: Record<string, LucideIcon> = {
   party: PartyPopper, hotel: Hotel, truck: Truck, basket: ShoppingBasket,
-  blocks: Blocks, graduation: GraduationCap, printer: Printer, car: Car, digital: Laptop, wine: Wine,
+  blocks: Blocks, graduation: GraduationCap, printer: Printer, car: Car, digital: Laptop, wine: Wine, package: Package,
   utensils: ChefHat, shirt: Shirt, footprints: Footprints,
   cpu: MonitorSmartphone, sparkles: Gem, hammer: Hammer, zap: Zap,
   droplets: Droplets, paintbrush: PaintRoller, "hard-hat": HardHat,
