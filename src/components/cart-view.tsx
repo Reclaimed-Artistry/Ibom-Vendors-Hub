@@ -53,7 +53,7 @@ export function CartView() {
                 const unit = item.price + item.addons.reduce((sum, addon) => sum + addon.price, 0);
                 return (
                   <li key={`${item.productId}-${item.variantId ?? ""}-${index}`} className="flex gap-4 px-5 py-4">
-                    <ListingMedia src={item.image ?? "/images/seed/product-jollof.svg"} alt={item.name} className="size-20 rounded-xl border border-ink-100 object-cover" />
+                    <ListingMedia autoPlayInView={false} src={item.image ?? "/images/seed/product-jollof.svg"} alt={item.name} className="size-20 rounded-xl border border-ink-100 object-cover" />
                     <div className="min-w-0 flex-1">
                       <Link href={`/s/${item.storeSlug}/products/${item.slug}`} className="text-sm font-semibold text-ink-900 hover:text-brand-800">
                         {item.name}

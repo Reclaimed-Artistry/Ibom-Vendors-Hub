@@ -314,7 +314,7 @@ export function CartDrawer({ base = "" }: { base?: string }) {
             <ul className="divide-y divide-ink-100">
               {items.map((item, index) => (
                 <li key={`${item.productId}-${item.variantId ?? ""}-${index}`} className="flex gap-2.5 py-3">
-                  <ListingMedia src={item.image ?? "/images/seed/product-jollof.svg"} alt={item.name} className="size-12 shrink-0 rounded-xl border border-ink-100 object-cover" />
+                  <ListingMedia autoPlayInView={false} src={item.image ?? "/images/seed/product-jollof.svg"} alt={item.name} className="size-12 shrink-0 rounded-xl border border-ink-100 object-cover" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-ink-900">{item.name}</p>
                     <p className="truncate text-xs text-ink-500">

@@ -62,7 +62,7 @@ export function StoreStockCarousel({ items }: { items: StockSlide[] }) {
           {items.map((item, position) => (
             <div key={item.id} role="group" aria-roledescription="slide" aria-label={`${position + 1} of ${items.length}: ${item.name}`} aria-hidden={position !== active} inert={position !== active} className="w-full min-w-0 shrink-0">
               <Link href={item.href} tabIndex={position === active ? 0 : -1} className="card grid h-[34rem] grid-rows-[13rem_1fr] overflow-hidden sm:h-80 sm:grid-cols-2 sm:grid-rows-1">
-                <ListingMedia src={item.image || "/brand/store-cover-placeholder.svg"} mimeType={item.mime_type} alt={item.name} className="h-52 w-full object-cover sm:h-80" />
+                <ListingMedia autoPlayInView={position === active} src={item.image || "/brand/store-cover-placeholder.svg"} mimeType={item.mime_type} alt={item.name} className="h-52 w-full object-cover sm:h-80" />
                 <div className="flex min-h-0 min-w-0 flex-col justify-center p-5 sm:p-8">
                   <span className="text-xs font-semibold uppercase tracking-wider text-brand-700">{item.service ? "Book a service" : "Available stock"}</span>
                   <h3 className="mt-2 line-clamp-2 font-display text-2xl text-ink-900">{item.name}</h3>

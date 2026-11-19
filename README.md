@@ -252,6 +252,8 @@ Listing editors accept photos/animated GIFs, MP4/WebM/MOV video and common audio
 up to 10 files per listing and 100 MB per uploaded file. Large files go **directly to a
 store-scoped signed Supabase Storage URL**, with progress and server-side verification,
 not through a Vercel function/server-action body. GIFs retain their original animation.
+Storefront videos autoplay muted when scrolled into view and pause off-screen or in
+a hidden tab. Full players let customers enable sound; audio files do not autoplay.
 Store logos/covers and KYC documents keep their existing separate upload rules.
 
 Storage uses `NEXT_PUBLIC_SUPABASE_URL`, server-only `SUPABASE_SERVICE_ROLE_KEY` and

@@ -154,7 +154,7 @@ export default async function VendorProductsPage({
                       <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-ink-100 text-ink-400">
                         {product.image_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <ListingMedia src={product.image_url} alt={product.name} className="size-10" />
+                          <ListingMedia autoPlayInView={false} src={product.image_url} alt={product.name} className="size-10" />
                         ) : (
                           <ImageIcon className="size-4" />
                         )}

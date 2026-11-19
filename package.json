@@ -16,7 +16,7 @@
     "test:smoke": "tsx scripts/test-smoke.ts",
     "test:seo": "tsx scripts/test-seo.ts",
     "test:seo:http": "tsx scripts/test-seo-http.ts",
-    "test:media": "tsx scripts/test-media-migration.ts && tsx scripts/test-vendor-media.ts",
+    "test:media": "tsx scripts/test-media-migration.ts && tsx scripts/test-vendor-media.ts && tsx scripts/test-video-autoplay.tsx",
     "test:media:http": "tsx scripts/test-vendor-media-http.ts",
     "test:multi-categories": "tsx scripts/test-category-migration.ts && tsx scripts/test-multi-categories.ts && tsx scripts/test-category-forms.tsx",
     "test:multi-categories:http": "tsx scripts/test-multi-categories-http.ts",

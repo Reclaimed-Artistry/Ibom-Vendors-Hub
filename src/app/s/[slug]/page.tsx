@@ -193,7 +193,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
                 <div className="mt-4 divide-y divide-ink-100 overflow-hidden rounded-2xl border border-ink-100 bg-white">
                   {groupProducts.map((product) => (
                     <Link key={product.id} href={`${base}/products/${product.slug}`} className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-ink-50">
-                      <ListingMedia src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"} mimeType={product.images?.[0]?.mime_type} alt={product.name} className="size-14 shrink-0 rounded-lg" />
+                      <ListingMedia autoPlayInView={false} src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"} mimeType={product.images?.[0]?.mime_type} alt={product.name} className="size-14 shrink-0 rounded-lg" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-ink-900">{product.name}</p>
                         <p className="line-clamp-1 text-xs text-ink-400">{truncate(product.description, 70)}</p>

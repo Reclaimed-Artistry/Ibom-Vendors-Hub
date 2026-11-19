@@ -1,28 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImageIcon, Music2, Play } from "lucide-react";
 import { mediaKind } from "@/lib/product-media";
 import { cn } from "@/lib/utils";
+import { observeVideoAutoplay } from "@/lib/video-autoplay";
 
 /** One renderer for listing cards, editor previews, carts and the full gallery. */
-export function ListingMedia({ src, mimeType, alt, className, player = false }: {
+export function ListingMedia({ src, mimeType, alt, className, player = false, autoPlayInView = true }: {
   src: string;
   mimeType?: string | null;
   alt: string;
   className?: string;
   player?: boolean;
+  /** Disable for editor previews, carts and decorative gallery thumbnails. */
+  autoPlayInView?: boolean;
 }) {
   const kind = mediaKind({ url: src, mime_type: mimeType });
   const [failed, setFailed] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   useEffect(() => setFailed(false), [src]);
+  useEffect(() => {
+    if (kind !== "video" || !autoPlayInView || failed || !videoRef.current) return;
+    return observeVideoAutoplay(videoRef.current);
+  }, [src, kind, autoPlayInView, failed]);
   return <div className={cn("relative overflow-hidden bg-ink-50", player && kind !== "image" && "flex flex-col", className)}>
     <div className={cn("relative size-full", player && kind !== "image" && "min-h-0 flex-1")}>
     {kind === "image" ? failed
       ? <span role="img" aria-label={alt} className="flex size-full items-center justify-center text-ink-300"><ImageIcon className="size-10" /></span>
       : <img src={src} alt={alt} loading="lazy" className="size-full object-cover" onError={() => setFailed(true)} />
       : kind === "video" ? <>
-        {!failed ? <video key={src} src={src} controls={player} muted={!player} playsInline preload="metadata" tabIndex={player ? undefined : -1}
+        {!failed ? <video key={src} ref={videoRef} src={src} controls={player} muted={autoPlayInView || !player} playsInline loop={!player && autoPlayInView}
+          preload={autoPlayInView ? "none" : "metadata"} tabIndex={player ? undefined : -1}
           aria-label={player ? `${alt} — video` : undefined} aria-hidden={player ? undefined : true}
           className={cn("size-full bg-ink-950 object-contain", !player && "pointer-events-none object-cover")}
           onError={() => setFailed(true)}>

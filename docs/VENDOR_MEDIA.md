@@ -10,7 +10,7 @@ Supported uploads:
 - Video: MP4, M4V (stored as MP4), WebM, MOV/QuickTime.
 - Audio: MP3, WAV, OGG/OGA, M4A.
 
-Files retain their original bytes: no canvas conversion that would flatten animation or remove audio. MP4 with H.264 video/AAC audio is recommended for broad device compatibility. Container support does not guarantee every codec is playable; customers get an open-file fallback. Players do not autoplay. Cards use muted video previews with metadata-only preloading, or an audio indicator. The accessible listing gallery lets customers select **all** files and play video/audio with native controls.
+Files retain their original bytes: no canvas conversion that would flatten animation or remove audio. MP4 with H.264 video/AAC audio is recommended for broad device compatibility. Container support does not guarantee every codec is playable; customers get an open-file fallback. Storefront videos autoplay **muted and inline** once at least half of the video is visible (half of the available viewport area for an oversized player), and pause when scrolled out of view or the browser tab is hidden. Cards loop their previews; full players retain native pause, seek and sound controls. Audio files do not autoplay. The accessible listing gallery lets customers select **all** files and play video/audio with native controls.
 
 Store logos/covers, registration/KYC documents and payment receipts retain their separate existing image/document rules and limits. This is listing media, not a new social feed or document-sharing feature. Optional external **image** links remain compatible; videos/audio must use verified uploads. The 100 MB upload limit is not a promise about the size/availability of externally hosted image links.
 
@@ -44,9 +44,15 @@ For local development without storage credentials, authenticated uploads stream 
 
 The shared media renderer covers editor previews, marketplace/home/catalogue cards, storefront highlights/carousel, listing gallery, service booking preview, vendor catalogue and carts. It never sends a video/audio URL to an `<img>` element. Social-preview and structured-data `image` fields select only actual images, falling back to store/platform artwork where needed; videos are not falsely labelled as images or given fabricated VideoObject metadata.
 
+## Scroll-triggered video playback
+
+`ListingMedia` uses a shared `IntersectionObserver` controller, not an unconditional HTML `autoplay` attribute. Off-screen content videos use `preload="none"`; playback starts when they enter view. Visibility thresholds adapt to player/viewport resizing, including landscape phones where half of a tall player cannot fit on screen. Leaving view, hiding the tab, changing a gallery selection or unmounting pauses the previous video and cleans up listeners. Re-entry resumes muted, without fighting a customer's explicit pause. Only the active carousel slide and selected gallery player participate; gallery thumbnails, cart thumbnails, compact dashboard previews and editor media remain still.
+
+Reduced-motion preferences disable automatic playback, but the full player's controls still work. Browser low-power/autoplay restrictions may also require tapping Play; rejected/aborted `play()` promises are handled without breaking the page. No browser can reliably autoplay unmuted audio without a user gesture, so automatic playback never turns sound on. Upload formats, file-size limits and storage prerequisites are unchanged.
+
 ## Tests
 
-- `npm run test:media`: allowlists/aliases, inclusive size boundary, signatures, signed storage protocol, verification/expiry/invalid-file cleanup, real `app_runtime` RLS, metadata and cross-store attachment guards, image-only SEO, and unchanged GIF/direct-transfer client behavior. Storage network calls are mocked; no production files are written.
+- `npm run test:media`: allowlists/aliases, inclusive size boundary, signatures, signed storage protocol, verification/expiry/invalid-file cleanup, real `app_runtime` RLS, metadata and cross-store attachment guards, image-only SEO, unchanged GIF/direct-transfer client behavior, and viewport autoplay/pause, muted playback, visibility/preferences, manual-pause behavior, rejected play promises and listener cleanup. Storage network calls are mocked; no production files are written.
 - `MEDIA_TEST_BASE_URL=http://127.0.0.1:3000 npm run test:media:http`: **local server/database only**. Actual GIF/MP4/WAV transfers, original bytes, a real 100 MiB HTTP upload with hash comparison, range/HEAD behavior, auth/origin/suspension guards, actual listing save/edit actions, cross-store rejection and atomic combined-count enforcement. Fixtures and uploaded files are cleaned. Tiny original fixtures live under `scripts/fixtures/vendor-media`; no large binary is committed.
 - `npm run test:multi-categories`, `npm run test:seo`, `npm run test:seo:http`, smoke checks, typecheck, lint and build protect the existing listing/category/storefront flows.
 

@@ -56,20 +56,20 @@ export function ProductMediaUploader({ existing, onBusyChange }: { existing: Arr
 
   return <div className="space-y-3">
     <p className="text-sm text-ink-500">Show the actual item or examples of your work. The first file is the cover. Up to 10 media files.</p>
-    <p className="text-xs leading-5 text-ink-500">{PRODUCT_MEDIA_HELP} GIFs stay animated. MP4 (H.264/AAC) is recommended for the widest video support. Videos/audio play only when customers choose to play them.</p>
+    <p className="text-xs leading-5 text-ink-500">{PRODUCT_MEDIA_HELP} GIFs stay animated. MP4 (H.264/AAC) is recommended for the widest video support. Videos autoplay muted when customers scroll to them. Customers can enable sound with the player controls; audio files use play controls.</p>
     {removed.map(id => <input key={id} type="hidden" name="removeImage" value={id} />)}
     {additions.map(item => <input key={item.id} type="hidden" name="uploadedMediaIds" value={item.id} />)}
     {existing.length || additions.length ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
       {existing.map(item => {
         const deleted = removed.includes(item.id);
         return <div key={item.id} className={`relative overflow-hidden rounded-xl border ${deleted ? "border-red-300 opacity-40" : "border-ink-200"}`}>
-          <ListingMedia src={item.url} mimeType={item.mime_type} alt="Existing listing" className="h-24 w-full" />
+          <ListingMedia autoPlayInView={false} src={item.url} mimeType={item.mime_type} alt="Existing listing" className="h-24 w-full" />
           {!deleted && kept[0]?.id === item.id ? <span className="absolute left-1 top-1 rounded bg-brand-800/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">Cover</span> : null}
           <button type="button" disabled={busy} aria-label={deleted ? "Keep media" : "Remove media"} onClick={() => setRemoved(current => deleted ? current.filter(id => id !== item.id) : [...current, item.id])} className="absolute right-1 top-1 rounded-full bg-white/95 p-1.5 text-ink-700 shadow-sm disabled:opacity-50">{deleted ? <Plus className="size-3.5" /> : <X className="size-3.5" />}</button>
         </div>;
       })}
       {additions.map((item, index) => <div key={item.id} className="relative overflow-hidden rounded-xl border border-brand-300">
-        <ListingMedia src={item.url} mimeType={item.mime_type} alt="New listing media" className="h-24 w-full" />
+        <ListingMedia autoPlayInView={false} src={item.url} mimeType={item.mime_type} alt="New listing media" className="h-24 w-full" />
         <span className="absolute left-1 top-1 rounded bg-brand-800/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">{!kept.length && index === 0 ? "Cover" : "Ready"}</span>
         <button type="button" disabled={busy} aria-label="Remove new media" onClick={() => setUploaded(current => current.filter(media => media.id !== item.id))} className="absolute right-1 top-1 rounded-full bg-white/95 p-1.5 text-ink-700 shadow-sm disabled:opacity-50"><X className="size-3.5" /></button>
       </div>)}

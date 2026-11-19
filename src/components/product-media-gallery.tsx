@@ -14,9 +14,9 @@ export function ProductMediaGallery({ items, name }: { items: ListingMediaItem[]
       {media.map((item, index) => <button type="button" key={item.id || `${item.url}-${index}`} aria-pressed={index === selected}
         aria-label={`View ${mediaKind(item)} ${index + 1} of ${media.length}`} onClick={() => setSelected(index)}
         className={`overflow-hidden rounded-xl border-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 ${index === selected ? "border-brand-600" : "border-transparent"}`}>
-        <ListingMedia src={item.url} mimeType={item.mime_type} alt={`${name} — view ${index + 1}`} className="aspect-square w-full" />
+        <ListingMedia autoPlayInView={false} src={item.url} mimeType={item.mime_type} alt={`${name} — view ${index + 1}`} className="aspect-square w-full" />
       </button>)}
     </div> : null}
-    <p className="mt-2 text-xs text-ink-500" aria-live="polite">{selected + 1} / {media.length} · {mediaKind(active) === "image" ? "Photo / GIF" : mediaKind(active) === "video" ? "Video — press play to watch" : "Audio — press play to listen"}</p>
+    <p className="mt-2 text-xs text-ink-500" aria-live="polite">{selected + 1} / {media.length} · {mediaKind(active) === "image" ? "Photo / GIF" : mediaKind(active) === "video" ? "Video — autoplays muted; use controls for sound" : "Audio — press play to listen"}</p>
   </section>;
 }
