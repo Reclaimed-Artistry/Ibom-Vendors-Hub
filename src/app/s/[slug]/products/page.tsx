@@ -7,6 +7,7 @@ import { withPublic } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { formatMoney, truncate } from "@/lib/utils";
 import { Badge, EmptyState, Pagination } from "@/components/ui";
+import { SmartSearch } from "@/components/smart-search";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -55,13 +56,20 @@ export default async function StoreProductsPage({
           </h1>
           <p className="mt-1 text-sm text-ink-500">{total} live listing{total === 1 ? "" : "s"} from {store.name}</p>
         </div>
-        <form className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
-            <input name="q" defaultValue={sp.q} placeholder="Search this store" className="input pl-10" />
-          </div>
-          <button className="btn-secondary">Search</button>
-        </form>
+        <SmartSearch
+          action={`${base}/products`}
+          placeholder="Search this store"
+          initialQuery={sp.q ?? ""}
+          hiddenFields={sp.category ? { category: sp.category } : undefined}
+          items={products.map((product) => ({
+            title: product.name,
+            subtitle: product.price ? `₦${Number(product.price).toLocaleString()}` : undefined,
+            href: `${base}/products/${product.slug}`,
+            searchText: `${product.name} ${product.description ?? ""}`,
+            icon: "product" as const,
+          }))}
+          className="w-full max-w-xs"
+        />
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2">

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SmartSearch } from "@/components/smart-search";
 import { Search, ScrollText } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
@@ -63,13 +64,16 @@ export default async function AdminAuditPage({
       <PageHeader title="Audit log" description="Immutable record of every consequential action on the platform." />
 
       <form className="card card-pad flex flex-wrap items-end gap-3" action="/admin/audit">
-        <label className="min-w-0 w-full flex-1 sm:w-auto sm:min-w-56">
-          <span className="label">Search</span>
-          <span className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
-            <input name="q" defaultValue={q ?? ""} className="input pl-9" placeholder="Action, entity or description" />
-          </span>
-        </label>
+        <div className="min-w-0 w-full flex-1 sm:w-auto sm:min-w-56">
+          <span className="label block">Search</span>
+          <SmartSearch
+            bare
+            action="/admin/audit"
+            placeholder="Action, entity or description"
+            initialQuery={q ?? ""}
+            items={rows.map((entry) => ({ title: entry.action, subtitle: entry.description ?? entry.store_name ?? entry.actor_email ?? "", href: `/admin/audit?q=${encodeURIComponent(entry.action)}`, searchText: `${entry.action} ${entry.description ?? ""} ${entry.store_name ?? ""} ${entry.actor_email ?? ""}`, icon: "record" as const }))}
+          />
+        </div>
         <label className="w-40">
           <span className="label">Actor</span>
           <select name="actor" defaultValue={actor} className="select">

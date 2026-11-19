@@ -66,3 +66,32 @@ export function filterCustomers<T extends SearchableCustomer>(
     .slice(0, limit)
     .map((entry) => entry.customer);
 }
+
+/**
+ * Generic fuzzy scoring for any searchable text (used by every smart search
+ * on the site). Higher is better; -1 means no match. Every typed token must
+ * appear in the text, so partial words and multi-word queries both work.
+ */
+export function scoreTextMatch(text: string, query: string): number {
+  const tokens = normalizeSearchText(query).split(" ").filter(Boolean);
+  if (tokens.length === 0) return 0;
+  const haystack = normalizeSearchText(text);
+  let score = 0;
+  for (const token of tokens) {
+    if (haystack.startsWith(token)) score += 40;
+    else if (haystack.includes(token)) score += 30;
+    else return -1;
+  }
+  return score;
+}
+
+/** Filter and rank items by fuzzy text match, best first. */
+export function filterByText<T>(items: T[], query: string, getText: (item: T) => string, limit = 8): T[] {
+  if (!query.trim()) return [];
+  return items
+    .map((item) => ({ item, score: scoreTextMatch(getText(item), query) }))
+    .filter((entry) => entry.score >= 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((entry) => entry.item);
+}

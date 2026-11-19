@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SmartSearch } from "@/components/smart-search";
 import { ImageIcon, Package, Plus, Search } from "lucide-react";
 import { requireActiveVendorContext } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
@@ -91,13 +92,16 @@ export default async function VendorProductsPage({
       ) : null}
 
       <form className="card card-pad flex flex-wrap items-end gap-3" action="/vendor/products">
-        <label className="min-w-0 w-full flex-1 sm:w-auto sm:min-w-48">
-          <span className="label">Search</span>
-          <span className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
-            <input name="q" defaultValue={q ?? ""} className="input pl-9" placeholder="Name, SKU or description" />
-          </span>
-        </label>
+        <div className="min-w-0 w-full flex-1 sm:w-auto sm:min-w-56">
+          <span className="label block">Search</span>
+          <SmartSearch
+            bare
+            action="/vendor/products"
+            placeholder="Name, SKU or description"
+            initialQuery={q ?? ""}
+            items={rows.map((product) => ({ title: product.name, subtitle: `₦${Number(product.price).toLocaleString()}${product.category_name ? ` · ${product.category_name}` : ""}`, href: `/vendor/products/${product.id}`, searchText: product.name, icon: "product" as const }))}
+          />
+        </div>
         <label className="w-40">
           <span className="label">Status</span>
           <select name="status" defaultValue={status ?? ""} className="select">

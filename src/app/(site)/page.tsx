@@ -1,3 +1,4 @@
+import { SmartSearch } from "@/components/smart-search";
 import { CategoryIcon } from "@/components/category-icon";
 import { StoreImage } from "@/components/store-image";
 import { FeaturedStoreCarousel } from "@/components/featured-store-carousel";
@@ -71,18 +72,13 @@ export default async function HomePage() {
                 </>
               )}
             </p>
-            <form action="/browse" className="mt-8 flex flex-col gap-2 sm:flex-row">
-              <div className="relative flex-1">
-                <Package className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-ink-400" />
-                <input
-                  name="q"
-                  placeholder="What are you looking for today?"
-                  className="w-full rounded-2xl border border-white/15 bg-white px-12 py-4 text-sm text-ink-900 placeholder:text-ink-400 focus:outline-none focus:ring-4 focus:ring-brand-500/30"
-                  aria-label="Search products and services"
-                />
-              </div>
-              <button className="btn-gold rounded-2xl px-7 py-4 text-sm">Search marketplace</button>
-            </form>
+            <SmartSearch
+              action="/browse"
+              marketplace
+              variant="gold"
+              placeholder="What are you looking for today?"
+              className="mt-8"
+            />
             <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-medium text-ink-300">
               <span className="inline-flex items-center gap-1.5"><ShieldCheck className="size-4 text-brand-400" /> Verified vendors</span>
               <span className="inline-flex items-center gap-1.5"><Truck className="size-4 text-brand-400" /> Delivery & pickup</span>

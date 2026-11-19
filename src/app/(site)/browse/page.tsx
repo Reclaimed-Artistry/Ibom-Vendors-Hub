@@ -4,6 +4,7 @@ import { getCategoriesWithCounts, searchMarketplace } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
 import { formatMoney } from "@/lib/utils";
 import { Badge, EmptyState, Pagination } from "@/components/ui";
+import { SmartSearch } from "@/components/smart-search";
 import { getCategoryBookingProfile, isArtisanCategorySlug } from "@/lib/artisan-bookings";
 
 export const metadata = { title: "Browse the marketplace" };
@@ -51,14 +52,14 @@ export default async function BrowsePage({
           </h1>
           <p className="mt-1 text-sm text-ink-500">{total} listing{total === 1 ? "" : "s"} from verified Akwa Ibom vendors</p>
         </div>
-        <form action="/browse" className="flex w-full max-w-md items-center gap-2">
-          {sp.category ? <input type="hidden" name="category" value={sp.category} /> : null}
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
-            <input name="q" defaultValue={sp.q} placeholder="Search products or services" className="input pl-10" aria-label="Search" />
-          </div>
-          <button className="btn-primary">Search</button>
-        </form>
+        <SmartSearch
+          action="/browse"
+          marketplace
+          placeholder="Search products or services"
+          initialQuery={sp.q ?? ""}
+          hiddenFields={sp.category ? { category: sp.category } : undefined}
+          className="w-full max-w-md"
+        />
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-2">

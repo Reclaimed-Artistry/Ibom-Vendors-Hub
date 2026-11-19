@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SmartSearch } from "@/components/smart-search";
 import { Download, Search, ShoppingBag } from "lucide-react";
 import { requireActiveVendorContext } from "@/lib/auth";
 import { getVendorOrderList } from "@/lib/orders";
@@ -49,13 +50,16 @@ export default async function VendorOrdersPage({
 
       <form className="card card-pad flex flex-wrap items-end gap-3" action="/vendor/orders">
         <input type="hidden" name="status" value={status} />
-        <label className="min-w-0 w-full flex-1 sm:w-auto sm:min-w-56">
-          <span className="label">Search orders</span>
-          <span className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
-            <input name="q" defaultValue={q ?? ""} className="input pl-9" placeholder="Reference, customer name, email or phone" />
-          </span>
-        </label>
+        <div className="min-w-0 w-full flex-1 sm:w-auto sm:min-w-56">
+          <span className="label block">Search orders</span>
+          <SmartSearch
+            bare
+            action="/vendor/orders"
+            placeholder="Reference, customer name, email or phone"
+            initialQuery={q ?? ""}
+            items={result.orders.map((order) => ({ title: order.reference, subtitle: `${order.customer_name} · ₦${Number(order.total).toLocaleString()}`, href: `/vendor/orders/${order.id}`, searchText: `${order.reference} ${order.customer_name} ${order.customer_email} ${order.customer_phone ?? ""}`, icon: "record" as const }))}
+          />
+        </div>
         <button type="submit" className="btn btn-secondary">Search</button>
         {q ? <Link href={`/vendor/orders?status=${status}`} className="btn btn-ghost btn-sm">Clear</Link> : null}
       </form>

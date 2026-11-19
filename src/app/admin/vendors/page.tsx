@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SmartSearch } from "@/components/smart-search";
 import { Building2, Search } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
@@ -111,13 +112,16 @@ export default async function AdminVendorsPage({
 
       <form className="card card-pad flex flex-wrap items-end gap-3" action="/admin/vendors">
         <input type="hidden" name="status" value={status} />
-        <label className="min-w-0 w-full flex-1 sm:w-auto sm:min-w-56">
-          <span className="label">Search vendors</span>
-          <span className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
-            <input name="q" defaultValue={q ?? ""} className="input pl-9" placeholder="Store, slug, owner name or email" />
-          </span>
-        </label>
+        <div className="min-w-0 w-full flex-1 sm:w-auto sm:min-w-56">
+          <span className="label block">Search vendors</span>
+          <SmartSearch
+            bare
+            action="/admin/vendors"
+            placeholder="Store, slug, owner name or email"
+            initialQuery={q ?? ""}
+            items={rows.map((store) => ({ title: store.name, subtitle: `${store.owner_name} · ${store.owner_email}`, href: `/admin/vendors/${store.id}`, searchText: `${store.name} ${store.slug} ${store.owner_name} ${store.owner_email}`, icon: "store" as const }))}
+          />
+        </div>
         <button type="submit" className="btn btn-secondary">Search</button>
       </form>
 
