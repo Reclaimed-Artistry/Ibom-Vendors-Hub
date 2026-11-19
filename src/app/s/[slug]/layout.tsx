@@ -78,11 +78,14 @@ export default async function StorefrontLayout({
       <main className="flex-1">{children}</main>
       <footer className="border-t border-ink-100 bg-white py-8">
         <div className="container-page flex flex-col items-center justify-between gap-3 text-xs text-ink-400 sm:flex-row">
-          <p className="flex items-center gap-1.5">
-            <ShieldCheck className="size-3.5 text-brand-600" />
-            {store.name} is a verified vendor on Ibom Vendors Hub
+          <p className="flex min-w-0 max-w-full items-start justify-center gap-1.5 text-center leading-5 sm:justify-start sm:text-left">
+            <ShieldCheck className="mt-[3px] size-3.5 shrink-0 text-brand-600" aria-hidden="true" />
+            <span className="min-w-0 break-words">
+              {store.name} is a verified vendor on{" "}
+              <span className="inline-block whitespace-nowrap">Ibom Vendors Hub</span>
+            </span>
           </p>
-          <p className="flex items-center gap-2">
+          <p className="flex shrink-0 items-center gap-2">
             Powered by
             <Logo height={22} />
           </p>

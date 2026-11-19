@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { request } from "node:http";
+import { JSDOM } from "jsdom";
 import { systemDb } from "../src/lib/db";
 
 const BASE = process.env.SEO_TEST_BASE_URL ?? "http://127.0.0.1:3010";
@@ -21,6 +22,22 @@ function title(html: string) {
 }
 function schemas(html: string): Array<Record<string, any>> {
   return [...html.matchAll(/<script\b[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/g)].map((match) => JSON.parse(match[1]));
+}
+function assertStorefrontFooter(html: string, storeName: string) {
+  const dom = new JSDOM(html);
+  try {
+    const footer = dom.window.document.querySelector("footer");
+    const brand = footer?.querySelector("span.inline-block.whitespace-nowrap");
+    assert.equal(brand?.textContent, "Ibom Vendors Hub", "the full platform name stays together on mobile");
+    const copy = brand?.parentElement;
+    assert.equal(copy?.textContent?.replace(/\s+/g, " ").trim(), `${storeName} is a verified vendor on Ibom Vendors Hub`);
+    assert(copy?.classList.contains("min-w-0"), "long vendor names can shrink and wrap instead of overflowing");
+    assert(!copy.classList.contains("whitespace-nowrap"), "do not force the whole sentence onto one overflowing line");
+    assert(footer?.querySelector('svg.shrink-0[aria-hidden="true"]'), "the decorative verification icon retains its size");
+    assert(footer?.querySelector('a[aria-label="Ibom Vendors Hub — home"]'), "powered-by logo and marketplace link are preserved");
+  } finally {
+    dom.window.close();
+  }
 }
 function get(path: string, host = ROOT): Promise<{ response: { status: number; headers: Headers }; text: string }> {
   // Node fetch can silently replace Host. A raw local HTTP request is needed
@@ -111,15 +128,18 @@ async function main() {
   assert(vendorUrls.every((url) => new URL(url).host === host));
   const vendor = await get("/", host);
   assert.equal(vendor.response.status, 200);
+  assertStorefrontFooter(vendor.text, store.name);
   assert.equal(canonical(vendor.text), `${origin}/`);
   assert(title(vendor.text).includes(store.name));
   assert(schemas(vendor.text).some((schema) => ["LocalBusiness", "Organization"].includes(schema["@type"])));
   const catalogue = await get("/products", host);
   assert.equal(catalogue.response.status, 200);
+  assertStorefrontFooter(catalogue.text, store.name);
   assert.equal(canonical(catalogue.text), `${origin}/products`);
   assert(title(catalogue.text).includes("Catalogue"));
   const product = await get(`/products/${store.product_slug}`, host);
   assert.equal(product.response.status, 200);
+  assertStorefrontFooter(product.text, store.name);
   assert.equal(canonical(product.text), `${origin}/products/${store.product_slug}`);
   assert(title(product.text).includes(store.product_name));
   assert(schemas(product.text).some((schema) => ["Product", "Service"].includes(schema["@type"])));
@@ -134,6 +154,7 @@ async function main() {
   }
   const quote = await get("/quote", host);
   assert.equal(quote.response.status, 200);
+  assertStorefrontFooter(quote.text, store.name);
   assert(quote.response.headers.get("x-robots-tag")?.includes("noindex"));
   assert(/name="robots" content="noindex/.test(quote.text));
   assert(!quote.text.includes('rel="canonical"'), "transactional forms do not inherit a storefront-home canonical");
@@ -144,6 +165,7 @@ async function main() {
   assert(previewRobots.response.headers.get("x-robots-tag")?.includes("noindex"));
   const previewSitemap = await get("/sitemap.xml", "project.vercel.app");
   assert(!previewSitemap.text.includes("<loc>"));
+  console.log("PASS: shared mobile-safe vendor footer on storefront home, catalogue, product and quotation pages");
   console.log(`PASS: production HTTP SEO — ${urls.length} platform URLs, ${vendorUrls.length} fixture vendor URLs, metadata/canonicals/JSON-LD, redirects, private/preview noindex and 404s`);
 }
 
