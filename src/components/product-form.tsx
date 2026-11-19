@@ -1,13 +1,13 @@
 "use client";
 
-import { uploadSingleProductImage } from "@/lib/product-image-upload";
+import { ProductMediaUploader } from "@/components/product-media-uploader";
 import { MarketplaceCategoryField } from "@/components/business-category-fields";
 import { productGuide } from "@/lib/product-guide";
 import { GuidedProductForm } from "@/components/guided-product-form";
 import { agricultureFieldRequired } from "@/lib/agriculture";
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { saveProductAction, type VendorState } from "@/app/actions/vendor";
 import { Alert, Field } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
@@ -53,7 +53,7 @@ export interface EditableProduct {
   specifications: Record<string, string>;
   variants: EditableVariant[];
   addons: Array<{ name: string; price: string }>;
-  images: Array<{ id: string; url: string }>;
+  images: Array<{ id: string; url: string; mime_type?: string | null; byte_size?: number | null }>;
 }
 
 export function AdvancedProductForm({
@@ -112,10 +112,7 @@ export function AdvancedProductForm({
   );
   const [variants, setVariants] = useState<EditableVariant[]>(product.variants.length ? product.variants : []);
   const [addons, setAddons] = useState<Array<{ name: string; price: string }>>(product.addons ?? []);
-  const [removedImages, setRemovedImages] = useState<string[]>([]);
-  const [uploadedImages, setUploadedImages] = useState<Array<{ url: string; name: string }>>([]);
-  const [uploadingCount, setUploadingCount] = useState(0);
-  const [uploadError, setUploadError] = useState("");
+  const [mediaBusy, setMediaBusy] = useState(false);
   const [imageUrls, setImageUrls] = useState("");
   const propertyListing = Boolean(features.propertyListings);
   const [kind, setKind] = useState(propertyListing ? "service" : product.kind || "product");
@@ -125,42 +122,14 @@ export function AdvancedProductForm({
     Object.fromEntries(specs.filter((row) => row.key.trim()).map((row) => [row.key.trim(), row.value.trim()])),
   );
 
-  const keptExistingCount = product.images.filter((img) => !removedImages.includes(img.id)).length;
-
-  async function handleFilesSelected(fileList: FileList | null) {
-    if (!fileList || fileList.length === 0) return;
-    setUploadError("");
-    const remainingSlots = Math.max(0, 10 - (keptExistingCount + uploadedImages.length));
-    const files = Array.from(fileList).slice(0, remainingSlots);
-    if (files.length === 0) {
-      setUploadError("Maximum of 10 images reached per product.");
-      return;
-    }
-
-    setUploadingCount(files.length);
-    for (const file of files) {
-      try {
-        const url = await uploadSingleProductImage(file);
-        setUploadedImages((prev) => [...prev, { url, name: file.name }]);
-      } catch (err) {
-        setUploadError(err instanceof Error ? err.message : `Could not upload ${file.name}`);
-      } finally {
-        setUploadingCount((c) => Math.max(0, c - 1));
-      }
-    }
-  }
-
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} onSubmit={event => { if (mediaBusy) event.preventDefault(); }} className="space-y-4">
       <input type="hidden" name="productId" value={product.id ?? ""} />
       <input type="hidden" name="isAvailablePresent" value="1" />
       <input type="hidden" name="attributesJson" value={JSON.stringify(attributeValues)} />
       <input type="hidden" name="specificationsJson" value={specsJson} />
       <input type="hidden" name="variantsJson" value={JSON.stringify(variants)} />
       <input type="hidden" name="addonsJson" value={JSON.stringify(addons)} />
-      {uploadedImages.map((item, idx) => (
-        <input key={`${item.url}-${idx}`} type="hidden" name="uploadedImageUrls" value={item.url} />
-      ))}
       {imageUrls
         .split("\n")
         .map((line) => line.trim())
@@ -186,7 +155,7 @@ export function AdvancedProductForm({
             setKind(next?.features?.propertyListings || productGuide(next?.slug).service ? "service" : "product");
             setPricingType(next?.features?.inquiryOnly ? "quotation" : "fixed");
           }} />
-        <p className="text-xs text-ink-500">Changing this updates category-specific fields. Your name, description, photos and variants are kept; review the listing before saving.</p>
+        <p className="text-xs text-ink-500">Changing this updates category-specific fields. Your name, description, media and variants are kept; review the listing before saving.</p>
       </section>
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
@@ -589,114 +558,19 @@ export function AdvancedProductForm({
 
         <div className="space-y-4">
           <section className="card card-pad space-y-3">
-            <h2 className="text-base font-semibold text-ink-900">Images</h2>
-            <p className="text-sm text-ink-500">Upload JPG, PNG or WebP (up to 10 MB each). The first image becomes the cover.</p>
+            <h2 className="text-base font-semibold text-ink-900">Photos, GIFs, videos &amp; audio</h2>
+            <ProductMediaUploader existing={product.images} onBusyChange={setMediaBusy} />
 
-            {(product.images.length > 0 || uploadedImages.length > 0) ? (
-              <div className="grid grid-cols-2 gap-2">
-                {product.images.map((image, idx) => {
-                  const removed = removedImages.includes(image.id);
-                  const isCover = !removed && idx === product.images.findIndex((i) => !removedImages.includes(i.id));
-                  return (
-                    <div key={image.id} className={`relative overflow-hidden rounded-xl border ${removed ? "border-red-300 opacity-40" : "border-ink-200"}`}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={image.url} alt="" className="h-24 w-full object-cover" />
-                      {isCover ? (
-                        <span className="absolute left-1.5 top-1.5 rounded bg-brand-800/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                          Cover
-                        </span>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="absolute right-1 top-1 rounded-full bg-white/90 p-1 text-ink-600 shadow-sm hover:bg-white"
-                        onClick={() =>
-                          setRemovedImages((current) =>
-                            current.includes(image.id) ? current.filter((id) => id !== image.id) : [...current, image.id],
-                          )
-                        }
-                        aria-label={removed ? "Keep image" : "Remove image"}
-                      >
-                        {removed ? <Plus className="size-3.5" /> : <X className="size-3.5" />}
-                      </button>
-                      {removed ? <input type="hidden" name="removeImage" value={image.id} /> : null}
-                    </div>
-                  );
-                })}
-
-                {uploadedImages.map((item, idx) => {
-                  const isCover = keptExistingCount === 0 && idx === 0;
-                  return (
-                    <div key={`${item.url}-${idx}`} className="relative overflow-hidden rounded-xl border border-brand-300 bg-brand-50/30">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={item.url} alt={item.name} className="h-24 w-full object-cover" />
-                      {isCover ? (
-                        <span className="absolute left-1.5 top-1.5 rounded bg-brand-800/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                          Cover
-                        </span>
-                      ) : (
-                        <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded bg-emerald-700/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                          <CheckCircle2 className="size-2.5" /> Ready
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        className="absolute right-1 top-1 rounded-full bg-white/90 p-1 text-ink-600 shadow-sm hover:bg-white"
-                        onClick={() => setUploadedImages((prev) => prev.filter((_, i) => i !== idx))}
-                        aria-label="Remove uploaded image"
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
-
-            {uploadError ? <Alert tone="danger">{uploadError}</Alert> : null}
-
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-ink-300 bg-ink-50 px-3 py-6 text-center text-sm text-ink-600 transition hover:border-brand-500 hover:bg-brand-50/40">
-              {uploadingCount > 0 ? (
-                <>
-                  <Loader2 className="size-5 animate-spin text-brand-700" />
-                  <span className="font-medium text-brand-800">
-                    Uploading {uploadingCount} image{uploadingCount > 1 ? "s" : ""}…
-                  </span>
-                </>
-              ) : (
-                <>
-                  <ImagePlus className="size-5 text-brand-700" />
-                  <span className="font-medium text-ink-800">
-                    {uploadedImages.length + keptExistingCount > 0 ? "Add more images" : "Choose product images"}
-                  </span>
-                  <span className="text-xs text-ink-400">
-                    {uploadedImages.length + keptExistingCount}/10 uploaded · JPG, PNG, WebP
-                  </span>
-                </>
-              )}
-              <input
-                type="file"
-                multiple
-                accept="image/png,image/jpeg,image/webp,image/gif,.jpg,.jpeg,.png,.webp"
-                className="sr-only"
-                disabled={uploadingCount > 0}
-                onChange={async (e) => {
-                  const files = e.target.files;
-                  await handleFilesSelected(files);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-
-            <Field label="Image URLs" htmlFor="imageUrls" hint="Optional. Paste external image URLs (one per line).">
+            <Field label="Image URLs" htmlFor="imageUrls" hint="Optional. Paste external image URLs (one per line). Upload videos/audio above so their file size can be verified.">
               <textarea id="imageUrls" className="textarea" rows={2} value={imageUrls} onChange={(event) => setImageUrls(event.target.value)} placeholder="https://…" />
             </Field>
           </section>
 
           <section className="card card-pad space-y-3">
             <h2 className="text-base font-semibold text-ink-900">Save</h2>
-            {uploadingCount > 0 ? (
+            {mediaBusy ? (
               <button type="button" disabled className="btn-primary w-full opacity-70">
-                <Loader2 className="size-4 animate-spin" /> Finishing image upload…
+                <Loader2 className="size-4 animate-spin" /> Finishing media upload…
               </button>
             ) : (
               <SubmitButton className="btn-primary w-full" pendingLabel="Publishing…">

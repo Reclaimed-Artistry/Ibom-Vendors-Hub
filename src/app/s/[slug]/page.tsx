@@ -1,3 +1,4 @@
+import { ListingMedia } from "@/components/listing-media";
 import { directBooking, listingActionLabel, storeFeatures } from "@/lib/category-policy";
 import { JsonLd } from "@/components/json-ld";
 import { storeStructuredData } from "@/lib/structured-data";
@@ -106,6 +107,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
             href: directBooking(product, category) ? `${base}/book/${product.slug}` : `${base}/products/${product.slug}`,
             name: product.name,
             image: product.images?.[0]?.url || null,
+            mime_type: product.images?.[0]?.mime_type,
             summary: product.short_description || product.description || "",
             price: product.pricing_type === "quotation" ? "Request quote" : `${product.pricing_type === "from" ? "From " : ""}${money(product.price)}`,
             service: directBooking(product, category),
@@ -160,7 +162,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
               {showcase.map((product) => (
                 <Link key={product.id} href={directBooking(product, category) ? `${base}/book/${product.slug}` : `${base}/products/${product.slug}`} className="group card overflow-hidden">
                   <div className="relative aspect-[4/3] overflow-hidden bg-ink-100">
-                    <img src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"} alt={product.name} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    <ListingMedia src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"} mimeType={product.images?.[0]?.mime_type} alt={product.name} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
                     {product.made_to_order ? (
                       <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-brand-800">Made to order</span>
                     ) : null}
@@ -191,7 +193,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
                 <div className="mt-4 divide-y divide-ink-100 overflow-hidden rounded-2xl border border-ink-100 bg-white">
                   {groupProducts.map((product) => (
                     <Link key={product.id} href={`${base}/products/${product.slug}`} className="flex items-center gap-4 px-4 py-3 transition-colors hover:bg-ink-50">
-                      <img src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"} alt="" className="size-14 rounded-lg object-cover" />
+                      <ListingMedia src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"} mimeType={product.images?.[0]?.mime_type} alt={product.name} className="size-14 shrink-0 rounded-lg" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold text-ink-900">{product.name}</p>
                         <p className="line-clamp-1 text-xs text-ink-400">{truncate(product.description, 70)}</p>

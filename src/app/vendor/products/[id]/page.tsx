@@ -64,7 +64,7 @@ export default async function EditProductPage({
   const marketplaceCategories = category && !availableCategories.some(item => item.id === category.id) ? [...availableCategories, category] : availableCategories;
 
   const [images, variants, addons, categories] = await Promise.all([
-    systemDb.query<{ id: string; url: string }>(`select id, url from product_images where product_id = $1 order by sort_order`, [id]),
+    systemDb.query<{ id: string; url: string; mime_type: string | null; byte_size: number | null }>(`select id, url, mime_type, byte_size from product_images where product_id = $1 order by sort_order`, [id]),
     systemDb.query<{ name: string; price: string | null; stock_quantity: number; attributes: Record<string, string> | null }>(
       `select name, price, stock_quantity, attributes from product_variants where product_id = $1 order by sort_order`,
       [id],

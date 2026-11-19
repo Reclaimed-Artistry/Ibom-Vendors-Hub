@@ -1,3 +1,4 @@
+import { ListingMedia } from "@/components/listing-media";
 import { directBooking, listingActionLabel, storeFeatures } from "@/lib/category-policy";
 import type { Metadata } from "next";
 import { NO_INDEX, listingCanonical, listingPage, publicMetadata, storeUrl } from "@/lib/seo";
@@ -127,7 +128,7 @@ export default async function StoreProductsPage({
           {products.map((product) => (
             <Link key={product.id} href={directBooking(product, category) && product.is_available ? `${base}/book/${product.slug}` : `${base}/products/${product.slug}`} className="group card overflow-hidden">
               <div className="relative aspect-[4/3] overflow-hidden bg-ink-100">
-                <img src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"} alt={product.name} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                <ListingMedia src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"} mimeType={product.images?.[0]?.mime_type} alt={product.name} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 {!product.is_available ? (
                   <span className="absolute inset-0 flex items-center justify-center bg-white/70 text-xs font-bold uppercase tracking-wide text-ink-700">Unavailable</span>
                 ) : null}

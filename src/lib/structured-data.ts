@@ -1,3 +1,4 @@
+import { mediaKind } from "@/lib/product-media";
 import type { Product, Store, StoreCategory } from "@/lib/types";
 import { seoDescription, SITE_DESCRIPTION, SITE_NAME, siteUrl, storeUrl } from "@/lib/seo";
 
@@ -91,7 +92,7 @@ export function productStructuredData(product: Product, store: Store, category: 
   category = product.marketplace_category ?? category;
   const url = storeUrl(store.slug, `/products/${encodeURIComponent(product.slug)}`);
   const service = product.kind === "service";
-  const images = (product.images ?? []).map((image) => webUrl(image.url, url)).filter(Boolean);
+  const images = (product.images ?? []).filter(image => mediaKind(image) === "image").map((image) => webUrl(image.url, url)).filter(Boolean);
   const price = Number(product.price);
   // A quotation/starting price, property price or enquiry is not a purchasable
   // fixed-price offer. Never manufacture a zero price, stock, review or rating.

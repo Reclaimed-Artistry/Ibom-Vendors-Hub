@@ -85,7 +85,7 @@ const PRODUCT_SELECT = `
     (select to_jsonb(mc) from store_categories mc join stores ms on ms.id = p.store_id
       where mc.id = coalesce(p.marketplace_category_id, ms.category_id)) as marketplace_category,
     coalesce((
-      select jsonb_agg(jsonb_build_object('id', i.id, 'url', i.url, 'alt', i.alt, 'sort_order', i.sort_order)
+      select jsonb_agg(jsonb_build_object('id', i.id, 'url', i.url, 'alt', i.alt, 'sort_order', i.sort_order, 'mime_type', i.mime_type, 'byte_size', i.byte_size)
              order by i.sort_order)
       from product_images i where i.product_id = p.id
     ), '[]'::jsonb) as images,
@@ -217,7 +217,7 @@ export async function searchMarketplace(query: MarketplaceQuery) {
       `select p.*, s.name as store_name, s.slug as store_slug, s.logo_url as store_logo,
               s.city as store_city, c.name as category_name, to_jsonb(c) as marketplace_category,
               coalesce((
-                select jsonb_agg(jsonb_build_object('id', i.id, 'url', i.url, 'alt', i.alt, 'sort_order', i.sort_order)
+                select jsonb_agg(jsonb_build_object('id', i.id, 'url', i.url, 'alt', i.alt, 'sort_order', i.sort_order, 'mime_type', i.mime_type, 'byte_size', i.byte_size)
                        order by i.sort_order)
                 from product_images i where i.product_id = p.id
               ), '[]'::jsonb) as images

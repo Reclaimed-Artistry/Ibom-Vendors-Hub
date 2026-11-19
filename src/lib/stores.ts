@@ -997,8 +997,8 @@ export async function deleteProductCompletely(input: {
   );
   if (!target) return null;
 
-  const images = await systemDb.query<{ url: string }>(
-    `select url from product_images where product_id = $1`,
+  const images = await systemDb.query<{ url: string; upload_id: string | null }>(
+    `select url, upload_id from product_images where product_id = $1`,
     [target.id],
   );
 
@@ -1026,7 +1026,6 @@ export async function deleteProductCompletely(input: {
     );
   });
 
-  await deleteStoredFiles(images.map((img) => img.url));
   const remainingImages = await systemDb.query<{ url: string }>(
     `select pi.url
        from product_images pi
@@ -1034,6 +1033,12 @@ export async function deleteProductCompletely(input: {
       where p.store_id = $1`,
     [target.store_id],
   );
+  const retainedUrls = new Set(remainingImages.map(row => row.url));
+  // Receipted media may be reused by another listing/editor during their save
+  // window. Their lock-aware cron cleanup, not a stale URL snapshot, deletes
+  // them once expired and unreferenced. Keep shared legacy photos as well.
+  const removedUrls = images.filter(image => !image.upload_id && !retainedUrls.has(image.url)).map(image => image.url);
+  await deleteStoredFiles(removedUrls);
   await pruneOrphanStoreProductFiles(
     target.store_slug,
     remainingImages.map((row) => row.url),
@@ -1085,7 +1090,8 @@ export async function deleteStoreCompletely(input: {
       `select pi.url
          from product_images pi
          join products p on p.id = pi.product_id
-        where p.store_id = $1`,
+        where p.store_id = $1
+       union select url from vendor_media_uploads where store_id=$1`,
       [store.id],
     ),
     systemDb.one<{ count: number }>(

@@ -246,16 +246,26 @@ overrides the computed callback URL. For production, whitelist exactly
 `/api/health` reports `signIn.google` as `live` (configured, not an end-to-end OAuth test)
 or `unconfigured`.
 
-### Image storage
+### Media storage
 
-Uploads (store logos, covers, product photos) go to Supabase Storage through the service
-role, so they survive a serverless deploy: `NEXT_PUBLIC_SUPABASE_URL`,
-`SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_STORAGE_BUCKET` (default `storefronts`). The bucket
-must exist and be public for reads — `insert into storage.buckets (id, name, public) values
-('storefronts','storefronts',true)`. Without those variables the uploader writes to
-`public/uploads`, which only works locally: on a serverless host (Vercel sets `VERCEL` or
-`AWS_LAMBDA_FUNCTION_NAME`) it now refuses with a clear error rather than returning a URL to a
-file that will disappear.
+Listing editors accept photos/animated GIFs, MP4/WebM/MOV video and common audio formats,
+up to 10 files per listing and 100 MB per uploaded file. Large files go **directly to a
+store-scoped signed Supabase Storage URL**, with progress and server-side verification,
+not through a Vercel function/server-action body. GIFs retain their original animation.
+Store logos/covers and KYC documents keep their existing separate upload rules.
+
+Storage uses `NEXT_PUBLIC_SUPABASE_URL`, server-only `SUPABASE_SERVICE_ROLE_KEY` and
+`SUPABASE_STORAGE_BUCKET` (default `storefronts`). The bucket must exist and be public for
+reads. Migration 0031 configures its MIME allowlist and 100 MB per-object limit.
+**The project's global limit must also allow 100 MB: Supabase Free caps a file at 50 MB,
+so uploads above 50 MB require a suitable paid plan and Storage Settings change by the
+owner. No billing upgrade is performed automatically.** A bucket change alone is not
+proof of live 100 MB acceptance. See [vendor media setup, safety and tests](docs/VENDOR_MEDIA.md).
+
+Without storage credentials, legacy image uploads use `public/uploads`; listing media
+stream to ignored `.data/vendor-media` with local byte-range delivery. Both disk paths are
+local development only. Serverless deployments refuse missing storage configuration
+rather than returning URLs for files that will disappear.
 
 ### Known external setup
 

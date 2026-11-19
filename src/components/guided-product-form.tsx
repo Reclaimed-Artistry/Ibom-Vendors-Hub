@@ -2,10 +2,10 @@
 
 import { MarketplaceCategoryField } from "@/components/business-category-fields";
 import { useActionState, useState } from "react";
-import { ImagePlus, X, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { saveProductAction, type VendorState } from "@/app/actions/vendor";
 import type { AdvancedProductForm } from "@/components/product-form";
-import { uploadSingleProductImage } from "@/lib/product-image-upload";
+import { ProductMediaUploader } from "@/components/product-media-uploader";
 import { Alert, Field } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { productGuide, selectionKind, agricultureSelection, descriptionExample, productQuestions } from "@/lib/product-guide";
@@ -28,14 +28,10 @@ export function GuidedProductForm({ product, categorySlug: defaultSlug, category
   const [selection, setSelection] = useState(product.id ? product.attributes.offering_type || "Other" : "");
   const [kind, setKind] = useState(property ? "service" : product.kind || (guide.service ? "service" : "product"));
   const [values, setValues] = useState<Record<string,string>>(product.attributes ?? {});
-  const [uploaded, setUploaded] = useState<string[]>([]);
-  const [removed, setRemoved] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
+  const [mediaBusy, setMediaBusy] = useState(false);
   const [extra, setExtra] = useState(false);
   const [trackStock, setTrackStock] = useState(product.trackStock);
   const [madeToOrder, setMadeToOrder] = useState(product.madeToOrder);
-  const count = product.images.length - removed.length + uploaded.length;
   const example = descriptionExample(categorySlug, selection);
   // Required property disclosures remain visible. Other category details are optional.
   const visibleFields = attributes.filter(field => {
@@ -55,7 +51,7 @@ export function GuidedProductForm({ product, categorySlug: defaultSlug, category
     </Field>;
   }
   const preserved = {categoryId:product.categoryId,shortDescription:product.shortDescription,compareAtPrice:product.compareAtPrice,pricingType:features.inquiryOnly?"quotation":property?"fixed":pricingType,sku:product.sku,condition:product.condition,brand:product.brand,model:product.model,warrantyInfo:product.warrantyInfo,warrantyMonths:product.warrantyMonths,prepTimeMinutes:product.prepTimeMinutes,portion:product.portion,serviceDurationMinutes:product.serviceDurationMinutes};
-  return <form action={action} className="mx-auto max-w-3xl space-y-4">
+  return <form action={action} onSubmit={event => { if (mediaBusy) event.preventDefault(); }} className="mx-auto max-w-3xl space-y-4">
     <input type="hidden" name="productId" value={product.id ?? ""} />
     <input type="hidden" name="attributesJson" value={JSON.stringify({...values,offering_type:selection})} />
     <input type="hidden" name="specificationsJson" value={JSON.stringify(product.specifications)} />
@@ -63,8 +59,6 @@ export function GuidedProductForm({ product, categorySlug: defaultSlug, category
     <input type="hidden" name="addonsJson" value={JSON.stringify(product.addons)} />
     <input type="hidden" name="kind" value={kind} />
     {Object.entries(preserved).map(([name,value])=><input key={name} type="hidden" name={name} value={value ?? ""} />)}
-    {uploaded.map(url=><input key={url} type="hidden" name="uploadedImageUrls" value={url} />)}
-    {removed.map(id=><input key={id} type="hidden" name="removeImage" value={id} />)}
     {state.error ? <Alert tone="danger">{state.error}</Alert> : null}
     {state.fieldErrors ? <Alert tone="warning">{Object.values(state.fieldErrors).join(" · ")}</Alert> : null}
     <section className="card card-pad space-y-3">
@@ -77,7 +71,7 @@ export function GuidedProductForm({ product, categorySlug: defaultSlug, category
           setKind(next?.features?.propertyListings || productGuide(next?.slug).service ? "service" : "product");
           setPricingType(next?.features?.inquiryOnly ? "quotation" : "fixed");
         }} />
-      <p className="text-xs text-ink-500">The guide below follows this listing’s category. Your basic details and photos are kept when you change it; review category details before saving.</p>
+      <p className="text-xs text-ink-500">The guide below follows this listing’s category. Your basic details and media are kept when you change it; review category details before saving.</p>
       <p className="text-xs font-semibold uppercase tracking-wider text-brand-700">1 · {categoryName || "Your store"}</p>
       <Field label={property ? "What property do you want to list?" : "What do you want to add?"} htmlFor="offering" required>
         <select id="offering" className="select" required value={selection} onChange={e=>{
@@ -108,17 +102,8 @@ export function GuidedProductForm({ product, categorySlug: defaultSlug, category
         {visibleFields.map(field=>fieldInput(field, farm ? agricultureFieldRequired(field.key,values) : Boolean(field.required)))}
       </section>
       <section className="card card-pad space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-brand-700">3 · Add photos</p>
-        <p className="text-xs text-ink-500">Show the actual item or examples of your work. First photo is the cover. Up to 10 photos.</p>
-        <div className="flex flex-wrap gap-2">
-          {product.images.filter(image=>!removed.includes(image.id)).map(image=><div key={image.id} className="relative"><img src={image.url} alt="Existing listing" className="size-20 rounded-xl object-cover" /><button type="button" aria-label="Remove photo" onClick={()=>setRemoved(current=>[...current,image.id])} className="absolute right-0 top-0 rounded-full bg-white p-1"><X className="size-3" /></button></div>)}
-          {uploaded.map(url=><div key={url} className="relative"><img src={url} alt="New listing photo" className="size-20 rounded-xl object-cover" /><button type="button" aria-label="Remove new photo" onClick={()=>setUploaded(current=>current.filter(item=>item!==url))} className="absolute right-0 top-0 rounded-full bg-white p-1"><X className="size-3" /></button></div>)}
-        </div>
-        <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-ink-300 p-5 text-sm text-brand-800"><ImagePlus className="size-5" />{uploading ? "Uploading photos…" : `Choose photos (${count}/10)`}<input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" disabled={uploading || count>=10} onChange={async e=>{
-          const files=Array.from(e.target.files ?? []).slice(0,Math.max(0,10-count));e.target.value="";setUploading(true);setUploadError("");
-          try { for(const file of files) {const url=await uploadSingleProductImage(file);setUploaded(current=>[...current,url]);} } catch(error) {setUploadError(error instanceof Error?error.message:"Could not upload photo. Please try again.");} finally {setUploading(false);}
-        }} /></label>
-        {uploadError ? <Alert tone="danger">{uploadError}</Alert> : null}
+        <p className="text-xs font-semibold uppercase tracking-wider text-brand-700">3 · Add photos, GIFs, videos or audio</p>
+        <ProductMediaUploader existing={product.images} onBusyChange={setMediaBusy} />
       </section>
       <section className="card card-pad space-y-4">
         <button type="button" aria-expanded={extra} onClick={()=>setExtra(!extra)} className="flex w-full items-center justify-between text-sm font-semibold text-ink-700">Optional details <span>{extra ? "−" : "+"}</span></button>
@@ -135,7 +120,7 @@ export function GuidedProductForm({ product, categorySlug: defaultSlug, category
         </div>
       </section>
       <p className="flex items-center gap-2 text-xs text-ink-500"><Check className="size-4 text-brand-700" />That’s all. You can edit this listing later.</p>
-      {uploading ? <button type="button" disabled className="btn-primary opacity-60">Finishing photo upload…</button> : <SubmitButton className="btn-primary w-full sm:w-auto" pendingLabel="Saving…">{product.id ? "Save changes" : property ? "Publish property" : kind === "service" ? "Publish service" : "Publish product"}</SubmitButton>}
+      {mediaBusy ? <button type="button" disabled className="btn-primary opacity-60">Finishing media upload…</button> : <SubmitButton className="btn-primary w-full sm:w-auto" pendingLabel="Saving…">{product.id ? "Save changes" : property ? "Publish property" : kind === "service" ? "Publish service" : "Publish product"}</SubmitButton>}
     </> : null}
   </form>;
 }

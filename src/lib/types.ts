@@ -155,8 +155,11 @@ export interface Store {
   business_categories?: StoreCategory[];
 }
 
+/** Legacy table name: a listing can now contain images, video or audio. */
 export interface ProductImage {
   id?: string;
+  mime_type?: string | null;
+  byte_size?: number | null;
   url: string;
   alt?: string | null;
   sort_order?: number;

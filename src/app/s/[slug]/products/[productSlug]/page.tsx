@@ -1,3 +1,5 @@
+import { ProductMediaGallery } from "@/components/product-media-gallery";
+import { firstListingImage } from "@/lib/product-media";
 import { listingCategory } from "@/lib/category-policy";
 import type { Metadata } from "next";
 import { JsonLd } from "@/components/json-ld";
@@ -31,7 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: `${product.name} | ${store.name} · Ibom Vendors Hub`,
     description: seoDescription(product.short_description || product.description, `${product.name} from ${store.name} in ${store.city || "Akwa Ibom"}. View details and contact this vendor on Ibom Vendors Hub.`),
     url: storeUrl(store.slug, `/products/${encodeURIComponent(product.slug)}`),
-    image: product.images?.[0]?.url || store.cover_url || store.logo_url,
+    image: firstListingImage(product.images) || store.cover_url || store.logo_url,
     index: live,
   });
 }
@@ -84,7 +86,6 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const propertyListing = isPropertyCategory(category?.slug);
   const features = (category?.features ?? {}) as Record<string, boolean>;
   const money = (value: number) => formatMoney(value, product.currency, settings.currency_symbol);
-  const image = product.images?.[0]?.url ?? "/images/seed/product-jollof.svg";
 
   return (
     <div className="container-page py-8">
@@ -103,18 +104,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
       </nav>
 
       <div className="grid gap-8 lg:grid-cols-2">
-        <div>
-          <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white">
-            <img src={image} alt={product.name} className="aspect-square w-full object-cover" />
-          </div>
-          {product.images && product.images.length > 1 ? (
-            <div className="mt-3 grid grid-cols-4 gap-3">
-              {product.images.slice(1, 5).map((img) => (
-                <img key={img.id ?? img.url} src={img.url} alt={img.alt || `${product.name} — additional view`} className="aspect-square w-full rounded-xl border border-ink-100 object-cover" />
-              ))}
-            </div>
-          ) : null}
-        </div>
+        <ProductMediaGallery items={product.images ?? []} name={product.name} />
 
         <div>
           <div className="flex flex-wrap items-center gap-2">

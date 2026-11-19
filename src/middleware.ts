@@ -94,5 +94,8 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|images|uploads).*)"],
+  // The local-only media sink must stream, not pass through middleware's 10 MB
+  // request-body clone. These handlers perform their own auth/origin checks.
+  // Hosted uploads use signed Storage URLs and never send file bodies here.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|images|uploads|api/vendor-media/).*)"],
 };

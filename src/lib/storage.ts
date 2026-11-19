@@ -146,6 +146,10 @@ export async function deleteStoredFiles(urls: Array<string | null | undefined>):
       if (objectPath) bucketPaths.push(objectPath);
       continue;
     }
+    if (/^\/api\/vendor-media\/[0-9a-f-]{36}\.[a-z0-9]+$/.test(fileUrl) && !process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      await unlink(path.join(process.cwd(), ".data", "vendor-media", path.basename(fileUrl))).catch(() => {});
+      continue;
+    }
     if (fileUrl.startsWith("/uploads/") && !process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
       const rel = fileUrl.replace(/^\/uploads\//, "").replace(/\.\./g, "");
       if (rel) {
@@ -253,9 +257,15 @@ export async function pruneOrphanStoreProductFiles(slug: string, activeUrls: str
       body: JSON.stringify({ prefix, limit: 200 }),
     });
     if (!listRes.ok) return;
-    const items = (await listRes.json()) as Array<{ name?: string; id?: string | null }>;
+    const items = (await listRes.json()) as Array<{ name?: string; id?: string | null; created_at?: string }>;
+    const grace = Date.now() - 48 * 60 * 60_000;
     const orphans = items
-      .filter((item) => item.name && item.id)
+      // A vendor may still be uploading or editing an unsaved listing.
+      // Expired new uploads are cleaned by the authenticated daily cron.
+      .filter((item) => item.name && item.id && item.created_at && new Date(item.created_at).getTime() < grace)
+      // UUID-named, verified media have their own receipt-aware cleanup. Never
+      // delete them using this legacy URL snapshot while another editor saves.
+      .filter((item) => !/^[0-9a-f-]{36}\.[a-z0-9]+$/.test(item.name ?? ""))
       .map((item) => `${prefix}/${item.name}`)
       .filter((fullPath) => !keepPaths.has(fullPath));
     if (orphans.length > 0) {

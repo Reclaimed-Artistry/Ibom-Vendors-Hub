@@ -1,3 +1,4 @@
+import { ListingMedia } from "@/components/listing-media";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SmartSearch } from "@/components/smart-search";
@@ -153,7 +154,7 @@ export default async function VendorProductsPage({
                       <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-ink-100 text-ink-400">
                         {product.image_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={product.image_url} alt="" className="size-10 object-cover" />
+                          <ListingMedia src={product.image_url} alt={product.name} className="size-10" />
                         ) : (
                           <ImageIcon className="size-4" />
                         )}

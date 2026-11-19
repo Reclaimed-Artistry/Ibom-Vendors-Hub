@@ -19,6 +19,7 @@ import { logActivity } from "@/lib/audit";
 import { notify, notifyAdmins } from "@/lib/notifications";
 import { sendEmail } from "@/lib/email";
 import { uploadImage, uploadVerificationDocument } from "@/lib/storage";
+import { MAX_PRODUCT_MEDIA_COUNT, mediaKind } from "@/lib/product-media";
 import { AKWA_IBOM_STATE } from "@/lib/akwa-ibom";
 import { getSettings, url } from "@/lib/settings";
 import { updateOrderByVendor } from "@/lib/orders";
@@ -197,11 +198,36 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
       .map((value) => String(value).trim())
       .filter(Boolean)
       .slice(0, 10);
-    const combinedNewImages = Array.from(new Set([...uploaded, ...imageUrls])).slice(0, 10);
+    const legacyUrls = Array.from(new Set([...uploaded, ...imageUrls]));
+    for (const imageUrl of legacyUrls) {
+      // Keep old image-only clients working, but do not let an arbitrary video
+      // URL bypass upload ownership, file-type verification or the 100 MB cap.
+      const remote = /^https?:\/\//i.test(imageUrl);
+      const local = /^\/(?:images\/seed|uploads)\//.test(imageUrl);
+      const inline = /^data:image\/(?:jpeg|png|webp|gif);base64,/.test(imageUrl) && imageUrl.length <= 2_800_000;
+      if ((!remote && !local && !inline) || mediaKind(imageUrl) !== "image") throw new Error("Upload videos and audio using the media picker so their type and 100 MB size limit can be checked.");
+      const pathname = remote ? decodeURIComponent(new URL(imageUrl).pathname) : imageUrl;
+      const ownedPath = /\/stores\/([^/]+)\/(?:products|uploads|branding)\//.exec(pathname);
+      if (ownedPath && ownedPath[1] !== ctx.store.slug) throw new Error("Use media uploaded to your own store.");
+      if (/\/stores\/[^/]+\/products\/[0-9a-f-]{36}\.[a-z0-9]+$/i.test(pathname)) {
+        throw new Error("Use the media picker for uploaded files. A storage link cannot replace a verified upload ID.");
+      }
+    }
+    const mediaIds = [...new Set(formData.getAll("uploadedMediaIds").map(String))];
+    if (mediaIds.length > MAX_PRODUCT_MEDIA_COUNT || mediaIds.some(id => !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) throw new Error("Invalid listing media. Choose up to 10 files using the media picker.");
 
     const savedId = await withActor(
       { id: ctx.user.id, role: "vendor", email: ctx.user.email },
       async (db) => {
+        const verified = mediaIds.length ? await db.query<{ id: string; url: string; mime_type: string; byte_size: number }>(
+          `select id, url, mime_type, byte_size from vendor_media_uploads where id=any($1::uuid[]) and store_id=$2 and status='ready' and expires_at > now()`, [mediaIds, ctx.store.id],
+        ) : [];
+        if (verified.length !== mediaIds.length) throw new Error("A media upload is unfinished, expired or belongs to another store. Choose the file again.");
+        const newMedia = [
+          ...mediaIds.map(id => { const item = verified.find(media => media.id === id)!; return { ...item, upload_id: item.id }; }),
+          ...legacyUrls.map(url => ({ url, mime_type: null, byte_size: null, upload_id: null })),
+        ].filter((item, index, items) => items.findIndex(other => other.url === item.url) === index);
+        if (newMedia.length > MAX_PRODUCT_MEDIA_COUNT) throw new Error("A listing can have up to 10 media files.");
         await addProductBusinessCategory(db, ctx.store.id, marketplaceCategoryId, productId);
         // Authorise the listing before touching dependent variants/images.
         if (productId && !await db.maybeOne(`select id from products where id = $1 and store_id = $2 for update`, [productId, ctx.store.id])) {
@@ -292,25 +318,24 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
           for (const imageId of removed) {
             await db.execute(`delete from product_images where id = $1 and product_id = $2`, [imageId, id]);
           }
-          const existingCount = await db.one<{ count: number }>(
-            `select count(*)::int as count from product_images where product_id = $1`,
-            [id],
+          const existingMedia = await db.query<{ url: string; sort_order: number }>(
+            `select url, sort_order from product_images where product_id=$1 order by sort_order, created_at, id`, [id],
           );
-          let offset = existingCount.count;
-          for (const imageUrl of combinedNewImages) {
+          const additions = newMedia.filter(item => !existingMedia.some(existing => existing.url === item.url));
+          if (existingMedia.length + additions.length > MAX_PRODUCT_MEDIA_COUNT) throw new Error("A listing can have up to 10 media files. Remove an existing file before adding more.");
+          let offset = Math.max(-1, ...existingMedia.map(item => item.sort_order)) + 1;
+          for (const media of additions) {
             await db.execute(
-              `insert into product_images (product_id, url, alt, sort_order) values ($1,$2,$3,$4)`,
-              [id, imageUrl, data.name, offset],
+              `insert into product_images (product_id,url,alt,sort_order,mime_type,byte_size,upload_id) values ($1,$2,$3,$4,$5,$6,$7)`,
+              [id, media.url, data.name, offset++, media.mime_type, media.byte_size, media.upload_id],
             );
-            offset += 1;
           }
         } else {
-          const allImages = [...combinedNewImages];
-          if (allImages.length === 0) allImages.push("/images/seed/product-jollof.svg");
-          for (const [index, imageUrl] of allImages.entries()) {
+          const allMedia = newMedia.length ? newMedia : [{ url: "/images/seed/product-jollof.svg", mime_type: null, byte_size: null, upload_id: null }];
+          for (const [index, media] of allMedia.entries()) {
             await db.execute(
-              `insert into product_images (product_id, url, alt, sort_order) values ($1,$2,$3,$4)`,
-              [id, imageUrl, data.name, index],
+              `insert into product_images (product_id,url,alt,sort_order,mime_type,byte_size,upload_id) values ($1,$2,$3,$4,$5,$6,$7)`,
+              [id, media.url, data.name, index, media.mime_type, media.byte_size, media.upload_id],
             );
           }
         }

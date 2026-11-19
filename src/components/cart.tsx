@@ -1,5 +1,7 @@
 "use client";
 
+import { ListingMedia } from "@/components/listing-media";
+
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -312,11 +314,7 @@ export function CartDrawer({ base = "" }: { base?: string }) {
             <ul className="divide-y divide-ink-100">
               {items.map((item, index) => (
                 <li key={`${item.productId}-${item.variantId ?? ""}-${index}`} className="flex gap-2.5 py-3">
-                  <img
-                    src={item.image ?? "/images/seed/product-jollof.svg"}
-                    alt={item.name}
-                    className="size-12 shrink-0 rounded-xl border border-ink-100 object-cover"
-                  />
+                  <ListingMedia src={item.image ?? "/images/seed/product-jollof.svg"} alt={item.name} className="size-12 shrink-0 rounded-xl border border-ink-100 object-cover" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-ink-900">{item.name}</p>
                     <p className="truncate text-xs text-ink-500">

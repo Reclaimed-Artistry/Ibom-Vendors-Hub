@@ -1,3 +1,4 @@
+import { ListingMedia } from "@/components/listing-media";
 import { JsonLd } from "@/components/json-ld";
 import { publicMetadata, SITE_DESCRIPTION, siteUrl } from "@/lib/seo";
 import { websiteStructuredData } from "@/lib/structured-data";
@@ -256,12 +257,7 @@ export default async function HomePage() {
           {featuredProducts.products.map((product) => (
             <Link key={product.id} href={`/s/${product.store_slug}/products/${product.slug}`} className="group card overflow-hidden">
               <div className="relative aspect-square overflow-hidden bg-ink-100">
-                <img
-                  src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"}
-                  alt={product.name}
-                  loading="lazy"
-                  className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
+                <ListingMedia src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"} mimeType={product.images?.[0]?.mime_type} alt={product.name} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
                 {product.compare_at_price ? (
                   <span className="absolute left-3 top-3 rounded-full bg-red-600 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
                     Deal

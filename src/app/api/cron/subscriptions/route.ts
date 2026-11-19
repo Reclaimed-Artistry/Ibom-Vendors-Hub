@@ -1,3 +1,4 @@
+import { cleanupExpiredProductMedia } from "@/lib/vendor-media-storage";
 import { recoverAdminNotificationEmails } from "@/lib/notifications";
 import { NextResponse } from "next/server";
 import { runSubscriptionMaintenance } from "@/lib/subscriptions";
@@ -27,7 +28,8 @@ async function handle(request: Request) {
   // here so a fix at the provider's end delivers the backlog without manual work.
   const adminEmailRecovery = await recoverAdminNotificationEmails();
   const emailRetry = await retryFailedEmails(30);
-  return NextResponse.json({ ok: true, ...summary, emailRetry, adminEmailRecovery, ranAt: new Date().toISOString() });
+  const mediaCleanup = await cleanupExpiredProductMedia().catch(() => ({ retry: true }));
+  return NextResponse.json({ ok: true, ...summary, emailRetry, adminEmailRecovery, mediaCleanup, ranAt: new Date().toISOString() });
 }
 
 export async function GET(request: Request) {

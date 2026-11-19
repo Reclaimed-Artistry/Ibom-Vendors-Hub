@@ -1,3 +1,4 @@
+import { ListingMedia } from "@/components/listing-media";
 import { listingCategory } from "@/lib/category-policy";
 import { NO_INDEX } from "@/lib/seo";
 import { isPropertyCategory, inspectionSlots } from "@/lib/property-inspections";
@@ -57,7 +58,7 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
       <div className="grid gap-6 lg:grid-cols-[0.75fr_1.25fr]">
         <div className="space-y-4">
           <Card className="overflow-hidden">
-            <img src={product.images?.[0]?.url ?? "/images/seed/product-facial.svg"} alt={product.name} className="aspect-square w-full object-cover" />
+            <ListingMedia src={product.images?.[0]?.url ?? "/images/seed/product-facial.svg"} mimeType={product.images?.[0]?.mime_type} alt={product.name} className="aspect-square w-full object-cover" />
             <div className="p-4">
               {category?.name ? (
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-brand-700">{category.name}</p>
