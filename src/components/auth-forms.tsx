@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useState } from "react";
-import { CheckCircle2, ClipboardCheck, Eye, EyeOff, FileCheck2, Landmark, Loader2, Lock, MapPin, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Eye, EyeOff, FileCheck2, Landmark, Loader2, Lock, MapPin, ShieldCheck } from "lucide-react";
 import {
   ActionState,
   forgotPasswordAction,
@@ -166,6 +166,72 @@ export function VendorRegisterForm({
   const [coverUploading, setCoverUploading] = useState(false);
 
   const [checkingName, setCheckingName] = useState(false);
+
+  const [missing, setMissing] = useState<string[]>([]);
+
+  const FIELD_LABELS: Record<string, string> = {
+    businessName: "Unique business name",
+    ownerName: "Owner full name",
+    phone: "Phone / WhatsApp number",
+    categorySlug: "Business or artisan category",
+    description: "About your business",
+    address: "Physical business / pickup street address",
+    nin: "National Identification Number (NIN)",
+    proofOfResidenceFile: "Proof of residence document",
+    cacNumber: "CAC registration number",
+    bankName: "Nigerian bank",
+    accountNumber: "10-digit account number",
+    accountName: "Account holder name",
+    acceptTerms: "Terms and privacy agreement",
+  };
+
+  function findMissingFields(): string[] {
+    const out: string[] = [];
+    if (businessName.trim().length < 3) out.push("businessName");
+    if (ownerName.trim().length < 2) out.push("ownerName");
+    if (!/^[+\d][\d\s()-]{6,23}$/.test(phone.trim())) out.push("phone");
+    if (!categorySlug) out.push("categorySlug");
+    if (description.trim().length < 10) out.push("description");
+    if (address.trim().length < 5) out.push("address");
+    if (!/^\d{11}$/.test(nin.replace(/[\s-]/g, ""))) out.push("nin");
+    if (!proofOfResidenceUrl) out.push("proofOfResidenceFile");
+    if (cacRegistered === "yes" && !cacNumber.trim()) out.push("cacNumber");
+    if (bankName.trim().length < 2) out.push("bankName");
+    if (!/^\d{10}$/.test(accountNumber)) out.push("accountNumber");
+    if (accountName.trim().length < 3) out.push("accountName");
+    if (!acceptTerms) out.push("acceptTerms");
+    return out;
+  }
+
+  function jumpToField(id: string) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.focus({ preventScroll: true });
+    }
+  }
+
+  function handleVendorSubmit(e: React.FormEvent) {
+    const skipped = findMissingFields();
+    if (skipped.length === 0) {
+      setMissing([]);
+      return;
+    }
+    e.preventDefault();
+    setMissing(skipped);
+    requestAnimationFrame(() => jumpToField(skipped[0]));
+  }
+
+  // Clear a field from the caution list as soon as it is filled in.
+  useEffect(() => {
+    if (missing.length === 0) return;
+    const stillMissing = findMissingFields();
+    setMissing((prev) => prev.filter((id) => stillMissing.includes(id)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessName, ownerName, phone, categorySlug, description, address, nin, proofOfResidenceUrl, cacNumber, bankName, accountNumber, accountName, acceptTerms]);
+
+  const miss = (id: string) =>
+    missing.includes(id) ? " border-red-400 bg-red-50/40 focus:border-red-500 focus:ring-red-500/20" : "";
   const [check, setCheck] = useState<{
     available: boolean;
     locked?: boolean;
@@ -203,7 +269,7 @@ export function VendorRegisterForm({
   const isNameLocked = Boolean(check && !check.available);
 
   return (
-    <form action={action} className="space-y-4">
+    <form action={action} onSubmit={handleVendorSubmit} noValidate className="space-y-4">
       <Feedback state={state} />
 
       <input type="hidden" name="proofOfResidenceUrl" value={proofOfResidenceUrl} />
@@ -232,6 +298,35 @@ export function VendorRegisterForm({
         </div>
       </div>
 
+      {missing.length > 0 ? (
+        <div role="alert" className="rounded-2xl border-2 border-red-300 bg-red-50 p-4">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-red-600" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-red-900">
+                Almost there — {missing.length} required {missing.length === 1 ? "field is" : "fields are"} still empty.
+              </p>
+              <p className="mt-0.5 text-xs text-red-800">
+                Please fill in the {missing.length === 1 ? "field" : "fields"} below before creating your storefront. Tap any item to jump straight to it:
+              </p>
+              <ul className="mt-2 flex flex-wrap gap-1.5">
+                {missing.map((id) => (
+                  <li key={id}>
+                    <button
+                      type="button"
+                      onClick={() => jumpToField(id)}
+                      className="rounded-full border border-red-300 bg-white px-3 py-1 text-xs font-semibold text-red-800 hover:bg-red-100"
+                    >
+                      {FIELD_LABELS[id] ?? id}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <Field
         label="Unique business name"
         htmlFor="businessName"
@@ -252,7 +347,7 @@ export function VendorRegisterForm({
           name="businessName"
           value={businessName}
           onChange={(e) => setBusinessName(e.target.value)}
-          className={`input ${isNameLocked ? "border-red-400 bg-red-50/30 focus:border-red-500 focus:ring-red-500/20" : ""}`}
+          className={`input ${isNameLocked ? "border-red-400 bg-red-50/30 focus:border-red-500 focus:ring-red-500/20" : miss("businessName")}`}
           required
           minLength={3}
           placeholder="e.g. Mama Put Kitchen"
@@ -274,7 +369,7 @@ export function VendorRegisterForm({
             name="ownerName"
             value={ownerName}
             onChange={(e) => setOwnerName(e.target.value)}
-            className="input"
+            className={`input${miss("ownerName")}`}
             required
             placeholder="Grace Etim"
           />
@@ -285,7 +380,7 @@ export function VendorRegisterForm({
             name="phone"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="input"
+            className={`input${miss("phone")}`}
             required
             placeholder="0803 123 4567"
           />
@@ -296,7 +391,7 @@ export function VendorRegisterForm({
         <select
           id="categorySlug"
           name="categorySlug"
-          className="select"
+          className={`select${miss("categorySlug")}`}
           required
           value={categorySlug}
           onChange={(e) => setCategorySlug(e.target.value)}
@@ -362,7 +457,7 @@ export function VendorRegisterForm({
           rows={3}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="textarea"
+          className={`textarea${miss("description")}`}
           required
           placeholder="Tell customers what you sell, make or offer…"
         />
@@ -406,7 +501,7 @@ export function VendorRegisterForm({
           name="address"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          className="input"
+          className={`input${miss("address")}`}
           required
           placeholder="e.g. 12 Aba Road, beside Ibom Plaza, Uyo"
         />
@@ -438,7 +533,7 @@ export function VendorRegisterForm({
             maxLength={14}
             value={nin}
             onChange={(e) => setNin(e.target.value.replace(/[^\d\s-]/g, ""))}
-            className="input font-mono tracking-wider"
+            className={`input font-mono tracking-wider${miss("nin")}`}
             required
             placeholder="12345678901"
           />
@@ -505,7 +600,7 @@ export function VendorRegisterForm({
                   setProofUploading(false);
                 }
               }}
-              className="input py-1.5 text-xs"
+              className={`input py-1.5 text-xs${miss("proofOfResidenceFile")}`}
             />
           </Field>
         </div>
@@ -570,7 +665,7 @@ export function VendorRegisterForm({
               name="cacNumber"
               value={cacNumber}
               onChange={(e) => setCacNumber(e.target.value)}
-              className="input font-mono uppercase"
+              className={`input font-mono uppercase${miss("cacNumber")}`}
               required
               placeholder="e.g. BN-3482910 or RC-1928374"
             />
@@ -603,7 +698,7 @@ export function VendorRegisterForm({
               list="nigerian-banks-list"
               value={bankName}
               onChange={(e) => setBankName(e.target.value)}
-              className="input"
+              className={`input${miss("bankName")}`}
               required
               placeholder="Select or type bank (e.g. GTBank, OPay)"
             />
@@ -627,7 +722,7 @@ export function VendorRegisterForm({
               maxLength={10}
               value={accountNumber}
               onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
-              className="input font-mono tracking-wider"
+              className={`input font-mono tracking-wider${miss("accountNumber")}`}
               required
               placeholder="0123456789"
             />
@@ -646,7 +741,7 @@ export function VendorRegisterForm({
             name="accountName"
             value={accountName}
             onChange={(e) => setAccountName(e.target.value)}
-            className="input"
+            className={`input${miss("accountName")}`}
             required
             placeholder="e.g. Mama Put Kitchen Ventures or Grace Etim"
           />
@@ -712,7 +807,7 @@ export function VendorRegisterForm({
           name="acceptTerms"
           checked={acceptTerms}
           onChange={(e) => setAcceptTerms(e.target.checked)}
-          className="mt-0.5 size-4 rounded border-ink-300 text-brand-700"
+          className={`mt-0.5 size-4 rounded border-ink-300 text-brand-700${miss("acceptTerms") ? " border-red-500 ring-2 ring-red-300" : ""}`}
           required
         />
         <span>
