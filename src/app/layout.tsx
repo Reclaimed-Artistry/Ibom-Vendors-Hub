@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./motion.css";
 import { CartProvider } from "@/components/cart";
+import { SiteMotion } from "@/components/site-motion";
 import { BRAND_ICONS } from "@/lib/brand-assets";
 import { PUBLIC_ROBOTS, SITE_DESCRIPTION, siteUrl, siteVerification } from "@/lib/seo";
 
@@ -52,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="w-full max-w-full overflow-x-clip">
       <body className="w-full max-w-full overflow-x-clip">
         <CartProvider>{children}</CartProvider>
+        <SiteMotion />
       </body>
     </html>
   );

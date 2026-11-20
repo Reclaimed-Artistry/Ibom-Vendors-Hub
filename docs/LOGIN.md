@@ -58,6 +58,9 @@ shared theme tokens rather than the demo's grey-and-blue palette.
   fieldset disabled. Focus follows the active heading. Inputs have unique IDs,
   real labels, autocomplete hints and associated validation errors. Requests
   expose busy/pending state, and errors never claim success.
+- Shared [site-wide motion](SITE_MOTION.md) adds repeating scroll reveals to
+  headings/accents, an emerald/gold scroll-progress line and bounded parallax on
+  decorative circles only. Inputs stay stationary and keep native focus/scroll.
 - Card height follows active content. Narrow/short viewports can scroll to all
   controls and messages. Reduced-motion users get no decorative animation or
   animated flip; focus borders and controls still work. Forced-colors users

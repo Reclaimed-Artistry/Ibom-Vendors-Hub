@@ -14,6 +14,7 @@
     "db:seed": "tsx scripts/seed.ts",
     "test:db": "tsx scripts/test-db.ts",
     "test:smoke": "tsx scripts/test-smoke.ts",
+    "test:motion": "tsx scripts/test-site-motion.ts",
     "test:vendor-products": "tsx scripts/test-product-save-navigation.tsx && npm run test:multi-categories:http && npm run test:media:http",
     "test:login": "tsx scripts/test-checkout-login.ts && tsx scripts/test-login-ui.tsx && tsx scripts/test-login-theme.ts",
     "test:login:http": "tsx scripts/test-login-http.ts",

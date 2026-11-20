@@ -84,6 +84,7 @@ npm run test          # typecheck + database/RLS checks
 npm run test:db       # RLS isolation, payment integrity, retention checks
 npm run test:categories # category guides, migrations, forms, discovery + household checkout
 npm run test:smoke    # HTTP smoke test (needs the app running)
+npm run test:motion   # repeatable scroll/hover, accessibility and frame-budget safeguards
 npm run test:vendor-products # actual local create/edit/upload, ownership and save-completion checks
 npm run build         # production build
 npm run db:migrate    # apply supabase/migrations/*.sql
@@ -225,6 +226,16 @@ it stays recognisable at tiny search-result and browser-tab sizes. Use
 `<Logo>` renders the whole lockup with `object-contain`, height-driven sizing and `w-auto`, so
 it is never stretched or clipped; `invert` puts it on a white chip for dark surfaces because
 the wordmark is dark green.
+
+### Scroll and hover effects
+
+All pages share lightweight, repeatable scroll reveals and an emerald/gold
+scroll-progress accent. Linked cards, buttons and navigation have fine-pointer
+hover feedback; login's decorative circles gain bounded parallax. Effects use
+native observers/animations, idle startup and passive frame-batched scrolling,
+without an animation dependency, hidden server content or continuous render loop.
+Reduced motion, touch, forms and media controls remain protected. See
+[site motion, performance and checks](docs/SITE_MOTION.md).
 
 ### Login screen
 
