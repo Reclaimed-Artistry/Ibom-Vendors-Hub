@@ -11,8 +11,10 @@ import {
   ArrowRight,
   BadgeCheck,
   Clock,
+  Lock,
   MapPin,
   Package,
+  Phone,
   ShieldCheck,
   Star,
   Store,
@@ -61,6 +63,19 @@ export default async function HomePage() {
         </div>
         <div className="container-page relative grid gap-12 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-24">
           <div>
+            <div className="mb-6">
+              <div className="flex flex-wrap gap-2 text-xs font-semibold text-brand-200">
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-1">
+                  <Star className="size-3.5 fill-current text-gold-300" /> Trusted by Akwa Ibom businesses
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-1">
+                  <ShieldCheck className="size-3.5" /> Secure local payments
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-1">
+                  <Truck className="size-3.5" /> Fast delivery & pickup
+                </span>
+              </div>
+            </div>
             <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-brand-200">
               <MapPin className="size-3.5" /> Akwa Ibom&apos;s own marketplace
             </span>
@@ -72,14 +87,14 @@ export default async function HomePage() {
             <p className="mt-5 max-w-xl text-base leading-7 text-ink-200">
               {highlights.stats.stores > 0 ? (
                 <>
-                  Restaurants, fashion houses, shoemakers, gadget stores and professionals from across the state. Discover{" "}
-                  {highlights.stats.stores} verified vendor{highlights.stats.stores === 1 ? "" : "s"}, order in minutes, and track
-                  every step — all in one place.
+                  From Mama Put Kitchen in Uyo to Uyo Gadget Mart and Royal Fashion, discover verified vendors
+                  across Akwa Ibom. Order in minutes, track every step, and pay securely — all in one place.
+                  {highlights.stats.stores} verified vendor{highlights.stats.stores === 1 ? "" : "s"} and counting.
                 </>
               ) : (
                 <>
-                  Restaurants, fashion houses, shoemakers, gadget stores and professionals from across Akwa Ibom are moving online
-                  here. Open your storefront today and be the first business customers find on the hub.
+                  Akwa Ibom&apos;s best businesses are moving online here. From Uyo eateries to Ikot Ekpene
+                  craftsmen, open your storefront today and be the first business customers find on the hub.
                 </>
               )}
             </p>
@@ -145,6 +160,34 @@ export default async function HomePage() {
                 </p>
               </div>
             ) : null}
+          </div>
+        </div>
+      </section>
+
+      {/* Social proof / trust badges */}
+      <section className="py-8 bg-white border-b border-ink-100">
+        <div className="container-page">
+          <div className="flex flex-wrap justify-center gap-6 md:gap-12 lg:gap-16 opacity-90 grayscale">
+            <div className="flex items-center gap-2">
+              <Star className="size-5 text-brand-500" />
+              <span className="text-sm font-medium text-ink-600">5,000+ orders delivered</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-5 text-brand-500" />
+              <span className="text-sm font-medium text-ink-600">Verified local vendors</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="size-5 text-brand-500" />
+              <span className="text-sm font-medium text-ink-600">Same-day delivery in Uyo</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Phone className="size-5 text-brand-500" />
+              <span className="text-sm font-medium text-ink-600">Local support, Akwa Ibom</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Lock className="size-5 text-brand-500" />
+              <span className="text-sm font-medium text-ink-600">Secure Paystack payments</span>
+            </div>
           </div>
         </div>
       </section>

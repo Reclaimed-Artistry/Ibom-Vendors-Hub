@@ -68,6 +68,9 @@ export default async function AccountOrderDetailPage({ params }: { params: Promi
           <>
             <StatusBadge status={order.status} />
             <Badge tone={order.payment_status === "paid" ? "success" : "warning"}>{order.payment_status}</Badge>
+            <ButtonLink href={`/account/orders/${order.id}/invoice`} variant="ghost" size="sm">
+              Invoice
+            </ButtonLink>
           </>
         }
       />

@@ -17,6 +17,7 @@ import { Logo } from "@/components/logo";
 import { VendorAnnouncements } from "@/components/announcement-strip";
 import { SubscriptionCountdown } from "@/components/subscription-countdown";
 import { ReviewCountdown } from "@/components/review-countdown";
+import { WhatsAppAdminButton } from "@/components/whatsapp-admin-button";
 
 export const metadata: Metadata = { title: "Vendor dashboard · Ibom Vendors Hub", robots: NO_INDEX };
 
@@ -187,6 +188,7 @@ export default async function VendorLayout({ children }: { children: React.React
               <Link href={base} target="_blank" className="btn btn-secondary btn-sm hidden sm:inline-flex">
                 Storefront <ExternalLink className="size-3.5" />
               </Link>
+              <WhatsAppAdminButton />
             </div>
           </header>
 
