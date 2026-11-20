@@ -17,7 +17,7 @@ async function main() {
     await db.execute(`update products set is_available=true,track_stock=false where id=$1`,[product.id]);
     const input = checkoutSchema.parse({items:[{productId:product.id,quantity:1}],customerName:customer.fullName,customerEmail:customer.email,customerPhone:'08031234567',bioAddress:'10 Test Road',fulfilmentType:'delivery',address:'10 Test Road',city:'Uyo',state:'Akwa Ibom'});
     const result = await createCheckout(input, customer, 'bank_transfer');
-    assert(result.authorizationUrl.startsWith('/pay/'));
+    assert(result.authorizationUrl && result.authorizationUrl.startsWith('/pay/'));
     assert.equal((await db.one(`select count(*)::int n from manual_order_payments where payment_id=(select id from payments where reference=$1)`,[result.paymentReference])).n,1);
     const walletCheckout = await createCheckout(input, customer, 'wallet');
     await db.execute(`insert into wallets(user_id,balance) values($1,1000000) on conflict(user_id) do update set balance=1000000`,[customer.id]);

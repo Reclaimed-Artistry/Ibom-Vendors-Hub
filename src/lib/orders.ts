@@ -61,7 +61,7 @@ interface ProductRow {
 export interface CheckoutResult {
   checkoutReference: string;
   paymentReference: string;
-  authorizationUrl: string;
+  authorizationUrl: string | null;
   total: number;
   currency: string;
   orders: Array<{ id: string; reference: string; storeName: string; storeSlug: string; total: number }>;
@@ -75,7 +75,7 @@ function addonsTotal(raw: unknown): number {
 export async function createCheckout(
   input: CheckoutInput,
   customer: { id: string; email: string; fullName: string } | null,
-  paymentMethod: "gateway" | "bank_transfer" | "wallet" = "gateway",
+  paymentMethod: "gateway" | "bank_transfer" | "wallet" | "pay_on_delivery" = "gateway",
 ): Promise<CheckoutResult> {
   if (!customer?.id) {
     throw new Error("Please sign in to your account before checking out.");
@@ -84,6 +84,7 @@ export async function createCheckout(
   if (!settings.payments_enabled) throw new Error("Payments are temporarily disabled by the platform.");
 
   const productIds = [...new Set(input.items.map((item) => item.productId))];
+  const isPayOnDelivery = paymentMethod === "pay_on_delivery";
 
   const prepared = await withSystem(async (db) => {
     const rows = await db.query<ProductRow>(
@@ -414,7 +415,7 @@ export async function createCheckout(
       await db.one<{ ref: string }>(`select next_payment_reference('PAY') as ref`)
     ).ref;
 
-    const provider = paymentMethod === "wallet" ? "wallet" : paymentMethod === "bank_transfer" ? "manual" : paystackSecret(settings) ? "paystack" : "sandbox";
+    const provider = paymentMethod === "wallet" ? "wallet" : paymentMethod === "bank_transfer" || isPayOnDelivery ? "manual" : paystackSecret(settings) ? "paystack" : "sandbox";
     const payment = await db.one<{ id: string }>(
       `insert into payments
          (reference, scope, provider, checkout_reference, payer_user_id, payer_email, amount, currency,
@@ -429,7 +430,7 @@ export async function createCheckout(
         input.customerEmail.trim().toLowerCase(),
         grandTotal,
         settings.currency,
-        JSON.stringify({ storeCount: created.length, orderIds: created.map((o) => o.id) }),
+        JSON.stringify({ storeCount: created.length, orderIds: created.map((o) => o.id), paymentMethod: isPayOnDelivery ? "cash_on_delivery" : paymentMethod }),
       ],
     );
 
@@ -444,13 +445,20 @@ export async function createCheckout(
         await db.execute(`update orders set platform_commission = 0, vendor_payable = 0 where id = $1`, [order.id]);
       }
     }
+
+    if (isPayOnDelivery) {
+      for (const order of created) {
+        await db.execute(`update orders set platform_commission = 0, vendor_payable = 0 where id = $1`, [order.id]);
+      }
+    }
     return { checkoutReference, paymentReference, paymentId: payment.id, created, grandTotal };
   });
 
   // Start the payment *after* the transaction commits.
-  let authorizationUrl = `/pay/${prepared.paymentReference}`;
+  // Pay-on-delivery orders have no payment portal — the customer pays cash when the order is handed over.
+  let authorizationUrl = isPayOnDelivery ? null : `/pay/${prepared.paymentReference}`;
   try {
-    if (paymentMethod === "gateway") {
+    if (paymentMethod === "gateway" && !isPayOnDelivery) {
     const init = await initializeTransaction({
       reference: prepared.paymentReference,
       amount: prepared.grandTotal,

@@ -124,6 +124,7 @@ export interface Store {
   phone: string | null;
   whatsapp: string | null;
   website: string | null;
+  custom_domain: string | null;
   address: string | null;
   city: string | null;
   state: string | null;

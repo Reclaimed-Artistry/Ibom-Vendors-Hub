@@ -7,6 +7,7 @@ import { getStoreCategories } from "@/lib/storefront";
 import { storeBase } from "@/lib/storefront-base";
 import { storefrontUrl } from "@/lib/domains";
 import { formatDate } from "@/lib/utils";
+import { requestCustomDomainAction } from "@/app/actions/vendor";
 import { Alert, Badge, Card, CardHeader, PageHeader } from "@/components/ui";
 import {
   DeleteOwnStoreForm,
@@ -128,10 +129,45 @@ export default async function VendorStorePage() {
 
           <Card className="card-pad space-y-2">
             <p className="flex items-center gap-1.5 text-sm font-semibold text-ink-900"><Globe className="size-4 text-brand-600" /> Custom domain</p>
-            <p className="text-sm text-ink-500">
-              Your storefront is served at <span className="font-medium text-ink-700">{storefrontUrl(store.slug)}</span>. Ask the platform team if you need a branded domain pointed at your store.
-            </p>
-            <ContactPlatformLink />
+            {store.custom_domain ? (
+              <>
+                <p className="text-sm text-ink-600">
+                  Your branded domain: <span className="font-medium text-ink-900 break-all">{store.custom_domain}</span>
+                </p>
+                <p className="text-[11px] text-ink-500">
+                  Point your domain&rsquo;s CNAME or A record at your storefront. DNS changes can take up to 48 hours to propagate.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-ink-600">
+                  Your storefront is served at <span className="font-medium text-ink-700">{storefrontUrl(store.slug)}</span>. Request a branded domain below.
+                </p>
+                <form
+                  action={async (formData: FormData) => {
+                    await requestCustomDomainAction(undefined as any, formData);
+                  }}
+                  className="mt-3 flex flex-wrap gap-2"
+                >
+                  <input
+                    name="customDomain"
+                    type="text"
+                    placeholder="shop.yourbusiness.com.ng"
+                    className="input flex-1 min-w-[200px]"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="btn-primary btn-sm"
+                  >
+                    Request domain
+                  </button>
+                </form>
+                <p className="mt-2 text-[11px] text-ink-500">
+                  A platform admin will review your request and help you configure DNS. You&rsquo;ll need access to your domain&rsquo;s DNS settings.
+                </p>
+              </>
+            )}
           </Card>
 
           <DeleteOwnStoreForm storeName={store.name} storeSlug={store.slug} />

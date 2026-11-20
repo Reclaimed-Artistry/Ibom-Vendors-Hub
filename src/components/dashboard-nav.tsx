@@ -23,6 +23,7 @@ import {
   Star,
   Store,
   Tags,
+  Truck,
   Users,
   Wallet,
 } from "lucide-react";
@@ -51,6 +52,7 @@ const ICONS = {
   audit: ScrollText,
   emails: Mail,
   help: MessageSquare,
+  recovery: Truck,
 } as const;
 
 export type DashboardIcon = keyof typeof ICONS;

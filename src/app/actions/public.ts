@@ -67,16 +67,17 @@ export async function submitCheckoutAction(_prev: PublicState, formData: FormDat
   }
 
   const paymentMethod = String(formData.get("paymentMethod") ?? "bank_transfer");
-  if (!["wallet", "bank_transfer"].includes(paymentMethod)) return { error: "Choose bank transfer or wallet payment." };
+  if (!["wallet", "bank_transfer", "pay_on_delivery"].includes(paymentMethod)) return { error: "Choose bank transfer, wallet, or pay on delivery." };
 
   let paymentPortal: string | null = null;
+  let result: Awaited<ReturnType<typeof createCheckout>> | null = null;
   try {
-    const result = await withSystem(async () => {
+    result = await withSystem(async () => {
     const checkout = await createCheckout(parsed.data, {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
-    }, paymentMethod as "bank_transfer" | "wallet");
+    }, paymentMethod as "gateway" | "bank_transfer" | "wallet" | "pay_on_delivery");
     if (paymentMethod === "wallet") await payWithWalletCheckout({ userId: user.id, email: user.email, checkoutReference: checkout.checkoutReference, grandTotal: checkout.total });
     return checkout;
     });
@@ -87,15 +88,24 @@ export async function submitCheckoutAction(_prev: PublicState, formData: FormDat
       revalidatePath("/account/wallet");
       revalidatePath("/account/orders");
       return {
-        message: `Paid ₦${result.total.toLocaleString()} from your wallet. Your order is confirmed.`,
+        message: `Paid ₦${result!.total.toLocaleString()} from your wallet. Your order is confirmed.`,
         redirectUrl: "/account/orders",
       };
     }
 
-    paymentPortal = result.authorizationUrl;
+    paymentPortal = result!.authorizationUrl;
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Checkout failed. Please try again." };
   }
+  // Pay-on-delivery orders have no payment portal — confirm the order and show the customer their order page.
+  if (paymentMethod === "pay_on_delivery") {
+    revalidatePath("/account/orders");
+    return {
+      message: `Order placed — total ₦${result.total.toLocaleString()} payable on delivery.`,
+      redirectUrl: "/account/orders",
+    };
+  }
+
   // Server navigation guarantees the authenticated portal opens after commit;
   // it does not depend on a client effect or form-state hydration.
   if (paymentPortal) redirect(paymentPortal);

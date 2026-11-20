@@ -45,7 +45,7 @@ export function CheckoutForm({
   walletBalance?: number;
 }) {
   const { items, ready, subtotal } = useCart();
-  const [paymentMethod, setPaymentMethod] = useState<"wallet" | "bank_transfer">("bank_transfer");
+  const [paymentMethod, setPaymentMethod] = useState<"wallet" | "bank_transfer" | "pay_on_delivery">("bank_transfer");
   const [fulfilment, setFulfilment] = useState<"delivery" | "pickup">("delivery");
   const [bioAddress, setBioAddress] = useState(defaults.bioAddress ?? defaults.address ?? "");
   const [deliveryAddress, setDeliveryAddress] = useState(defaults.address ?? defaults.bioAddress ?? "");
@@ -454,21 +454,32 @@ export function CheckoutForm({
               <input type="radio" name="paymentMethod" value="bank_transfer" checked={paymentMethod === "bank_transfer"} onChange={() => setPaymentMethod("bank_transfer")} />
               <span><strong className="block text-sm text-ink-900">Bank transfer to vendor</strong><span className="text-xs text-ink-600">View bank details, transfer within 20 minutes, upload your receipt and await vendor approval.</span></span>
             </label>
+            <label className="flex cursor-pointer gap-3 rounded-xl bg-brand-50 p-3">
+              <input type="radio" name="paymentMethod" value="pay_on_delivery" checked={paymentMethod === "pay_on_delivery"} onChange={() => setPaymentMethod("pay_on_delivery")} />
+              <span><strong className="block text-sm text-ink-900">Pay on delivery</strong><span className="text-xs text-ink-600">Pay cash to the dispatch rider or at the vendor shop when you receive your order. No online payment required.</span></span>
+            </label>
             {walletBalance > 0 ? <label className="flex gap-3 rounded-xl border p-3">
               <input type="radio" name="paymentMethod" value="wallet" checked={paymentMethod === "wallet"} onChange={() => setPaymentMethod("wallet")} disabled={!walletCovers} />
               <span className="text-sm">Wallet · {formatMoney(walletBalance)}{!walletCovers ? " (insufficient balance)" : ""}</span>
             </label> : null}
           </fieldset>
 
-          <SubmitButton className="w-full" disabled={!ratesReady} pendingLabel="Preparing payment…">
-            <Lock className="size-4" /> Pay {formatMoney(total)}
+          <SubmitButton className="w-full" disabled={!ratesReady} pendingLabel="Placing order…">
+            <Lock className="size-4" />
+            {paymentMethod === "pay_on_delivery" ? "Place order — pay on delivery" : `Pay ${formatMoney(total)}`}
           </SubmitButton>
-          <div className="rounded-xl bg-brand-50/70 p-3 text-[11px] text-brand-900">
+          <div className="rounded-xl p-3 text-[11px]">
             <p className="flex items-center gap-1.5 font-semibold">
-              <ShieldCheck className="size-4 shrink-0 text-brand-700" /> {paymentMethod === "bank_transfer" ? "Direct vendor transfer" : "Delivery-Protected Escrow"}
+              {paymentMethod === "pay_on_delivery" ? (
+                <><Truck className="size-4 shrink-0 text-brand-700" /> Pay on delivery</>
+              ) : paymentMethod === "bank_transfer" ? (
+                <><ShieldCheck className="size-4 shrink-0 text-brand-700" /> Direct vendor transfer</>
+              ) : (
+                <><ShieldCheck className="size-4 shrink-0 text-brand-700" /> Delivery-Protected Escrow</>
+              )}
             </p>
             <p className="mt-1 text-brand-800/90">
-              {paymentMethod === "bank_transfer" ? "Money goes directly to the vendor, not platform escrow. Only pay the account shown on your payment portal. A receipt alone does not confirm payment; the vendor must verify the money arrived." : "Vendor settlement stays held until you confirm receipt or share your secret 6-digit Delivery PIN upon handover."}
+              {paymentMethod === "pay_on_delivery" ? "Pay cash to the dispatch rider or at the vendor shop when your order is ready for handover. Your order will be marked 'pending payment' until the vendor confirms receipt." : paymentMethod === "bank_transfer" ? "Money goes directly to the vendor, not platform escrow. Only pay the account shown on your payment portal. A receipt alone does not confirm payment; the vendor must verify the money arrived." : "Vendor settlement stays held until you confirm receipt or share your secret 6-digit Delivery PIN upon handover."}
             </p>
           </div>
         </Card>

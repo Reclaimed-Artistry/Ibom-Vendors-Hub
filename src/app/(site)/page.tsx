@@ -323,6 +323,65 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* Vendor spotlights */}
+      <section className="py-14 bg-ink-50">
+        <div className="container-page">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Vendor spotlights</p>
+              <h2 className="mt-2 font-display text-2xl text-ink-900 sm:text-3xl">Meet the businesses behind the hub</h2>
+            </div>
+          </div>
+          <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="group card rounded-2xl border border-ink-100 bg-white p-6 hover:border-brand-300 transition-colors">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="grid size-10 place-items-center rounded-full bg-brand-50 text-brand-700">
+                  <Store className="size-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-ink-900">Mama Put Kitchen</p>
+                  <p className="text-xs text-ink-500">Uyo · Local dishes</p>
+                </div>
+              </div>
+              <p className="text-sm leading-6 text-ink-600 mb-4">
+                Serving authentic Akwa Ibom home cooking since 2018. From afang soup to ekpang nkukwo, every dish is made fresh with ingredients from Uyo&rsquo;s local markets.
+              </p>
+              <Link href="/sell" className="text-xs font-semibold text-brand-700 hover:underline">View storefront →</Link>
+            </div>
+            <div className="group card rounded-2xl border border-ink-100 bg-white p-6 hover:border-brand-300 transition-colors">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="grid size-10 place-items-center rounded-full bg-brand-50 text-brand-700">
+                  <Truck className="size-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-ink-900">Uyo Gadget Mart</p>
+                  <p className="text-xs text-ink-500">Uyo · Phones & accessories</p>
+                </div>
+              </div>
+              <p className="text-sm leading-6 text-ink-600 mb-4">
+                Your neighborhood tech shop for phones, accessories, and repairs. Same-day service with a 3-month warranty on all repairs.
+              </p>
+              <Link href="/sell" className="text-xs font-semibold text-brand-700 hover:underline">View storefront →</Link>
+            </div>
+            <div className="group card rounded-2xl border border-ink-100 bg-white p-6 hover:border-brand-300 transition-colors">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="grid size-10 place-items-center rounded-full bg-brand-50 text-brand-700">
+                  <Star className="size-5 text-gold-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-ink-900">Royal Fashion</p>
+                  <p className="text-xs text-ink-500">Ikot Ekpene · Fabrics & tailoring</p>
+                </div>
+              </div>
+              <p className="text-sm leading-6 text-ink-600 mb-4">
+                Bespoke Ankara and traditional wear for men, women and children. Custom tailoring with delivery across Akwa Ibom.
+              </p>
+              <Link href="/sell" className="text-xs font-semibold text-brand-700 hover:underline">View storefront →</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Vendor CTA */}
       <section className="container-page pb-16">
         <div className="relative overflow-hidden rounded-3xl bg-ink-900 px-6 py-12 sm:px-12">
