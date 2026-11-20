@@ -14,6 +14,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "test:db": "tsx scripts/test-db.ts",
     "test:smoke": "tsx scripts/test-smoke.ts",
+    "test:login": "tsx scripts/test-checkout-login.ts && tsx scripts/test-login-ui.tsx",
+    "test:login:http": "tsx scripts/test-login-http.ts",
     "test:brand": "tsx scripts/test-storefront-icons.ts",
     "test:seo": "npm run test:brand && tsx scripts/test-seo.ts",
     "test:seo:http": "tsx scripts/test-seo-http.ts",
@@ -30,6 +32,7 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.5.16",
     "@electric-sql/pglite-socket": "^0.2.19",
+    "@fontsource/poppins": "5.2.7",
     "@types/pg": "^8.23.1",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",

@@ -124,7 +124,13 @@ export const customerRegisterSchema = z.object({
   email,
   phone: phone.optional().or(z.literal("")),
   password,
+  // The new flip-card form confirms passwords; older registration forms remain
+  // compatible when this optional field is absent.
+  confirmPassword: z.string().optional(),
   acceptTerms: z.literal("on", { message: "You must accept the terms" }),
+}).refine((data) => data.confirmPassword === undefined || data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 export const forgotPasswordSchema = z.object({ email });

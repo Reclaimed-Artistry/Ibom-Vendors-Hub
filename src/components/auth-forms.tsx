@@ -7,7 +7,6 @@ import { AlertTriangle, CheckCircle2, ClipboardCheck, Eye, EyeOff, FileCheck2, L
 import {
   ActionState,
   forgotPasswordAction,
-  loginAction,
   registerCustomerAction,
   registerVendorAction,
   resetPasswordAction,
@@ -67,61 +66,6 @@ async function preUploadFile(file: File, kind: "kyc" | "logo" | "cover"): Promis
     throw new Error(data.error || "Could not upload file");
   }
   return data.url;
-}
-
-export function LoginForm({ next }: { next?: string }) {
-  const [state, action] = useActionState<ActionState, FormData>(loginAction as Action, initial);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-
-  return (
-    <form action={action} className="space-y-4">
-      <Feedback state={state} />
-      {next ? <input type="hidden" name="next" value={next} /> : null}
-      <Field label="Email address" htmlFor="email" error={state?.fieldErrors?.email} required>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="input"
-          required
-          autoComplete="email"
-          placeholder="you@business.com"
-        />
-      </Field>
-      <Field label="Password" htmlFor="password" error={state?.fieldErrors?.password} required>
-        <div className="relative">
-          <input
-            id="password"
-            name="password"
-            type={showPassword ? "text" : "password"}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="input pr-10"
-            required
-            autoComplete="current-password"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? "Hide password" : "Show password"}
-            className="absolute inset-y-0 right-0 flex items-center px-3 text-ink-400 hover:text-ink-700"
-          >
-            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          </button>
-        </div>
-      </Field>
-      <div className="flex items-center justify-between text-sm">
-        <Link href="/forgot-password" className="font-medium text-brand-800 hover:text-brand-900">
-          Forgot password?
-        </Link>
-      </div>
-      <SubmitButton className="w-full" pendingLabel="Signing in…">Sign in</SubmitButton>
-    </form>
-  );
 }
 
 export interface VendorInitialUser {

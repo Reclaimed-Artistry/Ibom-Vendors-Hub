@@ -66,7 +66,7 @@ export async function createSessionToken(user: SessionPayload) {
     .sign(secretKey());
 }
 
-export async function setSessionCookie(token: string) {
+export async function setSessionCookie(token: string, { remember = true }: { remember?: boolean } = {}) {
   const store = await cookies();
   const secure = await isHttpsRequest();
   const domain = authCookieDomain((await headers()).get("host"));
@@ -76,7 +76,7 @@ export async function setSessionCookie(token: string) {
     ...(domain ? { domain } : {}),
     secure,
     path: "/",
-    maxAge: SESSION_DAYS * 86_400,
+    ...(remember ? { maxAge: SESSION_DAYS * 86_400 } : {}),
   });
 }
 

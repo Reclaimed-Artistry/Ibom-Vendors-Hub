@@ -110,7 +110,9 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
     role: effectiveRole,
     name: user.full_name,
   });
-  await setSessionCookie(token);
+  // Unchecked means a browser-session cookie; other auth flows retain their
+  // existing persistent-cookie default. Passwords are never stored client-side.
+  await setSessionCookie(token, { remember: formData.get("rememberMe") === "on" });
   await systemDb.execute(`update users set last_login_at = now() where id = $1`, [user.id]);
   await logActivity({
     actorId: user.id,
@@ -240,6 +242,7 @@ export async function registerCustomerAction(_prev: ActionState, formData: FormD
     email: formData.get("email"),
     phone: formData.get("phone") ?? "",
     password: formData.get("password"),
+    confirmPassword: formData.has("confirmPassword") ? formData.get("confirmPassword") : undefined,
     acceptTerms: formData.get("acceptTerms") ?? "",
   });
   if (!parsed.success) {

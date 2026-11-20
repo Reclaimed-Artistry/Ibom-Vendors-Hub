@@ -225,6 +225,14 @@ it stays recognisable at tiny search-result and browser-tab sizes. Use
 it is never stretched or clipped; `invert` puts it on a white chip for dark surfaces because
 the wordmark is dark green.
 
+### Login screen
+
+`/login` adapts the supplied grey-and-blue neumorphic flip-card design with real
+password sign-in/account creation, conditional Google sign-in, password reveal,
+Remember me, checkout continuation and reset links. Other auth pages retain their
+existing layout. Poppins and icons are self-hosted; styles are scoped and reduced
+motion is respected. See [login design and checks](docs/LOGIN.md).
+
 ### Google sign-in
 
 `/auth/google` runs a server-side authorization-code flow: it mints a CSRF `state` into an
