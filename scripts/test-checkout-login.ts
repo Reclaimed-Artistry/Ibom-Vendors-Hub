@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import { authCookieDomain, authContinueUrl, googleNextForHost, safeAuthNext } from "../src/lib/auth-navigation";
+process.env.NEXT_PUBLIC_ROOT_DOMAIN = "ibomvendorshub.com";
+process.env.NEXT_PUBLIC_APP_URL = "https://www.ibomvendorshub.com";
+assert.equal(authCookieDomain("kemcycollections.ibomvendorshub.com"), ".ibomvendorshub.com");
+assert.equal(authCookieDomain("www.ibomvendorshub.com"), ".ibomvendorshub.com");
+assert.equal(authCookieDomain("localhost:3000"), undefined);
+assert.equal(authCookieDomain("ibomvendorshub.com.evil.test"), undefined);
+const portal = "/pay/PAY-test?receipt=1";
+const googleNext = googleNextForHost("kemcycollections.ibomvendorshub.com", portal)!;
+const continuation = new URL(googleNext, "https://www.ibomvendorshub.com");
+assert.equal(authContinueUrl(continuation.searchParams.get("store"), continuation.searchParams.get("next")), `https://kemcycollections.ibomvendorshub.com${portal}`);
+assert.equal(googleNextForHost("www.ibomvendorshub.com", portal), portal);
+assert.equal(authContinueUrl("kemcycollections", "/checkout"), "https://kemcycollections.ibomvendorshub.com/checkout");
+for (const unsafe of ["//evil.test", "/\\evil.test", "https://evil.test", "/\r\nevil"]) assert.equal(safeAuthNext(unsafe), null);
+assert.equal(authContinueUrl("evil.test", "/checkout"), "https://www.ibomvendorshub.com/checkout");
+console.log("Checkout login tests passed: shared first-party cookies, Google callback returns to original cart/payment origin, safe redirects, local/preview isolation.");

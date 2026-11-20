@@ -1,0 +1,1189 @@
+import { validateBusinessCategories } from "@/lib/business-categories";
+import { FREE_STORE_ACCESS } from "@/lib/store-access-policy";
+import { adminEmailRecipients } from "@/lib/admin-email-recipients";
+import { isUniqueViolation, systemDb, withSystem } from "@/lib/db";
+import { hashPassword } from "@/lib/auth";
+import { isReservedSubdomain, normaliseSubdomain, storefrontUrl } from "@/lib/domains";
+import { AKWA_IBOM_STATE, isAkwaIbomState, proofOfResidenceLabel } from "@/lib/akwa-ibom";
+import { getSettings } from "@/lib/settings";
+import { logActivity } from "@/lib/audit";
+import { notify, notifyAdmins } from "@/lib/notifications";
+import { sendEmail } from "@/lib/email";
+import { url } from "@/lib/settings";
+import { deleteStoredFiles, deleteStoreStorageFolder, pruneOrphanStoreProductFiles } from "@/lib/storage";
+import type { Role } from "@/lib/db";
+
+export interface SubdomainCheck {
+  available: boolean;
+  locked?: boolean;
+  slug: string;
+  suggestedSlug?: string;
+  reason?: string;
+}
+
+export function normaliseBusinessName(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/** Validate + uniqueness-check a business name and its subdomain. */
+export async function checkSubdomain(name: string, excludeStoreId?: string): Promise<SubdomainCheck> {
+  const cleanName = normaliseBusinessName(name);
+  const slug = normaliseSubdomain(name);
+  if (!cleanName || !slug || slug.length < 3) {
+    return { available: false, slug, reason: "Business name must contain at least 3 letters or numbers" };
+  }
+  if (slug.length > 48) {
+    return { available: false, slug, reason: "Business name is too long for a store address" };
+  }
+
+  // Hard lock: no two vendors may ever use the same business name (case/space-insensitive)
+  const nameTaken = await systemDb.maybeOne<{ id: string; name: string }>(
+    `select id, name from stores
+      where lower(regexp_replace(btrim(name), '\\s+', ' ', 'g')) = $1
+        and ($2::uuid is null or id <> $2::uuid)
+      limit 1`,
+    [cleanName, excludeStoreId ?? null],
+  );
+  if (nameTaken) {
+    return {
+      available: false,
+      locked: true,
+      slug,
+      reason: `Business name “${nameTaken.name}” is already in use and locked by another vendor. Please choose a unique business name.`,
+    };
+  }
+
+  // Also block if another vendor already owns the exact subdomain / domain for that business name
+  const storeSlugTaken = await systemDb.maybeOne<{ name: string }>(
+    `select s.name from stores s
+      where (lower(s.slug) = lower($1) or exists (select 1 from store_domains d where lower(d.subdomain) = lower($1)))
+        and ($2::uuid is null or s.id <> $2::uuid)
+      limit 1`,
+    [slug, excludeStoreId ?? null],
+  );
+  if (storeSlugTaken) {
+    return {
+      available: false,
+      locked: true,
+      slug,
+      reason: `That business name / store address is already in use and locked by “${storeSlugTaken.name}”. Please choose a unique business name.`,
+    };
+  }
+
+  const reservedHit =
+    isReservedSubdomain(slug) ||
+    Boolean(
+      await systemDb.maybeOne<{ hit: number }>(
+        `select 1 as hit from reserved_subdomains r where lower(r.name) = lower($1) limit 1`,
+        [slug],
+      ),
+    );
+  if (reservedHit) {
+    return { available: false, slug, reason: "This address is reserved by the platform" };
+  }
+
+  const pending = await systemDb.maybeOne<{ id: string }>(
+    `select id from subdomain_change_requests
+      where lower(requested_subdomain) = lower($1) and status = 'pending' limit 1`,
+    [slug],
+  );
+  if (pending) {
+    return { available: false, locked: true, slug, reason: "That store address is reserved by another vendor" };
+  }
+
+  return { available: true, slug };
+}
+
+/**
+ * Check availability of a business name & subdomain.
+ * If another vendor already uses the business name (or its store slug), it is
+ * strictly LOCKED (`available: false, locked: true`, no auto-suffix allowed).
+ */
+export async function resolveAvailableSubdomain(name: string, city?: string): Promise<SubdomainCheck> {
+  const direct = await checkSubdomain(name);
+  if (direct.available || direct.locked) return direct;
+
+  const baseRaw = normaliseSubdomain(name).slice(0, 36);
+  const citySlug = normaliseSubdomain(city || "ibom").slice(0, 10) || "ibom";
+  if (!baseRaw || baseRaw.length < 2) {
+    return direct;
+  }
+
+  // Only reached when `slug` matched a platform-reserved system word (e.g. "support"), never another vendor's name
+  const candidates = [`${baseRaw}-${citySlug}`, `${baseRaw}-store`, `${baseRaw}-hub`];
+  for (const candidate of candidates) {
+    const check = await checkSubdomain(candidate);
+    if (check.available) {
+      return {
+        available: true,
+        slug: check.slug,
+      };
+    }
+  }
+  return direct;
+}
+
+/** Find a free variation (used only when the platform decides to auto-suffix). */
+export async function suggestSubdomains(name: string) {
+  const base = normaliseSubdomain(name).slice(0, 40);
+  if (!base) return [];
+  const candidates = [base, `${base}-uyo`, `${base}-store`];
+  for (let i = 2; i <= 8; i += 1) candidates.push(`${base}-${i}`);
+  const free: string[] = [];
+  for (const candidate of candidates) {
+    const check = await checkSubdomain(candidate);
+    if (check.available && !free.includes(check.slug)) free.push(check.slug);
+    if (free.length >= 3) break;
+  }
+  return free;
+}
+
+export interface RegisterVendorInput {
+  authenticatedUserId?: string;
+  businessName: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  password?: string;
+  categorySlug: string;
+  categorySlugs?: string[];
+  description: string;
+  city: string;
+  state: string;
+  address?: string;
+  nin: string;
+  proofOfResidenceType: string;
+  proofOfResidenceUrl: string;
+  cacRegistered: "yes" | "no" | boolean;
+  cacNumber?: string;
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
+  logoUrl?: string;
+  coverUrl?: string;
+}
+
+export interface RegisterVendorResult {
+  userId: string;
+  storeId: string;
+  slug: string;
+  status: string;
+  trialEndsAt: string | null;
+  verificationToken: string;
+  planName: string;
+}
+
+export async function registerVendor(input: RegisterVendorInput): Promise<RegisterVendorResult> {
+  if (!isAkwaIbomState(input.state)) {
+    throw new Error("Every vendor on Ibom Vendors Hub must be located in Akwa Ibom State.");
+  }
+  const cleanBusinessTitle = input.businessName.trim().replace(/\s+/g, " ");
+  if (cleanBusinessTitle.length < 3) {
+    throw new Error("Business name must contain at least 3 characters.");
+  }
+
+  const cacRegistered = input.cacRegistered === true || input.cacRegistered === "yes";
+  const cacNumber = cacRegistered ? (input.cacNumber ?? "").trim().toUpperCase() : null;
+  if (cacRegistered && !cacNumber) {
+    throw new Error("Enter your CAC registration number.");
+  }
+
+  const bankName = (input.bankName ?? "").trim() || null;
+  const accountNumber = (input.accountNumber ?? "").trim() || null;
+  const accountName = (input.accountName ?? "").trim() || null;
+
+  const settings = await getSettings();
+  // All selected categories are checked again inside the registration transaction.
+
+  // Enforce strict unique business name lock — never allow two vendors to share a name
+  const resolved = await resolveAvailableSubdomain(cleanBusinessTitle, input.city);
+  if (!resolved.available || !resolved.slug) {
+    throw new Error(
+      resolved.reason ??
+        "That business name is already in use and locked by another vendor. Please choose a unique business name.",
+    );
+  }
+  const chosenSlug = resolved.slug;
+
+  let existingUser: { id: string; email: string; role: string; status: string; password_hash: string | null } | null =
+    null;
+  if (input.authenticatedUserId) {
+    existingUser = await systemDb.maybeOne<{
+      id: string;
+      email: string;
+      role: string;
+      status: string;
+      password_hash: string | null;
+    }>(`select id, email, role, status, password_hash from users where id = $1`, [input.authenticatedUserId]);
+    if (!existingUser) {
+      throw new Error("Please sign in with Google or create an account first before creating a storefront.");
+    }
+  } else {
+    const lookupEmail = input.email.trim().toLowerCase();
+    existingUser = await systemDb.maybeOne<{
+      id: string;
+      email: string;
+      role: string;
+      status: string;
+      password_hash: string | null;
+    }>(`select id, email, role, status, password_hash from users where lower(email) = $1`, [lookupEmail]);
+  }
+
+  const email = (existingUser?.email ?? input.email).trim().toLowerCase();
+
+  if (existingUser) {
+    if (existingUser.status !== "active") {
+      throw new Error("This account has been suspended. Please contact support.");
+    }
+    if (existingUser.role === "admin" || existingUser.role === "super_admin") {
+      throw new Error("Admin accounts cannot be converted into vendor accounts. Please sign in with a separate account.");
+    }
+    const existingStore = await systemDb.maybeOne<{ id: string; name: string }>(
+      `select id, name from stores where owner_id = $1 limit 1`,
+      [existingUser.id],
+    );
+    if (existingStore) {
+      throw new Error(
+        `Your account already owns a storefront (${existingStore.name}). Open your Vendor Dashboard to manage it.`,
+      );
+    }
+  } else if (!input.password || input.password.length < 8) {
+    throw new Error("Please sign in with Google or create an account first before creating a storefront.");
+  }
+
+  const passwordHash = input.password && input.password.length >= 8 ? await hashPassword(input.password) : null;
+  const status = "pending";
+  const defaultTrialDays = Math.max(settings.default_trial_days || 14, 14);
+  const proofLabel = proofOfResidenceLabel(input.proofOfResidenceType);
+  const cacSummary = cacRegistered ? `Registered (${cacNumber})` : "Not registered";
+
+  const trialPlan = await systemDb.maybeOne<{
+    id: string;
+    name: string;
+    trial_days: number;
+    duration_days: number;
+  }>(
+    `select id, name, trial_days, duration_days from subscription_plans
+      where is_active = true order by trial_days desc, price asc limit 1`,
+  );
+
+  let result: {
+    userId: string;
+    storeId: string;
+    slug: string;
+    status: string;
+    reviewDeadlineAt: string;
+    trialEndsAt: string | null;
+    planName: string;
+  };
+  try {
+    result = await withSystem(async (db) => {
+      const selected = await validateBusinessCategories(db, input.categorySlug, input.categorySlugs);
+      const category = selected.primary;
+      const user = existingUser
+        ? await db.one<{ id: string }>(
+            `update users
+                set password_hash = coalesce($2, password_hash),
+                    full_name = $3,
+                    phone = $4,
+                    role = 'vendor',
+                    updated_at = now()
+              where id = $1
+              returning id`,
+            [existingUser.id, passwordHash, input.ownerName.trim(), input.phone.trim()],
+          )
+        : await db.one<{ id: string }>(
+            `insert into users (email, password_hash, full_name, phone, role, email_verified_at)
+             values ($1,$2,$3,$4,'vendor', null)
+             returning id`,
+            [email, passwordHash, input.ownerName.trim(), input.phone.trim()],
+          );
+
+      await db.execute(
+        `insert into vendor_profiles
+           (user_id, position, nin, proof_of_residence_type, proof_of_residence_url, cac_registered, cac_number,
+            bank_name, account_number, account_name, kyc_status)
+         values ($1, 'Owner', $2, $3, $4, $5, $6, $7, $8, $9, 'submitted')
+         on conflict (user_id) do update
+           set nin = excluded.nin,
+               proof_of_residence_type = excluded.proof_of_residence_type,
+               proof_of_residence_url = excluded.proof_of_residence_url,
+               cac_registered = excluded.cac_registered,
+               cac_number = excluded.cac_number,
+               bank_name = coalesce(excluded.bank_name, vendor_profiles.bank_name),
+               account_number = coalesce(excluded.account_number, vendor_profiles.account_number),
+               account_name = coalesce(excluded.account_name, vendor_profiles.account_name),
+               kyc_status = 'submitted',
+               updated_at = now()`,
+        [
+          user.id,
+          input.nin.trim(),
+          input.proofOfResidenceType.trim(),
+          input.proofOfResidenceUrl,
+          cacRegistered,
+          cacNumber,
+          bankName,
+          accountNumber,
+          accountName,
+        ],
+      );
+      await db.execute(
+        `insert into user_roles (user_id, role) values ($1,'vendor') on conflict do nothing`,
+        [user.id],
+      );
+
+      const store = await db.one<{ id: string; slug: string; status: string; review_deadline_at: string }>(
+        `insert into stores
+           (owner_id, category_id, name, slug, tagline, description, logo_url, cover_url,
+            email, phone, city, state, address, country, status, approved_at,
+            review_deadline_at, access_until, delivery_fee, prep_time_minutes)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
+                 null,
+                 now() + interval '48 hours',
+                 case when ${FREE_STORE_ACCESS} or $16::boolean then null else now() + make_interval(days => $17) end,
+                 1500, 30)
+         returning id, slug, status, review_deadline_at`,
+        [
+          user.id,
+          category.id,
+          cleanBusinessTitle,
+          chosenSlug,
+          input.description.slice(0, 120),
+          input.description.trim(),
+          input.logoUrl || null,
+          input.coverUrl || null,
+          email,
+          input.phone.trim(),
+          input.city.trim(),
+          AKWA_IBOM_STATE,
+          input.address?.trim() || null,
+          settings.country,
+          status,
+          !FREE_STORE_ACCESS && Boolean(trialPlan),
+          defaultTrialDays,
+        ],
+      );
+
+    await db.execute(
+      `insert into store_category_assignments(store_id,category_id)
+       select $1, unnest($2::uuid[]) on conflict do nothing`,
+      [store.id, selected.categories.map((item) => item.id)],
+    );
+
+    let trialEndsAt: string | null = null;
+    let planName = "Free store";
+    if (!FREE_STORE_ACCESS && trialPlan) {
+      const trialDays = trialPlan.trial_days > 0 ? trialPlan.trial_days : defaultTrialDays;
+      planName = trialPlan.name;
+      const sub = await db.one<{ id: string; expires_at: string }>(
+        `insert into subscriptions (store_id, plan_id, status, started_at, expires_at)
+         values ($1,$2,'trialing', now(), now() + make_interval(days => $3))
+         returning id, expires_at`,
+        [store.id, trialPlan.id, trialDays],
+      );
+      trialEndsAt = sub.expires_at;
+      await db.execute(
+        `insert into subscription_history (subscription_id, store_id, from_status, to_status, to_expires_at, note)
+         values ($1,$2,'none','trialing',$3,$4)`,
+        [sub.id, store.id, sub.expires_at, `${trialDays}-day free trial`],
+      );
+    }
+
+    await db.execute(
+      `insert into vendor_balances (store_id) values ($1) on conflict (store_id) do nothing`,
+      [store.id],
+    );
+
+    const bankSummary =
+      bankName && accountNumber && accountName
+        ? `${bankName} · ${accountNumber} (${accountName})`
+        : "Not provided yet (can be added in Vendor Payout Settings)";
+
+    const adminMessageBody = [
+      `New Storefront Registration — 48-Hour Verification Required`,
+      ``,
+      `Business Name: ${cleanBusinessTitle}`,
+      `Subdomain Slug: ${chosenSlug}`,
+      `Business categories: ${selected.categories.map((item) => item.name).join(", ")} (primary: ${category.name})`,
+      `Owner Name: ${input.ownerName.trim()}`,
+      `Owner Email: ${email}`,
+      `Owner Phone / WhatsApp: ${input.phone.trim()}`,
+      `Location: ${[input.address?.trim(), input.city.trim(), AKWA_IBOM_STATE].filter(Boolean).join(", ")}`,
+      `NIN: ${input.nin.trim()}`,
+      `CAC Registration: ${cacSummary}`,
+      `Proof of Residence: ${proofLabel}`,
+      `Payout Bank Account: ${bankSummary}`,
+      `48-Hour Decision Deadline: ${new Date(store.review_deadline_at).toUTCString()}`,
+      ``,
+      `Please review all uploaded registration documents before approving or declining this storefront.`,
+    ].join("\n");
+
+    await db.execute(
+      `insert into customer_messages
+         (store_id, customer_id, sender_name, sender_email, sender_role, category, subject, body, status)
+       values ($1,$2,$3,$4,'vendor','store_approval',$5,$6,'open')`,
+      [
+        store.id,
+        user.id,
+        input.ownerName.trim(),
+        email,
+        `New Storefront Review (48h Timer): ${input.businessName.trim()}`,
+        adminMessageBody,
+      ],
+    );
+
+    await logActivity(
+      {
+        actorId: user.id,
+        actorRole: "vendor",
+        storeId: store.id,
+        action: "vendor.registered",
+        entityType: "store",
+        entityId: store.id,
+        description: `${input.businessName} registered (${category.name}) — awaiting 48h admin document review`,
+        meta: {
+          category: category.slug,
+          categories: selected.categories.map((item) => item.slug),
+          slug: chosenSlug,
+          reviewDeadlineAt: store.review_deadline_at,
+          upgradedExistingUser: Boolean(existingUser),
+        },
+      },
+      db,
+    );
+
+    await notify(
+      {
+        userId: user.id,
+        storeId: store.id,
+        type: "welcome",
+        title: "Application received — 48-hour review started",
+        body: `We received your registration & KYC documents for ${input.businessName.trim()}. Our admin team will review and notify you within 48 hours. You can already add products!`,
+        actionUrl: "/vendor",
+        dedupeKey: `welcome:${user.id}:${store.id}`,
+      },
+      db,
+    );
+
+    await notifyAdmins(
+      {
+        storeId: store.id,
+        type: "vendor_registered",
+        title: `48h Storefront Review: ${input.businessName.trim()}`,
+        body: `Owner: ${input.ownerName.trim()} (${email}, ${input.phone.trim()}) · ${input.city.trim()}, Akwa Ibom · Review uploaded documents & approve or decline within 48 hours.`,
+        actionUrl: `/admin/vendors/${store.id}`,
+        dedupeKey: `vendor-registered:${store.id}`,
+      },
+      db,
+    );
+
+    return {
+      userId: user.id,
+      storeId: store.id,
+      slug: store.slug,
+      status: store.status,
+      reviewDeadlineAt: store.review_deadline_at,
+      trialEndsAt,
+      planName,
+    };
+  });
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      throw new Error(
+        "That business name is already in use and locked by another vendor. Please choose a unique business name.",
+      );
+    }
+    throw err;
+  }
+
+  // Verification + pending-review + admin notification emails (outside the transaction — never block registration).
+  let token = "";
+  try {
+    const { createAuthToken } = await import("@/lib/auth");
+    token = await createAuthToken(result.userId, "verify_email", 60 * 24);
+    const verifyLink = url(`/verify-email?token=${token}`);
+    const deadlineLabel = new Date(result.reviewDeadlineAt).toUTCString();
+
+    await sendEmail({
+      to: email,
+      template: "verify_email",
+      data: { name: input.ownerName, link: verifyLink },
+      dedupeKey: `verify:${result.userId}:${token.slice(0, 12)}`,
+    });
+    await sendEmail({
+      to: email,
+      template: "vendor_pending_review",
+      data: {
+        name: input.ownerName,
+        storeName: input.businessName,
+        storeUrl: storefrontUrl(result.slug),
+        planName: result.planName,
+        reviewDeadline: deadlineLabel,
+      },
+      dedupeKey: `vendor-pending:${result.storeId}`,
+    });
+
+    const adminEmails = new Set<string>();
+    if (settings.support_email) adminEmails.add(settings.support_email.toLowerCase());
+    if (process.env.ADMIN_EMAIL) adminEmails.add(process.env.ADMIN_EMAIL.toLowerCase());
+    const dbAdmins = await systemDb.query<{ email: string }>(
+      `select email from users where role in ('admin','super_admin') and status = 'active'`,
+    );
+    for (const row of dbAdmins) {
+      if (row.email) adminEmails.add(row.email.toLowerCase());
+    }
+
+    for (const adminEmail of adminEmailRecipients([...adminEmails])) {
+      await sendEmail({
+        to: adminEmail,
+        template: "admin_new_vendor",
+        data: {
+          storeName: input.businessName,
+          storeUrl: storefrontUrl(result.slug),
+          name: input.ownerName,
+          email,
+          phone: input.phone.trim(),
+          location: `${[input.address?.trim(), input.city.trim(), AKWA_IBOM_STATE].filter(Boolean).join(", ")}`,
+          nin: input.nin.trim(),
+          cacInfo: cacSummary,
+          proofType: proofLabel,
+          reviewDeadline: deadlineLabel,
+          reviewUrl: url(`/admin/vendors/${result.storeId}`),
+        },
+        dedupeKey: `admin-new-vendor:${result.storeId}:${adminEmail}`,
+      });
+    }
+  } catch (emailErr) {
+    console.error("[registerVendor] Non-fatal post-registration email error:", emailErr);
+  }
+
+  return {
+    ...result,
+    verificationToken: token,
+  };
+}
+
+export interface RegisterCustomerInput {
+  fullName: string;
+  email: string;
+  phone?: string;
+  password: string;
+}
+
+export async function registerCustomer(input: RegisterCustomerInput) {
+  const email = input.email.trim().toLowerCase();
+  const existing = await systemDb.maybeOne<{ id: string }>(
+    `select id from users where lower(email) = $1`,
+    [email],
+  );
+  if (existing) throw new Error("An account with this email already exists. Please sign in instead.");
+
+  const passwordHash = await hashPassword(input.password);
+  const userId = await withSystem(async (db) => {
+    const user = await db.one<{ id: string }>(
+      `insert into users (email, password_hash, full_name, phone, role)
+       values ($1,$2,$3,$4,'customer') returning id`,
+      [email, passwordHash, input.fullName.trim(), input.phone?.trim() || null],
+    );
+    await db.execute(`insert into customer_profiles (user_id) values ($1)`, [user.id]);
+    await db.execute(`insert into user_roles (user_id, role) values ($1,'customer') on conflict do nothing`, [user.id]);
+    await logActivity(
+      { actorId: user.id, actorRole: "customer", action: "customer.registered", entityType: "user", entityId: user.id },
+      db,
+    );
+    return user.id;
+  });
+
+  const { createAuthToken } = await import("@/lib/auth");
+  const token = await createAuthToken(userId, "verify_email", 60 * 24);
+  await sendEmail({
+    to: email,
+    template: "verify_email",
+    data: { name: input.fullName, link: url(`/verify-email?token=${token}`) },
+    dedupeKey: `verify:${userId}:${token.slice(0, 12)}`,
+  });
+  await sendEmail({
+    to: email,
+    template: "customer_welcome",
+    data: { name: input.fullName },
+    dedupeKey: `customer-welcome:${userId}`,
+  });
+
+  return { userId, verificationToken: token };
+}
+
+export async function approveStore(storeId: string, adminId: string) {
+  const details = await withSystem(async (db) => {
+    const existing = await db.maybeOne<{
+      id: string;
+      owner_id: string;
+      name: string;
+      slug: string;
+      owner_email: string;
+      owner_name: string;
+      nin: string | null;
+      proof_url: string | null;
+    }>(
+      `select s.id, s.owner_id, s.name, s.slug, u.email as owner_email, u.full_name as owner_name,
+              vp.nin, vp.proof_of_residence_url as proof_url
+         from stores s
+         join users u on u.id = s.owner_id
+         left join vendor_profiles vp on vp.user_id = s.owner_id
+        where s.id = $1`,
+      [storeId],
+    );
+    if (!existing) throw new Error("Storefront not found");
+    if (!existing.proof_url || !existing.nin) {
+      throw new Error(
+        "Cannot approve storefront before registration documents (Proof of Residence & NIN) are uploaded and reviewed.",
+      );
+    }
+
+    const store = await db.one<{ owner_id: string; name: string; slug: string; status: string }>(
+      `update stores
+          set status = 'active',
+              approved_at = now(),
+              approved_by = $2,
+              rejection_reason = null,
+              manual_suspension = false
+        where id = $1
+        returning owner_id, name, slug, status`,
+      [storeId, adminId],
+    );
+
+    await db.execute(
+      `insert into vendor_profiles (user_id, position, kyc_status, kyc_note, verified_at)
+       values ($1, 'Owner', 'verified', 'Registration documents reviewed and approved.', now())
+       on conflict (user_id) do update
+         set kyc_status = 'verified',
+             kyc_note = 'Registration documents reviewed and approved.',
+             verified_at = now(),
+             updated_at = now()`,
+      [store.owner_id],
+    );
+
+    // Ensure vendor gets a full 14-day selling window starting from approval
+    await db.execute(
+      `update subscriptions
+          set expires_at = greatest(expires_at, now() + interval '14 days')
+        where store_id = $1 and status = 'trialing'`,
+      [storeId],
+    );
+
+    const openMsg = await db.maybeOne<{ id: string }>(
+      `update customer_messages
+          set status = 'resolved', updated_at = now()
+        where store_id = $1 and category = 'store_approval' and status in ('new','open','awaiting_customer')
+        returning id`,
+      [storeId],
+    );
+
+    await db.execute(
+      `insert into customer_messages
+         (store_id, customer_id, sender_name, sender_email, sender_role, category, subject, body, status, parent_id)
+       values ($1,$2,'Ibom Vendors Hub Verification','support@ibomvendorshub.ng','admin','store_approval',$3,$4,'resolved',$5)`,
+      [
+        storeId,
+        store.owner_id,
+        `Storefront Approved & Open: ${store.name}`,
+        `Congratulations ${existing.owner_name}! We reviewed your uploaded registration documents and approved ${store.name}. Your storefront is now LIVE and open to customers at ${storefrontUrl(store.slug)}.`,
+        openMsg?.id ?? null,
+      ],
+    );
+
+    await logActivity(
+      {
+        actorId: adminId,
+        actorRole: "admin",
+        storeId,
+        action: "store.approved",
+        entityType: "store",
+        entityId: storeId,
+        description: `Reviewed documents and approved ${store.name}`,
+      },
+      db,
+    );
+
+    await notify(
+      {
+        userId: store.owner_id,
+        storeId,
+        type: "store_approved",
+        title: "Your storefront has been approved & is now OPEN!",
+        body: `${store.name} passed document verification and is now live and accepting customer orders.`,
+        actionUrl: `/s/${store.slug}`,
+        dedupeKey: `store-approved:${storeId}:${Date.now()}`,
+      },
+      db,
+    );
+
+    return existing;
+  });
+
+  try {
+    await sendEmail({
+      to: details.owner_email,
+      template: "store_approved",
+      data: {
+        name: details.owner_name,
+        storeName: details.name,
+        storeUrl: storefrontUrl(details.slug),
+      },
+      dedupeKey: `store-approved-email:${storeId}:${Date.now()}`,
+    });
+  } catch (err) {
+    console.error("[approveStore] Non-fatal email error:", err);
+  }
+}
+
+export async function rejectStore(storeId: string, adminId: string, reason: string) {
+  const details = await withSystem(async (db) => {
+    const existing = await db.maybeOne<{
+      owner_id: string;
+      name: string;
+      slug: string;
+      owner_email: string;
+      owner_name: string;
+    }>(
+      `select s.owner_id, s.name, s.slug, u.email as owner_email, u.full_name as owner_name
+         from stores s join users u on u.id = s.owner_id
+        where s.id = $1`,
+      [storeId],
+    );
+    if (!existing) throw new Error("Storefront not found");
+
+    await db.execute(
+      `update stores set status = 'rejected', rejection_reason = $2 where id = $1`,
+      [storeId, reason],
+    );
+
+    await db.execute(
+      `insert into vendor_profiles (user_id, position, kyc_status, kyc_note, verified_at)
+       values ($1, 'Owner', 'rejected', $2, null)
+       on conflict (user_id) do update
+         set kyc_status = 'rejected',
+             kyc_note = excluded.kyc_note,
+             verified_at = null,
+             updated_at = now()`,
+      [existing.owner_id, reason],
+    );
+
+    const openMsg = await db.maybeOne<{ id: string }>(
+      `update customer_messages
+          set status = 'resolved', updated_at = now()
+        where store_id = $1 and category = 'store_approval' and status in ('new','open','awaiting_customer')
+        returning id`,
+      [storeId],
+    );
+
+    await db.execute(
+      `insert into customer_messages
+         (store_id, customer_id, sender_name, sender_email, sender_role, category, subject, body, status, parent_id)
+       values ($1,$2,'Ibom Vendors Hub Verification','support@ibomvendorshub.ng','admin','store_approval',$3,$4,'resolved',$5)`,
+      [
+        storeId,
+        existing.owner_id,
+        `Storefront Application Declined: ${existing.name}`,
+        `Hi ${existing.owner_name}, after reviewing your registration documents for ${existing.name}, your storefront application was declined.\n\nReason: ${reason}\n\nYou can upload corrected verification documents in Store Profile (/vendor/store) for a fresh 48-hour review.`,
+        openMsg?.id ?? null,
+      ],
+    );
+
+    await logActivity(
+      {
+        actorId: adminId,
+        actorRole: "admin",
+        storeId,
+        action: "store.rejected",
+        entityType: "store",
+        entityId: storeId,
+        description: reason,
+      },
+      db,
+    );
+
+    await notify(
+      {
+        userId: existing.owner_id,
+        storeId,
+        type: "store_rejected",
+        title: "Storefront application declined",
+        body: `Your application for ${existing.name} was declined after document review. Reason: ${reason}`,
+        actionUrl: "/vendor/store",
+        dedupeKey: `store-rejected:${storeId}:${Date.now()}`,
+      },
+      db,
+    );
+
+    return existing;
+  });
+
+  try {
+    await sendEmail({
+      to: details.owner_email,
+      template: "store_declined",
+      data: {
+        name: details.owner_name,
+        storeName: details.name,
+        reason,
+      },
+      dedupeKey: `store-declined-email:${storeId}:${Date.now()}`,
+    });
+  } catch (err) {
+    console.error("[rejectStore] Non-fatal email error:", err);
+  }
+}
+
+export async function resubmitStoreForReview(storeId: string) {
+  await withSystem(async (db) => {
+    const info = await db.maybeOne<{
+      id: string;
+      name: string;
+      slug: string;
+      status: string;
+      owner_id: string;
+      owner_name: string;
+      owner_email: string;
+      owner_phone: string | null;
+      city: string | null;
+      nin: string | null;
+      proof_of_residence_type: string | null;
+    }>(
+      `select s.id, s.name, s.slug, s.status, s.owner_id, s.city,
+              u.full_name as owner_name, u.email as owner_email, u.phone as owner_phone,
+              vp.nin, vp.proof_of_residence_type
+         from stores s
+         join users u on u.id = s.owner_id
+         left join vendor_profiles vp on vp.user_id = s.owner_id
+        where s.id = $1`,
+      [storeId],
+    );
+    if (!info || info.status !== "rejected") return;
+
+    const updated = await db.one<{ review_deadline_at: string }>(
+      `update stores
+          set status = 'pending',
+              rejection_reason = null,
+              review_deadline_at = now() + interval '48 hours'
+        where id = $1
+        returning review_deadline_at`,
+      [storeId],
+    );
+
+    await db.execute(
+      `insert into customer_messages
+         (store_id, customer_id, sender_name, sender_email, sender_role, category, subject, body, status)
+       values ($1,$2,$3,$4,'vendor','store_approval',$5,$6,'open')`,
+      [
+        storeId,
+        info.owner_id,
+        info.owner_name,
+        info.owner_email,
+        `Re-Submitted Storefront Review (48h Timer): ${info.name}`,
+        `Updated verification documents submitted for ${info.name} (${info.owner_name}, ${info.owner_email}).\nNIN: ${info.nin ?? "—"}\nProof of Residence: ${proofOfResidenceLabel(info.proof_of_residence_type)}\n48-Hour Deadline: ${new Date(updated.review_deadline_at).toUTCString()}`,
+      ],
+    );
+
+    await notifyAdmins({
+      storeId,
+      type: "vendor_resubmitted",
+      title: `48h Re-Review Required: ${info.name}`,
+      body: `${info.owner_name} uploaded updated KYC documents for ${info.name}. Review within 48 hours.`,
+      actionUrl: `/admin/vendors/${storeId}`,
+      dedupeKey: `vendor-resubmit:${storeId}:${Date.now()}`,
+    });
+  });
+}
+
+export async function suspendStore(storeId: string, adminId: string, reason: string) {
+  const store = await systemDb.one<{ owner_id: string; name: string; slug: string }>(
+    `select owner_id, name, slug from stores where id = $1`,
+    [storeId],
+  );
+  await withSystem(async (db) => {
+    await db.execute(
+      `update stores set manual_suspension = true, status = 'suspended', suspension_reason = $2,
+              suspended_at = now(), suspended_by = $3 where id = $1`,
+      [storeId, reason, adminId],
+    );
+    await logActivity(
+      {
+        actorId: adminId,
+        actorRole: "admin",
+        storeId,
+        action: "store.suspended",
+        entityType: "store",
+        entityId: storeId,
+        description: reason,
+      },
+      db,
+    );
+    await notify(
+      {
+        userId: store.owner_id,
+        storeId,
+        type: "store_suspended",
+        title: "Storefront suspended",
+        body: reason,
+        actionUrl: "/vendor",
+        dedupeKey: `store-suspended:${storeId}:${Date.now()}`,
+      },
+      db,
+    );
+  });
+  await sendEmail({
+    to: (await systemDb.one<{ email: string }>(`select email from users where id = $1`, [store.owner_id])).email,
+    template: "store_suspended",
+    data: { storeName: store.name, reason },
+    dedupeKey: `store-suspended-email:${storeId}:${Date.now()}`,
+  });
+  await sendEmail({
+    to: (await getSettings()).support_email,
+    template: "admin_manual_suspension",
+    data: { storeName: store.name, reason },
+    dedupeKey: `admin-suspended:${storeId}:${Date.now()}`,
+  });
+}
+
+export async function restoreStore(storeId: string, adminId: string) {
+  await withSystem(async (db) => {
+    await db.execute(
+      `update stores set manual_suspension = false, suspension_reason = null,
+              suspended_at = null, suspended_by = null,
+              status = case when ${FREE_STORE_ACCESS} or exists (
+                select 1 from subscriptions s where s.store_id = stores.id
+                 and s.status in ('active','trialing') and s.expires_at > now()
+              ) then 'active' else 'expired' end
+        where id = $1`,
+      [storeId],
+    );
+    await logActivity(
+      { actorId: adminId, actorRole: "admin", storeId, action: "store.restored", entityType: "store", entityId: storeId },
+      db,
+    );
+  });
+}
+
+export async function getStoreOwnerEmail(storeId: string) {
+  return systemDb.maybeOne<{ email: string; full_name: string; slug: string; name: string }>(
+    `select u.email, u.full_name, s.slug, s.name
+       from stores s join users u on u.id = s.owner_id where s.id = $1`,
+    [storeId],
+  );
+}
+
+/**
+ * Permanently remove a product, all its variants/add-ons/images/reviews, any
+ * single-product flash announcements, and its uploaded storage assets.
+ */
+export async function deleteProductCompletely(input: {
+  productId: string;
+  storeId?: string;
+  actorId: string;
+  actorRole: Role;
+}): Promise<{ storeId: string; storeSlug: string; productSlug: string; productName: string } | null> {
+  const target = await systemDb.maybeOne<{
+    id: string;
+    store_id: string;
+    name: string;
+    slug: string;
+    store_slug: string;
+  }>(
+    `select p.id, p.store_id, p.name, p.slug, s.slug as store_slug
+       from products p
+       join stores s on s.id = p.store_id
+      where p.id = $1 and ($2::uuid is null or p.store_id = $2::uuid)`,
+    [input.productId, input.storeId ?? null],
+  );
+  if (!target) return null;
+
+  const images = await systemDb.query<{ url: string; upload_id: string | null }>(
+    `select url, upload_id from product_images where product_id = $1`,
+    [target.id],
+  );
+
+  await withSystem(async (db) => {
+    // Delete any store announcement that ONLY promoted this product so no dead promo remains
+    await db.execute(
+      `delete from announcements a
+        where a.store_id = $1
+          and exists (select 1 from announcement_products ap where ap.announcement_id = a.id and ap.product_id = $2)
+          and not exists (select 1 from announcement_products ap where ap.announcement_id = a.id and ap.product_id <> $2)`,
+      [target.store_id, target.id],
+    );
+
+    await db.execute(`delete from inventory_movements where product_id = $1`, [target.id]);
+    await db.execute(`delete from products where id = $1`, [target.id]);
+
+    // Remove stale creation/update log rows for this product so its old name never lingers in activity feeds
+    await db.execute(
+      `delete from activity_logs where entity_type = 'product' and entity_id = $1`,
+      [target.id],
+    );
+    await db.execute(
+      `delete from vendor_activity_logs where entity_type = 'product' and entity_id = $1`,
+      [target.id],
+    );
+  });
+
+  const remainingImages = await systemDb.query<{ url: string }>(
+    `select pi.url
+       from product_images pi
+       join products p on p.id = pi.product_id
+      where p.store_id = $1`,
+    [target.store_id],
+  );
+  const retainedUrls = new Set(remainingImages.map(row => row.url));
+  // Receipted media may be reused by another listing/editor during their save
+  // window. Their lock-aware cron cleanup, not a stale URL snapshot, deletes
+  // them once expired and unreferenced. Keep shared legacy photos as well.
+  const removedUrls = images.filter(image => !image.upload_id && !retainedUrls.has(image.url)).map(image => image.url);
+  await deleteStoredFiles(removedUrls);
+  await pruneOrphanStoreProductFiles(
+    target.store_slug,
+    remainingImages.map((row) => row.url),
+  );
+
+  return {
+    storeId: target.store_id,
+    storeSlug: target.store_slug,
+    productSlug: target.slug,
+    productName: target.name,
+  };
+}
+
+/**
+ * Permanently remove a storefront, its entire product catalogue, orders,
+ * messages, announcements, subscriptions, storage files, and vendor profile.
+ */
+export async function deleteStoreCompletely(input: {
+  storeId: string;
+  actorId: string;
+  actorRole: Role;
+  reason?: string;
+}): Promise<{ storeName: string; storeSlug: string; ownerId: string; ownerEmail: string } | null> {
+  const store = await systemDb.maybeOne<{
+    id: string;
+    owner_id: string;
+    name: string;
+    slug: string;
+    logo_url: string | null;
+    cover_url: string | null;
+    owner_email: string;
+    owner_name: string;
+    owner_role: string;
+    proof_url: string | null;
+  }>(
+    `select s.id, s.owner_id, s.name, s.slug, s.logo_url, s.cover_url,
+            u.email as owner_email, u.full_name as owner_name, u.role as owner_role,
+            vp.proof_of_residence_url as proof_url
+       from stores s
+       join users u on u.id = s.owner_id
+       left join vendor_profiles vp on vp.user_id = s.owner_id
+      where s.id = $1`,
+    [input.storeId],
+  );
+  if (!store) return null;
+
+  const [productImages, otherStoresCount] = await Promise.all([
+    systemDb.query<{ url: string }>(
+      `select pi.url
+         from product_images pi
+         join products p on p.id = pi.product_id
+        where p.store_id = $1
+       union select url from vendor_media_uploads where store_id=$1`,
+      [store.id],
+    ),
+    systemDb.one<{ count: number }>(
+      `select count(*)::int as count from stores where owner_id = $1 and id <> $2`,
+      [store.owner_id, store.id],
+    ),
+  ]);
+
+  const downgradeVendor = otherStoresCount.count === 0 && store.owner_role === "vendor";
+
+  await withSystem(async (db) => {
+    await db.execute(`delete from refunds where store_id = $1`, [store.id]);
+    await db.execute(`delete from payments where store_id = $1`, [store.id]);
+    await db.execute(`delete from activity_logs where store_id = $1`, [store.id]);
+    await db.execute(`delete from stores where id = $1`, [store.id]);
+
+    if (downgradeVendor) {
+      await db.execute(`delete from vendor_profiles where user_id = $1`, [store.owner_id]);
+      await db.execute(`delete from user_roles where user_id = $1 and role = 'vendor'`, [store.owner_id]);
+      await db.execute(
+        `insert into user_roles (user_id, role) values ($1, 'customer') on conflict do nothing`,
+        [store.owner_id],
+      );
+      await db.execute(
+        `insert into customer_profiles (user_id) values ($1) on conflict do nothing`,
+        [store.owner_id],
+      );
+      await db.execute(`update users set role = 'customer', updated_at = now() where id = $1`, [
+        store.owner_id,
+      ]);
+    }
+
+    await logActivity({
+      actorId: input.actorId,
+      actorRole: input.actorRole,
+      storeId: null,
+      action: "store.deleted",
+      entityType: "store",
+      entityId: store.id,
+      description: `Permanently deleted storefront ${store.name} (${store.slug})${input.reason ? ` — ${input.reason}` : ""}`,
+      meta: { slug: store.slug, ownerEmail: store.owner_email },
+    });
+
+    if (input.actorRole === "admin" || input.actorRole === "super_admin") {
+      await notify({
+        userId: store.owner_id,
+        storeId: null,
+        type: "store_deleted",
+        title: "Storefront permanently deleted",
+        body: `${store.name} has been permanently removed from Ibom Vendors Hub.${input.reason ? ` Reason: ${input.reason}` : ""}`,
+        actionUrl: "/",
+        dedupeKey: `store-deleted:${store.id}`,
+      });
+    }
+  });
+
+  const urlsToPurge: Array<string | null> = [
+    store.logo_url,
+    store.cover_url,
+    ...productImages.map((img) => img.url),
+  ];
+  if (downgradeVendor && store.proof_url) {
+    urlsToPurge.push(store.proof_url);
+  }
+  await Promise.all([
+    deleteStoredFiles(urlsToPurge),
+    deleteStoreStorageFolder(store.slug),
+  ]);
+
+  if (input.actorRole === "admin" || input.actorRole === "super_admin") {
+    try {
+      await sendEmail({
+        to: store.owner_email,
+        template: "store_deleted",
+        data: {
+          name: store.owner_name,
+          storeName: store.name,
+          reason: input.reason,
+        },
+        dedupeKey: `store-deleted-email:${store.id}`,
+      });
+    } catch (err) {
+      console.error("[deleteStoreCompletely] Non-fatal email error:", err);
+    }
+  }
+
+  return {
+    storeName: store.name,
+    storeSlug: store.slug,
+    ownerId: store.owner_id,
+    ownerEmail: store.owner_email,
+  };
+}
+
+export { isUniqueViolation };

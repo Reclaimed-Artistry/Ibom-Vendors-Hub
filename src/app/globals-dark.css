@@ -1,0 +1,23 @@
+[data-theme="dark"] {
+  --color-ink-50: #0b140e;
+  --color-ink-100: #141d17;
+  --color-ink-200: #1e2a23;
+  --color-ink-300: #2d3e34;
+  --color-ink-400: #4a5f56;
+  --color-ink-500: #6b7f75;
+  --color-ink-600: #8fa098;
+  --color-ink-700: #a8b6ae;
+  --color-ink-800: #c2cdc6;
+  --color-ink-900: #e8efe8;
+
+  --color-brand-50: #022c22;
+  --color-brand-100: #064e3b;
+  --color-brand-200: #10b981;
+  --color-brand-300: #34d399;
+  --color-brand-400: #6ee7b7;
+  --color-brand-500: #a7f3d0;
+  --color-brand-600: #d1fae5;
+  --color-brand-700: #ecfdf5;
+  --color-brand-800: #f0fdfa;
+  --color-brand-900: #f0fdf4;
+}

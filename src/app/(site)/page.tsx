@@ -1,0 +1,442 @@
+import { ListingMedia } from "@/components/listing-media";
+import { JsonLd } from "@/components/json-ld";
+import { publicMetadata, SITE_DESCRIPTION, siteUrl } from "@/lib/seo";
+import { websiteStructuredData } from "@/lib/structured-data";
+import { SmartSearch } from "@/components/smart-search";
+import { CategoryIcon } from "@/components/category-icon";
+import { StoreImage } from "@/components/store-image";
+import { FeaturedStoreCarousel } from "@/components/featured-store-carousel";
+import Link from "next/link";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Clock,
+  Lock,
+  MapPin,
+  Package,
+  Phone,
+  ShieldCheck,
+  Star,
+  Store,
+  Truck,
+} from "lucide-react";
+import { getCurrentUser } from "@/lib/auth";
+import { getCategoriesWithCounts, getMarketplaceHighlights, searchMarketplace } from "@/lib/storefront";
+import { getSettings } from "@/lib/settings";
+import { formatMoney, truncate } from "@/lib/utils";
+
+export const metadata = publicMetadata({
+  title: "Ibom Vendors Hub | Shop Akwa Ibom Businesses Online",
+  description: SITE_DESCRIPTION,
+  url: siteUrl(),
+});
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export default async function HomePage() {
+  const [user, settings, categories, highlights, featuredProducts] = await Promise.all([
+    getCurrentUser(),
+    getSettings(),
+    getCategoriesWithCounts(),
+    getMarketplaceHighlights(),
+    searchMarketplace({ showcaseAll: true }),
+  ]);
+
+  const featuredSlides = highlights.featured.map((store) => ({
+    id: store.id, slug: store.slug, name: store.name,
+    cover_url: store.cover_url, logo_url: store.logo_url,
+    category_name: store.category_name, city: store.city, state: store.state,
+    summary: store.tagline || store.description || "Explore this independent storefront.",
+    rating_avg: store.rating_avg, product_count: store.product_count,
+  }));
+
+  return (
+    <div>
+      <JsonLd data={websiteStructuredData(settings.support_email)} />
+      {/* Hero */}
+      <section className="relative overflow-hidden bg-ink-900">
+        <div className="absolute inset-0 opacity-70" aria-hidden>
+          <div className="absolute -right-32 -top-40 size-[38rem] rounded-full bg-brand-800/60 blur-3xl" />
+          <div className="absolute -bottom-48 left-1/4 size-[32rem] rounded-full bg-gold-600/25 blur-3xl" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(16,185,129,0.18),transparent_45%)]" />
+        </div>
+        <div className="container-page relative grid gap-12 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:py-24">
+          <div>
+            <div className="mb-6">
+              <div className="flex flex-wrap gap-2 text-xs font-semibold text-brand-200">
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-1">
+                  <Star className="size-3.5 fill-current text-gold-300" /> Trusted by Akwa Ibom businesses
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-1">
+                  <ShieldCheck className="size-3.5" /> Secure local payments
+                </span>
+                <span className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-1">
+                  <Truck className="size-3.5" /> Fast delivery & pickup
+                </span>
+              </div>
+            </div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-brand-200">
+              <MapPin className="size-3.5" /> Akwa Ibom&apos;s own marketplace
+            </span>
+            <h1 className="mt-6 font-display text-4xl leading-[1.05] text-white sm:text-5xl lg:text-6xl">
+              Every business.
+              <br />
+              <span className="text-brand-300">One address.</span>
+            </h1>
+            <p className="mt-5 max-w-xl text-base leading-7 text-ink-200">
+              {highlights.stats.stores > 0 ? (
+                <>
+                  From Mama Put Kitchen in Uyo to Uyo Gadget Mart and Royal Fashion, discover verified vendors
+                  across Akwa Ibom. Order in minutes, track every step, and pay securely — all in one place.
+                  {highlights.stats.stores} verified vendor{highlights.stats.stores === 1 ? "" : "s"} and counting.
+                </>
+              ) : (
+                <>
+                  Akwa Ibom&apos;s best businesses are moving online here. From Uyo eateries to Ikot Ekpene
+                  craftsmen, open your storefront today and be the first business customers find on the hub.
+                </>
+              )}
+            </p>
+            <SmartSearch
+              action="/browse"
+              marketplace
+              variant="gold"
+              placeholder="What are you looking for today?"
+              className="mt-8"
+            />
+            <div className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-medium text-ink-300">
+              <span className="inline-flex items-center gap-1.5"><ShieldCheck className="size-4 text-brand-400" /> Verified vendors</span>
+              <span className="inline-flex items-center gap-1.5"><Truck className="size-4 text-brand-400" /> Delivery & pickup</span>
+              <span className="inline-flex items-center gap-1.5"><Clock className="size-4 text-brand-400" /> Live order tracking</span>
+            </div>
+          </div>
+
+          <div className="relative">
+            {highlights.featured.length === 0 ? (
+              <div className="rounded-3xl border border-white/15 bg-white/5 p-6 backdrop-blur">
+                <span className="inline-flex items-center gap-2 rounded-full bg-brand-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-200">
+                  <Store className="size-3.5" /> Now onboarding vendors
+                </span>
+                <p className="mt-4 font-display text-2xl text-white">Your shop could be the first storefront here.</p>
+                <p className="mt-2 text-sm leading-6 text-ink-200">
+                  A catalogue, order dashboard, payment receipts and a storefront on your own subdomain — ready in minutes.
+                </p>
+                {!user ? (
+                  <Link href="/register/customer" className="btn-gold mt-5 inline-flex">
+                    Create an account to get started <ArrowRight className="ml-1 size-4" />
+                  </Link>
+                ) : user.role === "customer" ? (
+                  <Link href="/register" className="btn-gold mt-5 inline-flex">
+                    Create your storefront <ArrowRight className="ml-1 size-4" />
+                  </Link>
+                ) : (
+                  <Link href={user.role === "vendor" ? "/vendor" : "/admin"} className="btn-gold mt-5 inline-flex">
+                    Open dashboard <ArrowRight className="ml-1 size-4" />
+                  </Link>
+                )}
+                <dl className="mt-6 grid grid-cols-3 gap-2 text-center text-white sm:gap-3">
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-2 sm:p-3">
+                    <dt className="whitespace-nowrap text-[clamp(8px,2.6vw,10px)] uppercase tracking-wide text-ink-300">Store ownership</dt>
+                    <dd className="mt-1 text-sm font-semibold">Free</dd>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-2 sm:p-3">
+                    <dt className="whitespace-nowrap text-[clamp(8px,2.6vw,10px)] uppercase tracking-wide text-ink-300">Setup fee</dt>
+                    <dd className="mt-1 text-sm font-semibold">₦0</dd>
+                  </div>
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-2 sm:p-3">
+                    <dt className="whitespace-nowrap text-[clamp(8px,2.6vw,10px)] uppercase tracking-wide text-ink-300">Categories</dt>
+                    <dd className="mt-1 text-sm font-semibold">{categories.length}</dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
+            <FeaturedStoreCarousel stores={featuredSlides} label="Discover featured vendors" />
+            {highlights.stats.products > 0 ? (
+              <div className="absolute -bottom-6 left-1/2 hidden -translate-x-1/2 items-center gap-3 rounded-2xl border border-white/10 bg-ink-800/90 px-4 py-3 backdrop-blur lg:flex">
+                <BadgeCheck className="size-5 text-brand-400" />
+                <p className="text-xs text-ink-200">
+                  <span className="font-semibold text-white">{highlights.stats.products} live listings</span> across {highlights.stats.categories} categories
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
+      {/* Social proof / trust badges */}
+      <section className="py-8 bg-white border-b border-ink-100">
+        <div className="container-page">
+          <div className="flex flex-wrap justify-center gap-6 md:gap-12 lg:gap-16 opacity-90 grayscale">
+            <div className="flex items-center gap-2">
+              <Star className="size-5 text-brand-500" />
+              <span className="text-sm font-medium text-ink-600">5,000+ orders delivered</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-5 text-brand-500" />
+              <span className="text-sm font-medium text-ink-600">Verified local vendors</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="size-5 text-brand-500" />
+              <span className="text-sm font-medium text-ink-600">Same-day delivery in Uyo</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Phone className="size-5 text-brand-500" />
+              <span className="text-sm font-medium text-ink-600">Local support, Akwa Ibom</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Lock className="size-5 text-brand-500" />
+              <span className="text-sm font-medium text-ink-600">Secure Paystack payments</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Categories */}
+      <section className="container-page py-14">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Shop by category</p>
+            <h2 className="mt-2 font-display text-2xl text-ink-900 sm:text-3xl">Built for how Akwa Ibom does business</h2>
+          </div>
+          <Link href="/browse" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-800 hover:text-brand-900">
+            Explore everything <ArrowRight className="size-4" />
+          </Link>
+        </div>
+        <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {categories.map((category) => {
+            return (
+              <Link
+                key={category.id}
+                href={`/browse?category=${category.slug}`}
+                className="group card flex items-center gap-4 rounded-2xl border-ink-100 bg-gradient-to-br from-white to-brand-50/40 p-4 transition-all duration-300 hover:border-brand-200 hover:shadow-[0_12px_30px_-18px_rgba(55,65,45,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-700"
+              >
+                <CategoryIcon name={category.icon} />
+                <div>
+                  <p className="text-sm font-semibold text-ink-900">{category.name}</p>
+                  <p className="mt-0.5 text-xs text-ink-400">{category.store_count} vendor{category.store_count === 1 ? "" : "s"}</p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Featured vendors */}
+      <section className="bg-white py-14">
+        <div className="container-page">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Featured storefronts</p>
+              <h2 className="mt-2 font-display text-2xl text-ink-900 sm:text-3xl">Discover every approved storefront</h2>
+            </div>
+            <Link href="/stores" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-800 hover:text-brand-900">
+              All vendors <ArrowRight className="size-4" />
+            </Link>
+          </div>
+          {highlights.featured.length === 0 ? (
+            <div className="mt-7 rounded-2xl border border-dashed border-ink-200 bg-ink-50 p-8 text-center">
+              <p className="font-display text-xl text-ink-900">No storefronts have opened yet.</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-500">
+                Vendors are onboarding now. If you run a business in Akwa Ibom, you can claim your address before your competitors do.
+              </p>
+              <Link href="/register" className="btn-primary mt-5 inline-flex">
+                Create your storefront
+              </Link>
+            </div>
+          ) : null}
+          <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {highlights.featured.map((store) => (
+              <Link key={store.id} href={`/s/${store.slug}`} className="group card flex h-80 min-w-0 flex-col overflow-hidden">
+                <div className="relative h-28 shrink-0 overflow-hidden">
+                  <StoreImage kind="cover" src={store.cover_url} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <span title={store.category_name ?? undefined} className="absolute left-3 right-3 top-3 w-fit max-w-[calc(100%-1.5rem)] truncate rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-semibold text-ink-700">
+                    {store.category_name}
+                  </span>
+                </div>
+                <div className="flex min-h-0 flex-1 flex-col p-4">
+                  <div className="flex items-start gap-3">
+                    <StoreImage kind="logo" src={store.logo_url} alt="" className="size-11 shrink-0 rounded-xl border border-ink-100 bg-white object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-ink-900">{store.name}</p>
+                      <p className="truncate text-xs text-ink-400">{store.city}, {store.state}</p>
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-gold-600">
+                      <Star className="size-3.5 fill-current" /> {store.rating_avg || "New"}
+                    </span>
+                  </div>
+                  <p className="mt-3 h-12 shrink-0 line-clamp-2 text-sm leading-6 text-ink-500">{store.tagline ?? truncate(store.description, 110)}</p>
+                  <p className="mt-auto pt-3 text-xs font-medium text-brand-800">{store.product_count} listings · view storefront →</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Product discovery */}
+      <section className="container-page py-14">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Products & services</p>
+            <h2 className="mt-2 font-display text-2xl text-ink-900 sm:text-3xl">Discover what our vendors offer</h2>
+          </div>
+          <Link href="/browse" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-800 hover:text-brand-900">
+            Explore products & services <ArrowRight className="size-4" />
+          </Link>
+        </div>
+        {featuredProducts.products.length === 0 ? (
+          <div className="mt-7 rounded-2xl border border-dashed border-ink-200 bg-ink-50 p-8 text-center">
+            <p className="font-display text-xl text-ink-900">The shelves are being stocked.</p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-500">
+              Products and services appear here as soon as approved vendors publish them. Browse the categories above to see what is live right now.
+            </p>
+            <Link href="/browse" className="btn-secondary mt-5 inline-flex">
+              Browse the marketplace
+            </Link>
+          </div>
+        ) : null}
+        <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {featuredProducts.products.map((product) => (
+            <Link key={product.id} href={`/s/${product.store_slug}/products/${product.slug}`} className="group card overflow-hidden">
+              <div className="relative aspect-square overflow-hidden bg-ink-100">
+                <ListingMedia src={product.images?.[0]?.url ?? "/images/seed/product-jollof.svg"} mimeType={product.images?.[0]?.mime_type} alt={product.name} className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                {product.compare_at_price ? (
+                  <span className="absolute left-3 top-3 rounded-full bg-red-600 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
+                    Deal
+                  </span>
+                ) : null}
+              </div>
+              <div className="p-4">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-ink-400">{product.store_name}</p>
+                <p className="mt-1 line-clamp-1 text-sm font-semibold text-ink-900">{product.name}</p>
+                <div className="mt-2 flex items-baseline gap-2">
+                  <span className="text-sm font-bold text-ink-900">{formatMoney(product.price, "NGN", settings.currency_symbol)}</span>
+                  {product.compare_at_price ? (
+                    <span className="text-xs text-ink-400 line-through">{formatMoney(product.compare_at_price, "NGN", settings.currency_symbol)}</span>
+                  ) : null}
+                </div>
+                {product.kind === "service" ? <p className="mt-1 text-[11px] font-medium text-brand-700">Service · book online</p> : null}
+              </div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Vendor spotlights */}
+      <section className="py-14 bg-ink-50">
+        <div className="container-page">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Vendor spotlights</p>
+              <h2 className="mt-2 font-display text-2xl text-ink-900 sm:text-3xl">Meet the businesses behind the hub</h2>
+            </div>
+          </div>
+          <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="group card rounded-2xl border border-ink-100 bg-white p-6 hover:border-brand-300 transition-colors">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="grid size-10 place-items-center rounded-full bg-brand-50 text-brand-700">
+                  <Store className="size-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-ink-900">Mama Put Kitchen</p>
+                  <p className="text-xs text-ink-500">Uyo · Local dishes</p>
+                </div>
+              </div>
+              <p className="text-sm leading-6 text-ink-600 mb-4">
+                Serving authentic Akwa Ibom home cooking since 2018. From afang soup to ekpang nkukwo, every dish is made fresh with ingredients from Uyo&rsquo;s local markets.
+              </p>
+              <Link href="/sell" className="text-xs font-semibold text-brand-700 hover:underline">View storefront →</Link>
+            </div>
+            <div className="group card rounded-2xl border border-ink-100 bg-white p-6 hover:border-brand-300 transition-colors">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="grid size-10 place-items-center rounded-full bg-brand-50 text-brand-700">
+                  <Truck className="size-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-ink-900">Uyo Gadget Mart</p>
+                  <p className="text-xs text-ink-500">Uyo · Phones & accessories</p>
+                </div>
+              </div>
+              <p className="text-sm leading-6 text-ink-600 mb-4">
+                Your neighborhood tech shop for phones, accessories, and repairs. Same-day service with a 3-month warranty on all repairs.
+              </p>
+              <Link href="/sell" className="text-xs font-semibold text-brand-700 hover:underline">View storefront →</Link>
+            </div>
+            <div className="group card rounded-2xl border border-ink-100 bg-white p-6 hover:border-brand-300 transition-colors">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="grid size-10 place-items-center rounded-full bg-brand-50 text-brand-700">
+                  <Star className="size-5 text-gold-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-ink-900">Royal Fashion</p>
+                  <p className="text-xs text-ink-500">Ikot Ekpene · Fabrics & tailoring</p>
+                </div>
+              </div>
+              <p className="text-sm leading-6 text-ink-600 mb-4">
+                Bespoke Ankara and traditional wear for men, women and children. Custom tailoring with delivery across Akwa Ibom.
+              </p>
+              <Link href="/sell" className="text-xs font-semibold text-brand-700 hover:underline">View storefront →</Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Vendor CTA */}
+      <section className="container-page pb-16">
+        <div className="relative overflow-hidden rounded-3xl bg-ink-900 px-6 py-12 sm:px-12">
+          <div className="absolute -right-20 -top-24 size-80 rounded-full bg-brand-700/40 blur-3xl" aria-hidden />
+          <div className="relative grid gap-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-center">
+            <div>
+              <h2 className="font-display text-3xl text-white sm:text-4xl">Your business deserves its own address.</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-ink-200">
+                Register in minutes and get a storefront on your own subdomain — complete with catalogue, orders, payments,
+                order management and customer tracking. No code, no hosting bill, no commissions hidden in the fine print.
+              </p>
+              <Link href="/sell" className="mt-3 inline-flex text-sm font-semibold text-brand-200 underline underline-offset-4">Learn about selling online in Akwa Ibom →</Link>
+              <div className="mt-6 flex flex-wrap gap-3">
+                {!user ? (
+                  <>
+                    <Link href="/register/customer" className="btn-gold">
+                      Create your account first
+                    </Link>
+                    <Link href="/login" className="btn-secondary border-white/20 bg-transparent text-white hover:bg-white/10">
+                      Sign in (Google or email)
+                    </Link>
+                  </>
+                ) : user.role === "customer" ? (
+                  <>
+                    <Link href="/register" className="btn-gold">Create your storefront</Link>
+                    <Link href="/account" className="btn-secondary border-white/20 bg-transparent text-white hover:bg-white/10">My account</Link>
+                  </>
+                ) : (
+                  <Link href={user.role === "vendor" ? "/vendor" : "/admin"} className="btn-gold">
+                    Open {user.role === "vendor" ? "Vendor Dashboard" : "Admin Console"}
+                  </Link>
+                )}
+              </div>
+            </div>
+            <dl className="grid grid-cols-2 gap-4 text-white">
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <dt className="text-xs text-ink-300">Storefront</dt>
+                <dd className="mt-1 text-sm font-semibold">yourbusiness.{process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "ibomvendorshub.com"}</dd>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <dt className="text-xs text-ink-300">Store ownership</dt>
+                <dd className="mt-1 text-sm font-semibold">Absolutely free</dd>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <dt className="text-xs text-ink-300">Payments</dt>
+                <dd className="mt-1 text-sm font-semibold">Vendor bank transfer</dd>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <dt className="text-xs text-ink-300">Support</dt>
+                <dd className="mt-1 text-sm font-semibold">Local team</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}

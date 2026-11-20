@@ -1,0 +1,59 @@
+/* Shared, asset-free feedback. No layout animation, scroll hijack or hidden content. */
+.ivh-scroll-progress {
+  position: fixed;
+  z-index: 60;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(90deg, var(--color-brand-500), var(--color-gold-500), var(--color-brand-700));
+  transform: scaleX(var(--ivh-scroll-progress, 0));
+  transform-origin: left;
+}
+.ivh-scroll-progress[data-scrollable="true"] { opacity: 1; }
+
+@media (hover: hover) and (pointer: fine) {
+  :is(a.card, button.card, [data-hover-card]) {
+    transition: translate 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+  }
+  :is(a.card, button.card, [data-hover-card]):not(:disabled):not([aria-disabled="true"]):hover {
+    translate: 0 -4px;
+    border-color: var(--color-brand-200);
+    box-shadow: 0 14px 28px -20px rgb(6 95 70 / 45%);
+  }
+  :is(.btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger, .btn-gold) {
+    transition: translate 180ms ease, scale 180ms ease, color 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  }
+  :is(.btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger, .btn-gold):not(:disabled):not([aria-disabled="true"]):hover {
+    translate: 0 -2px;
+    box-shadow: 0 7px 15px -11px rgb(14 26 21 / 55%);
+  }
+  :is(.btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger, .btn-gold):not(:disabled):not([aria-disabled="true"]):active {
+    translate: 0 0;
+    scale: .985;
+  }
+  .sidebar-link { transition: translate 180ms ease, color 180ms ease, background-color 180ms ease; }
+  .sidebar-link:hover { translate: 2px 0; }
+  :is(header nav a, footer a) { transition: color 180ms ease, background-color 180ms ease; }
+  footer a:hover { text-decoration: underline; text-underline-offset: 4px; }
+  :is(.input, .select, .textarea) { transition: border-color 180ms ease, box-shadow 180ms ease; }
+  :is(.input, .select, .textarea):not(:disabled):not(:focus):hover { border-color: var(--color-brand-300); }
+}
+
+/* Focus remains a stable, visible target; do not require hover to find a link. */
+a.card:focus-visible { border-color: var(--color-brand-500); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  :is(a.card, button.card, [data-hover-card], .btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger, .btn-gold, .sidebar-link) {
+    translate: none !important;
+    scale: none !important;
+    transition: none !important;
+  }
+  .card [class~="group-hover:scale-105"] { transform: none !important; transition: none !important; }
+}
+@media (prefers-reduced-motion: reduce), (forced-colors: active), print {
+  .ivh-scroll-progress { display: none; }
+}
