@@ -80,8 +80,8 @@ async function main() {
     observer.emit(find("repeat"), true, 590, 0.01, 1);
     assert.equal(animations.length, 0, "do not animate at a fragile intersection boundary");
     observer.emit(find("repeat"), true);
-    assert.equal(animations.length, 1); assert.equal(animations[0].options.duration, 560);
-    assert.equal(animations[0].options.easing, "cubic-bezier(.16,1,.3,1)", "a smooth ease-out settles without bounce");
+    assert.equal(animations.length, 1); assert.equal(animations[0].options.duration, 700, "a moderate fly-in remains noticeable without a long wait");
+    assert.equal(animations[0].options.easing, "cubic-bezier(.22,.68,.3,1)", "gentler easing avoids a rushed start and settles without bounce");
     assert.equal(animations[0].keyframes[0].opacity, 0.28, "a soft fade stays visible throughout the fly-in");
     assert.equal(animations[0].keyframes[0].translate, "-37.5px 0", "content flies from the left toward its resting position");
     assert.deepEqual(animations[0].keyframes[1], { opacity: 1, translate: "0 0" });

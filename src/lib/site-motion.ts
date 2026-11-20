@@ -43,7 +43,7 @@ export function installSiteMotion(progress: HTMLElement | null): () => void {
             const animation = element.animate([
               { opacity: 0.28, translate: `${-distance}px 0` },
               { opacity: 1, translate: "0 0" },
-            ], { duration: 560, easing: "cubic-bezier(.16,1,.3,1)" });
+            ], { duration: 700, easing: "cubic-bezier(.22,.68,.3,1)" });
             state.animation = animation;
             void animation.finished.then(() => { if (state.animation === animation) state.animation = undefined; }).catch(() => {});
           } catch { /* Unsupported animation APIs leave ordinary visible content. */ }

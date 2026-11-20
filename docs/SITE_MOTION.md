@@ -29,9 +29,10 @@ content into client components. The approved emerald/gold palette is unchanged.
 - Startup waits for idle time (or the next frame on browsers without an idle
   callback). One IntersectionObserver handles all reveal targets, including
   those added by client navigation, filters and streamed/live content.
-- Fly-in animations use only opacity and independent horizontal translation for
-  560 ms, with no blur, bounce, stagger timers or animation dependency. They never
-  change layout, hide content pending JS, or use `fill: forwards`. Travel is also
+- Fly-in animations use only opacity and independent horizontal translation over
+  700 ms, with gentler ease-out timing instead of a front-loaded snap. There is no
+  blur, bounce, stagger timer or animation dependency. They never change layout,
+  hide content pending JS, or use `fill: forwards`. Travel is also
   capped at 40% of the visible width to prevent exit/re-entry jitter at clipped
   edges, including on narrow screens.
 - The single scroll listener is passive and coalesces events into one requested
