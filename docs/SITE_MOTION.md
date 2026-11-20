@@ -9,10 +9,12 @@ content into client components. The approved emerald/gold palette is unchanged.
 - A slim emerald/gold progress accent follows the current document's native
   scroll position. It is decorative, ignores pointer events and disappears on
   pages that do not need scrolling.
-- Eligible cards, headings, footer content and login accents gently fade/lift
-  into view. **They replay after leaving and re-entering the viewport**, in
-  either direction, rather than running only on the first visit. Initially
-  visible content paints immediately, without waiting for an intro animation.
+- Eligible cards, headings, footer content and login accents **fly in from left
+  to right** with a soft fade and smooth ease-out, settling into place without
+  bounce. Travel scales with the element's width and is capped at 56 px.
+  **They replay after leaving and re-entering the viewport**, whether scrolling
+  down or back up; the fly-in always travels left to right. Initially visible
+  content paints immediately, without waiting for an intro animation.
 - Login's decorative background circles gain a small, bounded depth effect.
   Their independent floating animation and the flip card remain intact; inputs
   do not move with the background.
@@ -27,9 +29,11 @@ content into client components. The approved emerald/gold palette is unchanged.
 - Startup waits for idle time (or the next frame on browsers without an idle
   callback). One IntersectionObserver handles all reveal targets, including
   those added by client navigation, filters and streamed/live content.
-- Reveal animations use only opacity and independent translation for 420 ms.
-  They never change layout, hide content pending JS, or use `fill: forwards`.
-  A visible-area guard prevents exit/re-entry jitter at intersection edges.
+- Fly-in animations use only opacity and independent horizontal translation for
+  560 ms, with no blur, bounce, stagger timers or animation dependency. They never
+  change layout, hide content pending JS, or use `fill: forwards`. Travel is also
+  capped at 40% of the visible width to prevent exit/re-entry jitter at clipped
+  edges, including on narrow screens.
 - The single scroll listener is passive and coalesces events into one requested
   animation frame. Document height is cached and refreshed on resize/content
   size changes. There is no continuous frame loop, polling or React state update
@@ -59,10 +63,10 @@ npm run lint
 npm run build
 ```
 
-The motion suite checks both-direction replays, intersection-edge bounds,
-initial paint, focus/pointer protection, exclusions, streamed nodes, passive
-scroll listeners, frame batching/cached geometry, hidden tabs, live preference
-changes, browser fallbacks and cleanup. Browser QA additionally covers repeated
+The motion suite checks left-to-right keyframes/easing, both-direction replays,
+responsive/visible-width bounds, initial paint, focus/pointer protection,
+exclusions, streamed nodes, passive scroll listeners, frame batching/cached
+geometry, hidden tabs, live preference changes, browser fallbacks and cleanup. Browser QA additionally covers repeated
 scrolling/hover on the marketplace and storefront, client-side navigation,
 mobile/touch, login/signup, reduced motion, keyboard access and idle stability.
 Use local fixtures for any authentication/product/cart mutations; production

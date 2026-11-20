@@ -35,14 +35,15 @@ export function installSiteMotion(progress: HTMLElement | null): () => void {
           // Keep watching after exit so scrolling back replays the effect.
           if (document.hidden || element.contains(document.activeElement) || element.closest("[inert], [aria-hidden='true']")) continue;
           cancel(state);
-          // Stay inside the observed area: the animation must not trigger its
-          // own exit/re-entry loop when someone stops scrolling at an edge.
-          const distance = Math.min(12, entry.intersectionRect.height * 0.4);
+          // Always glide left to right, even when scrolling back up. Bound the
+          // travel by target/visible width so narrow or clipped content cannot
+          // animate itself outside the observer and start an idle replay loop.
+          const distance = Math.min(56, entry.boundingClientRect.width / 8, entry.intersectionRect.width * 0.4);
           try {
             const animation = element.animate([
-              { opacity: 0.68, translate: `0 ${entry.boundingClientRect.top < 0 ? -distance : distance}px` },
+              { opacity: 0.28, translate: `${-distance}px 0` },
               { opacity: 1, translate: "0 0" },
-            ], { duration: 420, easing: "cubic-bezier(.2,.65,.3,1)" });
+            ], { duration: 560, easing: "cubic-bezier(.16,1,.3,1)" });
             state.animation = animation;
             void animation.finished.then(() => { if (state.animation === animation) state.animation = undefined; }).catch(() => {});
           } catch { /* Unsupported animation APIs leave ordinary visible content. */ }

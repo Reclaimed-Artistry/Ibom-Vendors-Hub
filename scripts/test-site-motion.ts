@@ -47,7 +47,7 @@ async function main() {
     observe(element: Element) { this.targets.add(element); }
     unobserve(element: Element) { this.targets.delete(element); }
     disconnect() { this.disconnected = true; this.targets.clear(); }
-    emit(element: Element, inside: boolean, top = 100, ratio = inside ? 0.8 : 0, visibleHeight = 30) { this.callback([{ target: element, isIntersecting: inside, intersectionRatio: ratio, boundingClientRect: { top }, intersectionRect: { height: visibleHeight } } as IntersectionObserverEntry], this as unknown as IntersectionObserver); }
+    emit(element: Element, inside: boolean, top = 100, ratio = inside ? 0.8 : 0, visibleHeight = 30, visibleWidth = 300, width = 300) { this.callback([{ target: element, isIntersecting: inside, intersectionRatio: ratio, boundingClientRect: { top, width }, intersectionRect: { height: visibleHeight, width: visibleWidth } } as IntersectionObserverEntry], this as unknown as IntersectionObserver); }
   }
   const observers: Observer[] = [];
   Object.defineProperty(window, "IntersectionObserver", { configurable: true, value: Observer });
@@ -80,20 +80,28 @@ async function main() {
     observer.emit(find("repeat"), true, 590, 0.01, 1);
     assert.equal(animations.length, 0, "do not animate at a fragile intersection boundary");
     observer.emit(find("repeat"), true);
-    assert.equal(animations.length, 1); assert.equal(animations[0].options.duration, 420);
-    assert.equal(animations[0].keyframes[0].opacity, 0.68, "content never disappears while waiting for an effect");
+    assert.equal(animations.length, 1); assert.equal(animations[0].options.duration, 560);
+    assert.equal(animations[0].options.easing, "cubic-bezier(.16,1,.3,1)", "a smooth ease-out settles without bounce");
+    assert.equal(animations[0].keyframes[0].opacity, 0.28, "a soft fade stays visible throughout the fly-in");
+    assert.equal(animations[0].keyframes[0].translate, "-37.5px 0", "content flies from the left toward its resting position");
+    assert.deepEqual(animations[0].keyframes[1], { opacity: 1, translate: "0 0" });
+    assert.deepEqual(Object.keys(animations[0].keyframes[0]), ["opacity", "translate"], "no layout changes, blur or expensive effects");
     observer.emit(find("repeat"), true); assert.equal(animations.length, 1, "no repeat animations while staying in view");
     observer.emit(find("repeat"), false); assert(animations[0].cancelled);
     observer.emit(find("repeat"), true, -10); assert.equal(animations.length, 2);
-    assert.equal(animations[1].keyframes[0].translate, "0 -12px", "scrolling upward replays with the matching direction");
+    assert.equal(animations[1].keyframes[0].translate, "-37.5px 0", "scrolling upward replays the same left-to-right fly-in, not a vertical or reversed effect");
     find("repeat").focus(); assert(animations[1].cancelled, "focus immediately stabilises the interactive target");
     observer.emit(find("repeat"), false); observer.emit(find("repeat"), true); assert.equal(animations.length, 2, "focused content is never moved");
     find("repeat").blur(); observer.emit(find("repeat"), false); observer.emit(find("repeat"), true);
     find("nested").dispatchEvent(new window.Event("pointerdown", { bubbles: true })); assert(animations[2].cancelled);
     observer.emit(find("inactive"), false); observer.emit(find("inactive"), true); assert.equal(animations.length, 3, "an inert login face is never animated");
-    observer.emit(find("hero"), false); observer.emit(find("hero"), true, 590, 0.12, 2);
-    assert.equal(animations.at(-1)?.keyframes[0].translate, "0 0.8px", "a small visible edge cannot translate itself out of view and create an idle replay loop");
-    console.log("PASS: one shared observer; repeat entrance in both scroll directions; no nested, form, player, carousel, sticky, modal, focused-target or intersection-edge jitter");
+    observer.emit(find("hero"), false); observer.emit(find("hero"), true, 590, 0.12, 30, 2);
+    assert.equal(animations.at(-1)?.keyframes[0].translate, "-0.8px 0", "a small visible horizontal edge cannot translate itself out of view and create an idle replay loop");
+    observer.emit(find("footer"), false); observer.emit(find("footer"), true, 100, 0.8, 30, 1200, 1200);
+    assert.equal(animations.at(-1)?.keyframes[0].translate, "-56px 0", "wide sections have bounded travel rather than crossing the screen");
+    observer.emit(find("first"), false); observer.emit(find("first"), true, 100, 0.8, 30, 160, 160);
+    assert.equal(animations.at(-1)?.keyframes[0].translate, "-20px 0", "small cards use proportionately shorter travel");
+    console.log("PASS: sleek left-to-right fly-ins replay in both scroll directions; responsive/visible-width travel bounds; no nested, form, player, carousel, sticky, modal, focused-target or intersection-edge jitter");
 
     flush(); assert.equal(frames.size, 0, "there is no continuous animation frame loop");
     assert.equal(progress.dataset.scrollable, "true"); assert.equal(progress.style.getPropertyValue("--ivh-scroll-progress"), "0.0000");
