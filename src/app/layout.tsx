@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import "./globals.css";
 import "./globals-dark.css";
 import "./motion.css";
@@ -60,56 +59,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <CartProvider>{children}</CartProvider>
           <SiteMotion />
         </ThemeProvider>
-
-        {/* Analytics & error tracking — configure IDs in Vercel env vars */}
-        {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
-          <Script
-            src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}`}
-            strategy="afterInteractive"
-          />
-        )}
-        {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
-          <Script id="ga-init" strategy="afterInteractive">
-            {`
-              window.dataLayer = window.dataLayer || [];
-              function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-              gtag('config', '${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}');
-            `}
-          </Script>
-        )}
-        {process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN && (
-          <Script
-            defer
-            data-domain={process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN}
-            src="https://plausible.io/js/script.js"
-            strategy="afterInteractive"
-          />
-        )}
-        {process.env.NEXT_PUBLIC_SENTRY_DSN && (
-          <Script
-            id="sentry-init"
-            strategy="beforeInteractive"
-            dangerouslySetInnerHTML={{
-              __html: `
-                (function(){
-                  var Sentry = window.Sentry || (window.Sentry = {});
-                  Sentry.init({
-                    dsn: '${process.env.NEXT_PUBLIC_SENTRY_DSN}',
-                    environment: '${process.env.NODE_ENV ?? 'production'}',
-                    tracesSampleRate: 0.1,
-                    replaysSessionSampleRate: 0.1,
-                    replaysOnErrorSampleRate: 1.0,
-                    integrations: [
-                      new Sentry.BrowserTracing(),
-                      new Sentry.Replay()
-                    ]
-                  });
-                })();
-              `,
-            }}
-          />
-        )}
       </body>
     </html>
   );

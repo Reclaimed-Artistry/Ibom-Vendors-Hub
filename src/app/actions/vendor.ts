@@ -1018,52 +1018,6 @@ export async function saveVendorBankAccountAction(_prev: VendorState, formData: 
   return { message: "Payout bank account saved." };
 }
 
-export async function requestCustomDomainAction(_prev: VendorState, formData: FormData): Promise<VendorState> {
-  const ctx = await getVendorContext();
-  const lockError = vendorSuspensionMessage(ctx);
-  if (lockError) return { error: lockError };
-
-  const requestedDomain = String(formData.get("customDomain") ?? "").trim().toLowerCase();
-  if (!requestedDomain) return { error: "Please enter a domain name." };
-  if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/.test(requestedDomain)) {
-    return { error: "Please enter a valid domain name (e.g. shop.yourbusiness.com.ng)." };
-  }
-
-  const existing = await systemDb.maybeOne<{ id: string }>(
-    `select id from stores where lower(custom_domain) = $1 and id <> $2`,
-    [requestedDomain, ctx.store.id],
-  );
-  if (existing) return { error: "This domain is already in use by another store." };
-
-  const existingRequest = await systemDb.maybeOne<{ id: string; status: string }>(
-    `select id, status from custom_domain_requests where store_id = $1 order by requested_at desc limit 1`,
-    [ctx.store.id],
-  );
-  if (existingRequest && existingRequest.status === "pending") {
-    return { error: "You already have a pending domain request. An admin will review it shortly." };
-  }
-
-  await withSystem(async (db) => {
-    await db.execute(
-      `insert into custom_domain_requests (store_id, requested_domain, status)
-       values ($1, $2, 'pending')`,
-      [ctx.store.id, requestedDomain],
-    );
-    await logActivity({
-      actorId: ctx.user.id,
-      actorRole: "vendor",
-      storeId: ctx.store.id,
-      action: "custom_domain.requested",
-      entityType: "store",
-      entityId: ctx.store.id,
-      description: `${ctx.store.name} requested custom domain ${requestedDomain}`,
-    });
-  });
-
-  revalidatePath("/vendor/store");
-  return { message: `Domain request for ${requestedDomain} has been submitted. An admin will review it shortly.` };
-}
-
 export async function requestVendorPayoutAction(_prev: VendorState, formData: FormData): Promise<VendorState> {
   const ctx = await getVendorContext();
   const lockError = vendorSuspensionMessage(ctx);
