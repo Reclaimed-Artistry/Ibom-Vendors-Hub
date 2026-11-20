@@ -11,14 +11,16 @@ import type { StoreCategory } from "../src/lib/types";
 const BASE = process.env.CATEGORY_TEST_BASE_URL ?? "http://127.0.0.1:3000";
 const HOST = "www.ibomvendorshub.com";
 interface Response { status: number; text: string; location?: string }
-async function http(path: string, cookie: string, data?: FormData): Promise<Response> {
+async function http(path: string, cookie: string, data?: FormData | Array<[string, string]>, origin = `https://${HOST}`): Promise<Response> {
   let body: Buffer | undefined; let contentType: string | undefined;
-  if (data) {
+  if (Array.isArray(data)) {
+    body = Buffer.from(JSON.stringify(data)); contentType = "application/json";
+  } else if (data) {
     const encoded = new Request("http://local.test", {method:"POST",body:data});
     body = Buffer.from(await encoded.arrayBuffer()); contentType = encoded.headers.get("content-type")!;
   }
   return new Promise((resolve,reject) => {
-    const req = request(new URL(path,BASE), {method:data?"POST":"GET",headers:{host:HOST,origin:`https://${HOST}`,cookie,...(body?{"content-type":contentType!,"content-length":body.length}:{})}}, res => {
+    const req = request(new URL(path,BASE), {method:data?"POST":"GET",headers:{host:HOST,origin,cookie,...(body?{"content-type":contentType!,"content-length":body.length}:{})}}, res => {
       let text=""; res.setEncoding("utf8"); res.on("data",chunk=>{text+=chunk;});
       res.on("end",()=>resolve({status:res.statusCode??0,text,location:res.headers.location})); res.on("error",reject);
     });
@@ -80,6 +82,41 @@ async function main() {
     const crossStore=await http(`/vendor/products/${boxes.id}`,cookie,data);assert.equal(crossStore.status,200);assert(crossStore.text.includes("not owned by you"));
     assert.equal((await systemDb.one(`select name from products where id=$1`,[foreignProductId])).name,"Foreign product");
     console.log("PASS: real product form actions persist independent category/section, add new business lines, roll back failures and reject cross-store edits");
+
+    const acknowledged = await saveListing("HTTP acknowledged product", fashion.id, { clientSaveNavigation: "1" });
+    assert.equal(acknowledged.status, 200, "hydrated editors receive a confirmed-save result, not a streamed 303 redirect");
+    const confirmed = await systemDb.one<{ id: string }>(`select id from products where store_id=$1 and name='HTTP acknowledged product'`, [storeId]);
+    assert(acknowledged.text.includes(`/vendor/products/${confirmed.id}?saved=1`), "the acknowledgement points to the actual committed listing");
+    assert(acknowledged.text.includes("Product saved"));
+    assert(acknowledged.text.includes("Open saved product"), "a usable fallback link is rendered even if browser navigation is blocked");
+    assert.equal((await systemDb.one(`select count(*)::int n from products where store_id=$1 and name='HTTP acknowledged product'`, [storeId])).n, 1);
+    console.log("PASS: hydrated product-save acknowledgement returns the committed listing URL and fallback confirmation; legacy HTML submissions keep 303 redirects");
+
+    const apiFields: Array<[string, string]> = [["name", "HTTP API product"], ["description", "Isolated authenticated JSON save fixture"], ["price", "4500"], ["marketplaceCategoryId", fashion.id], ["categoryId", sectionId], ["kind", "product"], ["trackStock", "true"], ["stockQuantity", "7"]];
+    assert.equal((await http("/api/vendor-products", "", apiFields)).status, 401);
+    const shopperCookie = `ivh_session_shared=${await createSessionToken({ sub: registrationUserId, email: `register-${slug}@example.test`, role: "customer", name: "Product API customer" })}`;
+    assert.equal((await http("/api/vendor-products", shopperCookie, apiFields)).status, 403);
+    assert.equal((await http("/api/vendor-products", cookie, apiFields, "https://attacker.example")).status, 403);
+    assert.equal((await http("/api/vendor-products", cookie, apiFields, "")).status, 403);
+    await systemDb.execute(`update stores set manual_suspension=true where id=$1`, [storeId]);
+    assert.equal((await http("/api/vendor-products", cookie, apiFields)).status, 403);
+    await systemDb.execute(`update stores set manual_suspension=false where id=$1`, [storeId]);
+    assert.equal((await http("/api/vendor-products", cookie, [["name", "oversized"], ["description", "x".repeat(256 * 1024)]])).status, 413);
+    assert.equal((await http("/api/vendor-products", cookie, [["name", "x"]])).status, 422);
+    assert.equal((await http("/api/vendor-products", cookie, [...apiFields, ["productId", foreignProductId]])).status, 422);
+    assert.equal((await systemDb.one(`select name from products where id=$1`, [foreignProductId])).name, "Foreign product");
+    const apiSaved = await http("/api/vendor-products", cookie, apiFields);
+    assert.equal(apiSaved.status, 200, apiSaved.text);
+    const apiResult = JSON.parse(apiSaved.text);
+    const apiProduct = await systemDb.one<{ id: string; price: string; stock_quantity: number; category_id: string }>(`select id,price,stock_quantity,category_id from products where store_id=$1 and name='HTTP API product'`, [storeId]);
+    assert.equal(apiResult.redirectUrl, `/vendor/products/${apiProduct.id}?saved=1`);
+    assert.equal(apiResult.message, "Product saved."); assert.equal(Number(apiProduct.price), 4500); assert.equal(apiProduct.stock_quantity, 7); assert.equal(apiProduct.category_id, sectionId);
+    const editedApiFields = apiFields.map(([key, value]): [string, string] => [key, key === "price" ? "4700" : value]);
+    const apiEdited = await http("/api/vendor-products", cookie, [...editedApiFields, ["productId", apiProduct.id]]);
+    assert.equal(apiEdited.status, 200); assert.equal(JSON.parse(apiEdited.text).redirectUrl, apiResult.redirectUrl);
+    assert.equal(Number((await systemDb.one(`select price from products where id=$1`, [apiProduct.id])).price), 4700);
+    assert.equal((await systemDb.one(`select count(*)::int n from products where store_id=$1 and name='HTTP API product'`, [storeId])).n, 1);
+    console.log("PASS: small JSON create/edit confirmation persists real listings; anonymous/customer/missing-origin/cross-origin/suspended/oversized/invalid/cross-store requests are rejected");
 
     const setCategories=async(primary:string,slugs:string[])=>{
       const page=await http("/vendor/store",cookie);assert.equal(page.status,200);

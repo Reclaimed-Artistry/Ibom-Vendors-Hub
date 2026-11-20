@@ -128,7 +128,7 @@ export function LoginExperience({
         <span className="ivh-login__bg-circle ivh-login__bg-circle--three" />
       </div>
       <div className="ivh-login__content">
-        <div className="ivh-login__brand"><Logo height={42} className="ivh-login__brand-link" /></div>
+        <div className="ivh-login__brand"><Logo height={42} invert className="ivh-login__brand-link" /></div>
         <div className="ivh-login__wrapper">
           <div className="ivh-login__card" data-mode={mode}>
             <section

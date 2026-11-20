@@ -1,14 +1,15 @@
 "use client";
 
 import { ProductMediaUploader } from "@/components/product-media-uploader";
+import { ProductSaveNavigation } from "@/components/product-save-navigation";
+import { useProductSubmission } from "@/components/use-product-submission";
 import { MarketplaceCategoryField } from "@/components/business-category-fields";
 import { productGuide } from "@/lib/product-guide";
 import { GuidedProductForm } from "@/components/guided-product-form";
 import { agricultureFieldRequired } from "@/lib/agriculture";
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Loader2, Plus, Trash2 } from "lucide-react";
-import { saveProductAction, type VendorState } from "@/app/actions/vendor";
 import { Alert, Field } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import type { CategoryAttribute, CategoryFeatures, StoreCategory } from "@/lib/types";
@@ -75,7 +76,7 @@ export function AdvancedProductForm({
   marketplaceCategories: StoreCategory[];
   businessCategoryIds: string[];
 }) {
-  const [state, formAction] = useActionState<VendorState, FormData>(saveProductAction, {});
+  const { state, action: formAction, submit, saving, redirecting } = useProductSubmission();
 
   const [marketplaceCategoryId, setMarketplaceCategoryId] = useState(product.marketplaceCategoryId ?? "");
   const category = marketplaceCategories.find(item => item.id === marketplaceCategoryId);
@@ -123,7 +124,8 @@ export function AdvancedProductForm({
   );
 
   return (
-    <form action={formAction} onSubmit={event => { if (mediaBusy) event.preventDefault(); }} className="space-y-4">
+    <form action={formAction} aria-busy={saving || redirecting} onSubmit={event => submit(event, mediaBusy)} className="space-y-4">
+      <ProductSaveNavigation redirectUrl={state.redirectUrl} />
       <input type="hidden" name="productId" value={product.id ?? ""} />
       <input type="hidden" name="isAvailablePresent" value="1" />
       <input type="hidden" name="attributesJson" value={JSON.stringify(attributeValues)} />
@@ -573,8 +575,9 @@ export function AdvancedProductForm({
                 <Loader2 className="size-4 animate-spin" /> Finishing media upload…
               </button>
             ) : (
-              <SubmitButton className="btn-primary w-full" pendingLabel="Publishing…">
-                {product.id ? "Save changes" : "Publish product"}
+              <SubmitButton className="btn-primary w-full" pendingLabel="Publishing…" disabled={saving || redirecting}>
+                {saving ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}
+                {redirecting ? "Opening saved product…" : saving ? "Publishing…" : product.id ? "Save changes" : "Publish product"}
               </SubmitButton>
             )}
             <Link href="/vendor/products" className="btn btn-ghost w-full">Back to products</Link>

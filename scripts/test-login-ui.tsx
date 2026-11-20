@@ -48,6 +48,7 @@ async function main() {
     assert(find<HTMLFieldSetElement>("#signup-panel fieldset").disabled);
     assert.equal(dom.window.document.querySelectorAll(".ivh-login__bg-circle").length, 3);
     assert(find('a[aria-label="Ibom Vendors Hub — home"]'));
+    assert(find('a[aria-label="Ibom Vendors Hub — home"] > span').classList.contains("bg-white"), "the official logo stays readable on the dark themed backdrop");
     assert.equal(find('a[href="/forgot-password"]').textContent, "Forgot password?");
     assert.equal(find<HTMLInputElement>('form[aria-label="Sign in"] [name="next"]').value, next);
     assert.equal(find<HTMLInputElement>("#loginPassword").autocomplete, "current-password");

@@ -1,11 +1,12 @@
 "use client";
 
 import { MarketplaceCategoryField } from "@/components/business-category-fields";
-import { useActionState, useState } from "react";
-import { Check } from "lucide-react";
-import { saveProductAction, type VendorState } from "@/app/actions/vendor";
+import { useState } from "react";
+import { Check, Loader2 } from "lucide-react";
+import { useProductSubmission } from "@/components/use-product-submission";
 import type { AdvancedProductForm } from "@/components/product-form";
 import { ProductMediaUploader } from "@/components/product-media-uploader";
+import { ProductSaveNavigation } from "@/components/product-save-navigation";
 import { Alert, Field } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
 import { productGuide, selectionKind, agricultureSelection, descriptionExample, productQuestions } from "@/lib/product-guide";
@@ -24,7 +25,7 @@ export function GuidedProductForm({ product, categorySlug: defaultSlug, category
   const guide = productGuide(categorySlug);
   const farm = categorySlug === "agriculture-livestock";
   const property = Boolean(features.propertyListings);
-  const [state, action] = useActionState<VendorState, FormData>(saveProductAction, {});
+  const { state, action, submit, saving, redirecting } = useProductSubmission();
   const [selection, setSelection] = useState(product.id ? product.attributes.offering_type || "Other" : "");
   const [kind, setKind] = useState(property ? "service" : product.kind || (guide.service ? "service" : "product"));
   const [values, setValues] = useState<Record<string,string>>(product.attributes ?? {});
@@ -51,7 +52,8 @@ export function GuidedProductForm({ product, categorySlug: defaultSlug, category
     </Field>;
   }
   const preserved = {categoryId:product.categoryId,shortDescription:product.shortDescription,compareAtPrice:product.compareAtPrice,pricingType:features.inquiryOnly?"quotation":property?"fixed":pricingType,sku:product.sku,condition:product.condition,brand:product.brand,model:product.model,warrantyInfo:product.warrantyInfo,warrantyMonths:product.warrantyMonths,prepTimeMinutes:product.prepTimeMinutes,portion:product.portion,serviceDurationMinutes:product.serviceDurationMinutes};
-  return <form action={action} onSubmit={event => { if (mediaBusy) event.preventDefault(); }} className="mx-auto max-w-3xl space-y-4">
+  return <form action={action} aria-busy={saving || redirecting} onSubmit={event => submit(event, mediaBusy)} className="mx-auto max-w-3xl space-y-4">
+    <ProductSaveNavigation redirectUrl={state.redirectUrl} />
     <input type="hidden" name="productId" value={product.id ?? ""} />
     <input type="hidden" name="attributesJson" value={JSON.stringify({...values,offering_type:selection})} />
     <input type="hidden" name="specificationsJson" value={JSON.stringify(product.specifications)} />
@@ -120,7 +122,7 @@ export function GuidedProductForm({ product, categorySlug: defaultSlug, category
         </div>
       </section>
       <p className="flex items-center gap-2 text-xs text-ink-500"><Check className="size-4 text-brand-700" />That’s all. You can edit this listing later.</p>
-      {mediaBusy ? <button type="button" disabled className="btn-primary opacity-60">Finishing media upload…</button> : <SubmitButton className="btn-primary w-full sm:w-auto" pendingLabel="Saving…">{product.id ? "Save changes" : property ? "Publish property" : kind === "service" ? "Publish service" : "Publish product"}</SubmitButton>}
+      {mediaBusy ? <button type="button" disabled className="btn-primary opacity-60">Finishing media upload…</button> : <SubmitButton className="btn-primary w-full sm:w-auto" pendingLabel="Saving…" disabled={saving || redirecting}>{saving ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : null}{redirecting ? "Opening saved product…" : saving ? "Saving…" : product.id ? "Save changes" : property ? "Publish property" : kind === "service" ? "Publish service" : "Publish product"}</SubmitButton>}
     </> : null}
   </form>;
 }

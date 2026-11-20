@@ -84,6 +84,7 @@ npm run test          # typecheck + database/RLS checks
 npm run test:db       # RLS isolation, payment integrity, retention checks
 npm run test:categories # category guides, migrations, forms, discovery + household checkout
 npm run test:smoke    # HTTP smoke test (needs the app running)
+npm run test:vendor-products # actual local create/edit/upload, ownership and save-completion checks
 npm run build         # production build
 npm run db:migrate    # apply supabase/migrations/*.sql
 npm run db:seed -- --reset
@@ -227,11 +228,12 @@ the wordmark is dark green.
 
 ### Login screen
 
-`/login` adapts the supplied grey-and-blue neumorphic flip-card design with real
-password sign-in/account creation, conditional Google sign-in, password reveal,
-Remember me, checkout continuation and reset links. Other auth pages retain their
-existing layout. Poppins and icons are self-hosted; styles are scoped and reduced
-motion is respected. See [login design and checks](docs/LOGIN.md).
+`/login` adapts the supplied neumorphic flip-card design with the site's shared
+forest-green background and emerald/gold animations. Real password sign-in/account
+creation, conditional Google sign-in, password reveal, Remember me, checkout
+continuation and reset links are retained. Other auth pages keep their existing
+layout. Poppins and icons are self-hosted; styles are scoped and reduced motion
+is respected. See [login design and checks](docs/LOGIN.md).
 
 ### Google sign-in
 
@@ -258,6 +260,15 @@ overrides the computed callback URL. For production, whitelist exactly
 `https://www.ibomvendorshub.com/auth/google/callback` in Google Cloud.
 `/api/health` reports `signIn.google` as `live` (configured, not an end-to-end OAuth test)
 or `unconfigured`.
+
+### Vendor product publishing
+
+Both listing editors save through the same authenticated, transactional product
+workflow. Hydrated forms use a small same-origin JSON confirmation followed by a
+fresh view of the saved listing, avoiding an intermittent stuck “Publishing…”
+state; older HTML clients retain native redirects. Validation errors retain the
+draft, and duplicate in-flight saves are blocked. See
+[vendor product verification and tests](docs/VENDOR_PRODUCTS.md).
 
 ### Media storage
 

@@ -1,9 +1,11 @@
 # Login design
 
 The `/login` screen adapts the owner's supplied `index.html`, `style.css` and
-`script.js`: soft grey neumorphic surfaces, floating background circles and
-labels, blue electric focus borders, independent password reveal buttons, and
-a 3D flip between login and account creation.
+`script.js`: soft neumorphic surfaces, floating background circles and labels,
+electric focus borders, independent password reveal buttons, and a 3D flip
+between login and account creation. Its forest-green backdrop, emerald/gold
+floating circles, focus glows and animated buttons now reuse the marketplace's
+shared theme tokens rather than the demo's grey-and-blue palette.
 
 ## Implementation and scope
 
@@ -20,7 +22,13 @@ a 3D flip between login and account creation.
   resets or `overflow: hidden` viewport lock are imported from the demo.
 - Poppins is self-hosted through the pinned `@fontsource/poppins` package (OFL).
   Icons use the existing local Lucide package, not Font Awesome's CDN.
-- The real platform logo is preserved. The lock/user emblems mirror the supplied
+- Colors reference `--color-ink-*`, `--color-brand-*` and `--color-gold-*` from
+  `globals.css`, matching the marketplace hero. The pale card keeps its soft
+  shadows; decorative circles, rotating electric borders, focus glow, controls
+  and animated button fills use the site's greens and golds, not a separate
+  blue palette. The dark-backdrop footer has contrasting text and gold focus.
+- The real platform logo is preserved on its existing white chip so it remains
+  legible on the dark backdrop. The lock/user emblems mirror the supplied
   design without replacing the site's brand artwork or search favicons.
 
 ## Working interactions
@@ -58,7 +66,7 @@ a 3D flip between login and account creation.
 ## Checks
 
 ```bash
-npm run test:login        # DOM interactions, validation and auth navigation; no DB writes
+npm run test:login        # DOM interactions, validation, auth navigation, shared palette and color contrast; no DB writes
 npm run test:login:http   # Local-only real form actions, cookie options and account/reset workflows
 npm run typecheck
 npm run lint

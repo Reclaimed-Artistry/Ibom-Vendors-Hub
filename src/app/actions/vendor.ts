@@ -20,6 +20,7 @@ import { notify, notifyAdmins } from "@/lib/notifications";
 import { sendEmail } from "@/lib/email";
 import { uploadImage, uploadVerificationDocument } from "@/lib/storage";
 import { MAX_PRODUCT_MEDIA_COUNT, mediaKind } from "@/lib/product-media";
+import { PRODUCT_SAVE_NAVIGATION_FIELD } from "@/lib/product-save-navigation";
 import { AKWA_IBOM_STATE } from "@/lib/akwa-ibom";
 import { getSettings, url } from "@/lib/settings";
 import { updateOrderByVendor } from "@/lib/orders";
@@ -368,7 +369,13 @@ export async function saveProductAction(_prev: VendorState, formData: FormData):
     revalidatePath(`/s/${ctx.store.slug}/products`);
     revalidatePath("/browse");
     revalidatePath("/");
-    redirect(`/vendor/products/${savedId}?saved=1`);
+    const destination = `/vendor/products/${savedId}?saved=1`;
+    // Hydrated editors acknowledge the committed save before doing a fresh GET.
+    // Keep native 303 redirects for plain HTML forms and older clients.
+    if (formData.get(PRODUCT_SAVE_NAVIGATION_FIELD) === "1") {
+      return { message: "Product saved.", redirectUrl: destination };
+    }
+    redirect(destination);
   } catch (error) {
     if (error && typeof error === "object" && "digest" in error) throw error;
     return { error: error instanceof Error ? error.message : "Product could not be saved" };
