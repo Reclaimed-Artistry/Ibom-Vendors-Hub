@@ -1,118 +1,110 @@
 /**
- * Brand asset pipeline.
+ * Brand asset pipeline, always derived from the owner's supplied artwork.
  *
- * The supplied artwork is a transparent PNG with generous empty margins. We
- * never crop the lockup itself — only the fully transparent padding is removed
- * (exact alpha bounding box) so the mark scales predictably in layouts. Every
- * derivative below therefore contains the complete logo: shopping bag, wordmark,
- * swoosh and the "One Hub. Every business. Endless opportunities." tagline.
+ * The site/email/social/organization lockups retain the entire logo, including
+ * its wordmark and tagline. Only favicons/touch icons use the existing shopping
+ * bag, map, cart and swoosh by itself, so it remains recognisable at search/tab
+ * sizes. The source file and the visible site's full lockups are not cropped.
  *
- *   tsx scripts/make-brand.ts
+ *   tsx scripts/make-brand.ts                 # all derivatives
+ *   tsx scripts/make-brand.ts --search-only   # only search/favicon assets
  */
 import sharp from "sharp";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { FAVICON_SIZES, ORGANIZATION_LOGO } from "../src/lib/brand-assets";
 
 const SOURCE = "assets/brand/logo-source.png";
 const OUT = "public/brand";
+const SEARCH_ONLY = process.argv.includes("--search-only");
 
-// Alpha bounding box of the artwork inside the 1536×1024 canvas, plus a 2px
-// safety margin so no anti-aliased edge pixel is clipped.
+// Full wordmark + tagline: the same source rectangle used by the site lockups.
 const BOX = { left: 43, top: 212, width: 1442, height: 500 };
+// The existing standalone emblem, above the tagline and left of the wordmark.
+// Includes safe transparent padding around the bag and the complete orange swoosh.
+const MARK_BOX = { left: 36, top: 204, width: 484, height: 424 };
 
 async function main() {
   mkdirSync(OUT, { recursive: true });
   const trimmed = await sharp(SOURCE).ensureAlpha().extract(BOX).png().toBuffer();
-  const meta = await sharp(trimmed).metadata();
-  console.log(`lockup: ${meta.width}×${meta.height} (${(meta.width! / meta.height!).toFixed(2)}:1)`);
+  const mark = await sharp(SOURCE).ensureAlpha().extract(MARK_BOX).png().toBuffer();
 
-  // Full lockup — web (webp + png fallback), email and OG use.
-  await sharp(trimmed).resize({ width: 1200 }).webp({ quality: 92 }).toFile(`${OUT}/ibom-vendors-hub-logo.webp`);
-  await sharp(trimmed).resize({ width: 1200 }).png({ compressionLevel: 9 }).toFile(`${OUT}/ibom-vendors-hub-logo.png`);
-  await sharp(trimmed).resize({ width: 480 }).png({ compressionLevel: 9 }).toFile(`${OUT}/ibom-vendors-hub-logo-small.png`);
+  if (!SEARCH_ONLY) {
+    // Full lockups used on the website and in email remain uncropped.
+    await sharp(trimmed).resize({ width: 1200 }).webp({ quality: 92 }).toFile(`${OUT}/ibom-vendors-hub-logo.webp`);
+    await sharp(trimmed).resize({ width: 1200 }).png({ compressionLevel: 9 }).toFile(`${OUT}/ibom-vendors-hub-logo.png`);
+    await sharp(trimmed).resize({ width: 480 }).png({ compressionLevel: 9 }).toFile(`${OUT}/ibom-vendors-hub-logo-small.png`);
 
-  // Square icons: the whole lockup, letterboxed on white — never cropped.
-  //
-  // The browser icon is a rounded square with transparent corners so it sits
-  // comfortably next to other tabs. apple-icon stays a full bleed square: iOS
-  // applies its own mask and paints any transparency black.
-  const roundedMask = (size: number) =>
-    Buffer.from(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">` +
-        `<rect x="0" y="0" width="${size}" height="${size}" rx="${Math.round(size * 0.225)}" ry="${Math.round(size * 0.225)}" fill="#ffffff"/>` +
-        `</svg>`,
-    );
-
-  for (const [name, size, pad, rounded] of [
-    ["src/app/icon.png", 256, 0.1, true],
-    ["src/app/apple-icon.png", 180, 0.1, false],
-    ["public/brand/icon-512.png", 512, 0.12, true],
-  ] as const) {
-    const inner = Math.round(size * (1 - pad * 2));
-    const scaled = await sharp(trimmed).resize({ width: inner, height: inner, fit: "inside" }).png().toBuffer();
-    const scaledMeta = await sharp(scaled).metadata();
-    let tile = await sharp({ create: { width: size, height: size, channels: 4, background: "#ffffff" } })
+    // Social card: complete lockup centred on a white card, on brand-dark canvas.
+    const canvas = { width: 1200, height: 630 };
+    const card = { width: 1080, height: 520, left: 60, top: 55 };
+    const cardLogo = await sharp(trimmed).resize({ width: 940 }).png().toBuffer();
+    const cardMeta = await sharp(cardLogo).metadata();
+    const whiteCard = await sharp({ create: { width: card.width, height: card.height, channels: 4, background: "#ffffff" } })
+      .png().toBuffer();
+    await sharp({ create: { ...canvas, channels: 4, background: "#0b3d2c" } })
       .composite([
+        { input: whiteCard, left: card.left, top: card.top },
         {
-          input: scaled,
-          left: Math.round((size - scaledMeta.width!) / 2),
-          top: Math.round((size - scaledMeta.height!) / 2),
+          input: cardLogo,
+          left: card.left + Math.round((card.width - cardMeta.width!) / 2),
+          top: card.top + Math.round((card.height - cardMeta.height!) / 2),
         },
       ])
-      .png()
-      .toBuffer();
-
-    if (rounded) {
-      tile = await sharp(tile)
-        .composite([{ input: roundedMask(size), blend: "dest-in" }])
-        .png()
-        .toBuffer();
-    }
-
-    await sharp(tile).png({ compressionLevel: 9 }).toFile(name);
+      .png({ compressionLevel: 9 }).toFile(`${OUT}/og-image.png`);
   }
 
-  // Explicit public favicons work on every storefront origin, including
-  // browsers that request /favicon.ico without inspecting page metadata.
-  const smallIcon = await sharp("src/app/icon.png").resize(32, 32).png().toBuffer();
-  writeFileSync(`${OUT}/favicon-32.png`, smallIcon);
-  // ICO container with a PNG-encoded image (supported by modern browsers).
-  const icoHeader = Buffer.alloc(22);
-  icoHeader.writeUInt16LE(1, 2); // icon type
-  icoHeader.writeUInt16LE(1, 4); // one image
-  icoHeader[6] = 32;
-  icoHeader[7] = 32;
-  icoHeader.writeUInt16LE(1, 10);
-  icoHeader.writeUInt16LE(32, 12);
-  icoHeader.writeUInt32LE(smallIcon.length, 14);
-  icoHeader.writeUInt32LE(22, 18);
-  writeFileSync("public/favicon.ico", Buffer.concat([icoHeader, smallIcon]));
-
-  // Social card: brand-dark canvas with the complete lockup centred on a white card.
-  const canvas = { width: 1200, height: 630 };
-  const card = { width: 1080, height: 520, left: 60, top: 55 };
-  const cardLogo = await sharp(trimmed).resize({ width: 940 }).png().toBuffer();
-  const cardMeta = await sharp(cardLogo).metadata();
-  const whiteCard = await sharp({
-    create: { ...card, channels: 4, background: "#ffffff" },
-  })
-    .png()
-    .toBuffer();
-  await sharp({ create: { ...canvas, channels: 4, background: "#0b3d2c" } })
-    .composite([
-      { input: whiteCard, left: card.left, top: card.top },
-      {
-        input: cardLogo,
-        left: card.left + Math.round((card.width - cardMeta.width!) / 2),
-        top: card.top + Math.round((card.height - cardMeta.height!) / 2),
-      },
-    ])
+  // A separate, high-resolution full logo for Organization JSON-LD. Flattening
+  // onto white ensures the green wordmark is legible on any viewer background.
+  await sharp(trimmed)
+    .flatten({ background: "#ffffff" })
+    .resize({ width: ORGANIZATION_LOGO.width - 48, height: ORGANIZATION_LOGO.height - 48, fit: "contain", background: "#ffffff" })
+    .extend({ top: 24, bottom: 24, left: 24, right: 24, background: "#ffffff" })
     .png({ compressionLevel: 9 })
-    .toFile(`${OUT}/og-image.png`);
+    .toFile(`public${ORGANIZATION_LOGO.path}`);
 
-  console.log("brand assets written to public/brand, src/app/icon.png, src/app/apple-icon.png");
+  // An opaque white square works on search's white background, dark browser
+  // chrome and iOS (which applies its own mask). No tiny wordmark or tagline.
+  async function squareIcon(size: number) {
+    const padding = Math.max(1, Math.round(size * 0.06));
+    return sharp(mark)
+      .flatten({ background: "#ffffff" })
+      .resize({ width: size - padding * 2, height: size - padding * 2, fit: "contain", background: "#ffffff" })
+      .extend({ top: padding, bottom: padding, left: padding, right: padding, background: "#ffffff" })
+      .png({ compressionLevel: 9 }).toBuffer();
+  }
+
+  const icons = new Map<number, Buffer>();
+  for (const size of [...FAVICON_SIZES, 180, 512]) icons.set(size, await squareIcon(size));
+  for (const size of [32, 48, 96]) writeFileSync(`${OUT}/favicon-${size}.png`, icons.get(size)!);
+  writeFileSync("src/app/icon.png", icons.get(256)!);
+  writeFileSync("src/app/apple-icon.png", icons.get(180)!);
+  writeFileSync(`${OUT}/icon-512.png`, icons.get(512)!);
+
+  // Multi-resolution ICO, including Google's recommended >48px resolution.
+  // Each directory entry points to one PNG. A zero size byte represents 256px.
+  const directory = Buffer.alloc(6 + FAVICON_SIZES.length * 16);
+  directory.writeUInt16LE(1, 2); // icon, not cursor
+  directory.writeUInt16LE(FAVICON_SIZES.length, 4);
+  let offset = directory.length;
+  const images: Buffer[] = [];
+  FAVICON_SIZES.forEach((size, index) => {
+    const image = icons.get(size)!;
+    const entry = 6 + index * 16;
+    directory[entry] = size === 256 ? 0 : size;
+    directory[entry + 1] = size === 256 ? 0 : size;
+    directory.writeUInt16LE(1, entry + 4); // planes
+    directory.writeUInt16LE(32, entry + 6); // bits per pixel
+    directory.writeUInt32LE(image.length, entry + 8);
+    directory.writeUInt32LE(offset, entry + 12);
+    images.push(image);
+    offset += image.length;
+  });
+  writeFileSync("public/favicon.ico", Buffer.concat([directory, ...images]));
+
+  console.log(`${SEARCH_ONLY ? "Search/favicon" : "All brand"} assets written; ICO resolutions: ${FAVICON_SIZES.join(", ")}px.`);
 }
 
 main().catch((error) => {
   console.error(error);
-  process.exit(1);
+  process.exitCode = 1;
 });

@@ -207,15 +207,19 @@ runs `next build`. Every deploy is therefore self-migrating and idempotent.
 The supplied logo (`assets/brand/logo-source.png`) is a transparent PNG lockup: shopping
 bag with the Akwa Ibom silhouette, swoosh, "Ibom Vendors Hub" wordmark and the tagline
 *One Hub. Every business. Endless opportunities.* `npm run brand:assets` regenerates every
-derivative from it — it removes only fully transparent padding (an exact alpha bounding box)
-and never crops the artwork:
+derivative from it. Website, email, social and Organization logos retain the entire lockup;
+only square favicon/touch icons isolate the existing shopping-bag/map/cart/swoosh emblem so
+it stays recognisable at tiny search-result and browser-tab sizes. Use
+`npm run brand:assets -- --search-only` to update only the search/favicon assets:
 
 | Output | Use |
 | --- | --- |
 | `public/brand/ibom-vendors-hub-logo.png` / `.webp` | site header, footer, auth panel, dashboards, storefront footer, email header |
 | `public/brand/ibom-vendors-hub-logo-small.png` | compact surfaces |
 | `public/brand/og-image.png` | Open Graph / Twitter card |
-| `src/app/icon.png`, `src/app/apple-icon.png`, `public/brand/icon-512.png` | favicon and touch icons (full lockup letterboxed on white) |
+| `public/brand/organization-logo.png` | high-resolution full logo (1200×480, white background) for Organization structured data |
+| `src/app/icon.png`, `src/app/apple-icon.png`, `public/brand/icon-512.png` | square emblem-only browser/touch/search icons (256/180/512px) |
+| `public/brand/favicon-{32,48,96}.png`, `public/favicon.ico` | public favicons; homepage advertises 96px and 512px, ICO contains 16/32/48/96/256px |
 
 `<Logo>` renders the whole lockup with `object-contain`, height-driven sizing and `w-auto`, so
 it is never stretched or clipped; `invert` puts it on a white chip for dark surfaces because

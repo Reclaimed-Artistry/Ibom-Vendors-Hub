@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { CartProvider } from "@/components/cart";
+import { BRAND_ICONS } from "@/lib/brand-assets";
 import { PUBLIC_ROBOTS, SITE_DESCRIPTION, siteUrl, siteVerification } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -32,14 +33,7 @@ export const metadata: Metadata = {
     images: ["/brand/og-image.png"],
   },
   applicationName: "Ibom Vendors Hub",
-  icons: {
-    icon: [
-      { url: "/brand/favicon-32.png?v=ivh-1", type: "image/png", sizes: "32x32" },
-      { url: "/brand/icon-512.png?v=ivh-1", type: "image/png", sizes: "512x512" },
-    ],
-    shortcut: "/favicon.ico?v=ivh-1",
-    apple: { url: "/apple-icon.png?v=ivh-1", sizes: "180x180", type: "image/png" },
-  },
+  icons: BRAND_ICONS,
 };
 
 export const dynamic = "force-dynamic";

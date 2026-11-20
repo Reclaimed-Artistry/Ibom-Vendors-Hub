@@ -12,6 +12,41 @@
 - `/sell` is a public, indexable page explaining free storefront ownership. Registration, sign-in and identity verification forms remain non-indexable.
 - Marketplace links from vendor subdomains permanently redirect to the canonical marketplace rather than a tenant 404.
 
+## Google search-result icon and organization logo
+
+These are separate signals, not a guarantee that Google will show a logo:
+
+- The server-rendered homepage `<head>` advertises stable, square PNG favicons at
+  `/brand/favicon-96.png` (96×96) and `/brand/icon-512.png` (512×512). Browser fallback
+  `/favicon.ico` includes 16/32/48/96/256px images; `/icon.png` and `/apple-icon.png`
+  use the same emblem. Icons use the existing shopping-bag/map/cart/orange-swoosh
+  artwork without squeezing the entire wordmark/tagline into a tiny square.
+- The homepage Organization JSON-LD identifies a separate full logo at
+  `https://www.ibomvendorshub.com/brand/organization-logo.png` (1200×480, opaque white),
+  with matching `url`, `contentUrl`, width and height. The visible website/email
+  lockups and original source artwork remain unchanged.
+- Exact public brand-image paths bypass tenant rewrites and page-level `noindex`
+  headers. The production robots file allows these images and the homepage.
+  Preview HTML remains noindexed and preview robots remain disallow-all.
+- Regenerate from the owner's original PNG with
+  `npm run brand:assets -- --search-only`. Keep the URLs stable; do not routinely
+  append a new query token or change filenames on each deployment.
+
+Google's [favicon guidance](https://developers.google.com/search/docs/appearance/favicon-in-search)
+requires a square image of at least 8px and recommends **larger than 48px** (not a
+mandatory multiple of 48). Googlebot must be able to fetch the homepage and
+Googlebot-Image the icon. Its [Organization logo guidance](https://developers.google.com/search/docs/appearance/structured-data/organization#logo)
+requires a crawlable/indexable supported image of at least 112×112px that looks
+right on white.
+
+After a logo change is live, inspect **`https://www.ibomvendorshub.com/`** in Google
+Search Console's URL Inspection tool, run **Test live URL**, then **Request indexing**
+where available. Google extracts the favicon from the homepage, not from a sitemap
+entry for the image. Refresh can take **several days to several weeks**, and Google
+ultimately controls whether the icon or organization logo is displayed. Deploying
+these files does not itself submit an indexing request or confirm search-result
+appearance.
+
 ## One-time owner setup (not completed by code deployment)
 
 Search engines choose whether/when to crawl, index and rank pages. A successful deployment or accessible sitemap is **not** evidence of indexing or rankings.
@@ -43,7 +78,8 @@ After deployment, the owner can click **Verify** for the matching URL-prefix pro
 ## Checks
 
 ```bash
-npm run test:seo           # Pure checks + local DB regression tests, rolled back
+npm run test:brand         # Icon/ICO bytes, legibility and public asset routing (no DB)
+npm run test:seo           # Brand checks + SEO/local DB regression tests, rolled back
 npm run typecheck
 npm run lint
 npm run build

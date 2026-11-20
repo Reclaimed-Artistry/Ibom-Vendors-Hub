@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appUrl, isReservedSubdomain, rootDomain, storefrontUrl, subdomainFromHost } from "@/lib/domains";
 import { crawlerContext, isNonIndexablePath } from "@/lib/seo";
+import { PUBLIC_BRAND_ASSET_PATHS } from "@/lib/brand-assets";
 
 // Platform routes must never be rewritten into non-existent tenant pages.
 const PUBLIC_PLATFORM_ROUTES = /^\/(browse|stores|about|contact|terms|privacy|sell)(?:\/|$)/;
 const PLATFORM_ROUTES = /^\/(checkout|cart|pay|login|logout|register|forgot-password|reset-password|verify-email|auth|account|vendor|admin|track|forbidden)(?:\/|$)/;
-const PLATFORM_ICON_PATHS = new Set(["/icon.png", "/apple-icon.png", "/favicon.ico"]);
+const PUBLIC_BRAND_PATHS = new Set<string>(PUBLIC_BRAND_ASSET_PATHS);
 const CRAWLER_PATHS = new Set(["/robots.txt", "/sitemap.xml"]);
 const PASSTHROUGH_PREFIXES = ["/api", "/_next", "/s/", "/uploads/", "/favicon", "/images", "/brand/"];
 
@@ -53,6 +54,12 @@ export function middleware(request: NextRequest) {
     return applyNoStoreHeaders(NextResponse.redirect(destination, 308), request);
   }
 
+  // Public, fixed brand artwork is independent of tenant/preview routing and
+  // must not inherit a page's noindex headers or require a storefront/login.
+  if (PUBLIC_BRAND_PATHS.has(pathname)) {
+    return NextResponse.next();
+  }
+
   // Both files are host-aware. Do not rewrite tenant /robots.txt or
   // /sitemap.xml to non-existent storefront child routes.
   if (CRAWLER_PATHS.has(pathname)) {
@@ -71,10 +78,6 @@ export function middleware(request: NextRequest) {
     const response = NextResponse.next({ request: { headers } });
     response.headers.set("x-ivh-root", "1");
     return applyNoStoreHeaders(response, request);
-  }
-
-  if (PLATFORM_ICON_PATHS.has(pathname)) {
-    return NextResponse.next();
   }
 
   if (PASSTHROUGH_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {

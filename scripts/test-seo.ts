@@ -9,6 +9,7 @@ import {
 import { sitemapForHost } from "../src/lib/seo-data";
 import { breadcrumbStructuredData, productStructuredData, storeStructuredData, websiteStructuredData } from "../src/lib/structured-data";
 import type { Product, Store, StoreCategory } from "../src/lib/types";
+import { ORGANIZATION_LOGO } from "../src/lib/brand-assets";
 
 process.env.NEXT_PUBLIC_APP_URL = "https://www.ibomvendorshub.com";
 process.env.NEXT_PUBLIC_ROOT_DOMAIN = "ibomvendorshub.com";
@@ -71,6 +72,14 @@ async function main() {
   }
   const website = websiteStructuredData("support@example.test");
   assert.equal(website["@graph"][0].name, "Ibom Vendors Hub");
+  const logo = website["@graph"][0].logo!;
+  assert.equal(logo["@type"], "ImageObject");
+  assert.equal(logo["@id"], siteUrl("/#logo"));
+  assert.equal(logo.url, siteUrl(ORGANIZATION_LOGO.path));
+  assert.equal(logo.contentUrl, logo.url);
+  assert.equal(logo.width, ORGANIZATION_LOGO.width);
+  assert.equal(logo.height, ORGANIZATION_LOGO.height);
+  assert.equal(website["@graph"][1].publisher?.["@id"], website["@graph"][0]["@id"], "WebSite publisher identifies the organization carrying the full logo");
   assert.equal(breadcrumbStructuredData([{ name: "Store", url: storeUrl("store-one") }]).itemListElement[0].position, 1);
   console.log("PASS: SEO URLs, robots, private routes, preview protection, snippets, verification and safe JSON-LD");
 

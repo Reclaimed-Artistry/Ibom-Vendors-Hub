@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { request } from "node:http";
 import { JSDOM } from "jsdom";
 import { systemDb } from "../src/lib/db";
+import { readFileSync } from "node:fs";
+import sharp from "sharp";
+import { BRAND_ICONS, ORGANIZATION_LOGO, PUBLIC_BRAND_ASSET_PATHS } from "../src/lib/brand-assets";
 
 const BASE = process.env.SEO_TEST_BASE_URL ?? "http://127.0.0.1:3010";
 const ROOT = "www.ibomvendorshub.com";
@@ -39,25 +42,28 @@ function assertStorefrontFooter(html: string, storeName: string) {
     dom.window.close();
   }
 }
-function get(path: string, host = ROOT): Promise<{ response: { status: number; headers: Headers }; text: string }> {
+function getResource(path: string, host = ROOT, userAgent = "Googlebot", method = "GET"): Promise<{ response: { status: number; headers: Headers }; body: Buffer }> {
   // Node fetch can silently replace Host. A raw local HTTP request is needed
   // to exercise the real wildcard middleware without external wildcard DNS.
   return new Promise((resolve, reject) => {
-    const req = request(new URL(path, BASE), { headers: { host, "user-agent": "Googlebot" } }, (res) => {
+    const req = request(new URL(path, BASE), { method, headers: { host, "user-agent": userAgent } }, (res) => {
       const headers = new Headers();
       for (const [key, value] of Object.entries(res.headers)) {
         if (value !== undefined) headers.set(key, Array.isArray(value) ? value.join(", ") : value);
       }
-      let text = "";
-      res.setEncoding("utf8");
-      res.on("data", (chunk) => { text += chunk; });
-      res.on("end", () => resolve({ response: { status: res.statusCode ?? 0, headers }, text }));
+      const chunks: Buffer[] = [];
+      res.on("data", (chunk: Buffer) => { chunks.push(chunk); });
+      res.on("end", () => resolve({ response: { status: res.statusCode ?? 0, headers }, body: Buffer.concat(chunks) }));
       res.on("error", reject);
     });
     req.setTimeout(30000, () => req.destroy(new Error(`Timed out: ${path}`)));
     req.on("error", reject);
     req.end();
   });
+}
+async function get(path: string, host = ROOT) {
+  const { response, body } = await getResource(path, host);
+  return { response, text: body.toString("utf8") };
 }
 
 async function main() {
@@ -93,6 +99,50 @@ async function main() {
   assert(title(home.text).includes("Shop Akwa Ibom Businesses Online"));
   assert(schemas(home.text).some((schema) => schema["@graph"]?.some((node: any) => node["@type"] === "Organization")));
   assert(/property="og:url" content="https:\/\/www\.ibomvendorshub\.com\/?"/.test(home.text));
+  const head = new JSDOM(home.text);
+  try {
+    for (const icon of BRAND_ICONS.icon) {
+      const link = head.window.document.head.querySelector(`link[rel="icon"][sizes="${icon.sizes}"]`);
+      assert.equal(link?.getAttribute("href"), icon.url, "search icon is present in server-rendered homepage head");
+      assert.equal(link?.getAttribute("type"), "image/png");
+    }
+    assert.equal(head.window.document.head.querySelector('link[rel="shortcut icon"]')?.getAttribute("href"), "/favicon.ico");
+    assert(!home.text.includes("?v=ivh-1"), "old query-versioned full-lockup icons are not advertised");
+  } finally { head.window.close(); }
+  const organization = schemas(home.text).flatMap((schema) => schema["@graph"] ?? []).find((node: any) => node["@type"] === "Organization");
+  assert.equal(organization.logo.url, `${publicOrigin}${ORGANIZATION_LOGO.path}`);
+  assert.equal(organization.logo.contentUrl, organization.logo.url);
+  assert.equal(organization.logo.width, ORGANIZATION_LOGO.width);
+  assert.equal(organization.logo.height, ORGANIZATION_LOGO.height);
+
+  // Test real response bytes, MIME types and noindex/auth/routing behavior,
+  // including paths fetched by Googlebot-Image instead of a page crawler.
+  for (const host of [ROOT, "kemcycollections.ibomvendorshub.com", "project.vercel.app"]) {
+    for (const path of PUBLIC_BRAND_ASSET_PATHS) {
+      const asset = await getResource(path, host, "Googlebot-Image/1.0");
+      assert.equal(asset.response.status, 200, `${host}${path}`);
+      assert(asset.response.headers.get("content-type")?.startsWith("image/"), `${path} has an image MIME type`);
+      assert.equal(asset.response.headers.get("location"), null, `${path} requires no authentication or redirect`);
+      assert.equal(asset.response.headers.get("x-robots-tag"), null, `${path} is not noindexed`);
+      const file = path === "/icon.png" || path === "/apple-icon.png" ? `src/app${path}` : `public${path}`;
+      assert.deepEqual(asset.body, readFileSync(file), `${path} serves the intended artwork unchanged`);
+      if (path.endsWith(".png")) {
+        const image = await sharp(asset.body).metadata();
+        assert.equal(image.format, "png");
+        if (path === ORGANIZATION_LOGO.path) {
+          assert.equal(image.width, ORGANIZATION_LOGO.width);
+          assert.equal(image.height, ORGANIZATION_LOGO.height);
+        } else {
+          assert.equal(image.width, image.height, `${path} is square`);
+        }
+      }
+    }
+    const iconHead = await getResource("/brand/favicon-96.png", host, "Googlebot-Image/1.0", "HEAD");
+    assert.equal(iconHead.response.status, 200);
+    assert.equal(iconHead.body.length, 0);
+    assert.equal(iconHead.response.headers.get("x-robots-tag"), null);
+  }
+  console.log("PASS: server-rendered stable favicon links and full Organization logo; public image bytes/MIME/GET/HEAD on platform, vendor and preview hosts");
 
   const sell = await get("/sell");
   assert.equal(sell.response.status, 200);

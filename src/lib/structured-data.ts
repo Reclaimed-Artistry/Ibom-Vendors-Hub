@@ -1,4 +1,5 @@
 import { mediaKind } from "@/lib/product-media";
+import { ORGANIZATION_LOGO } from "@/lib/brand-assets";
 import type { Product, Store, StoreCategory } from "@/lib/types";
 import { seoDescription, SITE_DESCRIPTION, SITE_NAME, siteUrl, storeUrl } from "@/lib/seo";
 
@@ -22,7 +23,15 @@ export function websiteStructuredData(supportEmail: string) {
         name: SITE_NAME,
         alternateName: "Ibomvendorshub",
         url: siteUrl(),
-        logo: { "@type": "ImageObject", url: siteUrl("/brand/icon-512.png"), width: 512, height: 512 },
+        logo: {
+          "@type": "ImageObject",
+          "@id": siteUrl("/#logo"),
+          url: siteUrl(ORGANIZATION_LOGO.path),
+          contentUrl: siteUrl(ORGANIZATION_LOGO.path),
+          width: ORGANIZATION_LOGO.width,
+          height: ORGANIZATION_LOGO.height,
+          caption: SITE_NAME,
+        },
         email: supportEmail,
         areaServed: { "@type": "State", name: "Akwa Ibom", containedInPlace: { "@type": "Country", name: "Nigeria" } },
       },
