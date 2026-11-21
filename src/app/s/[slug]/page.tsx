@@ -6,14 +6,18 @@ import { StoreStockCarousel } from "@/components/store-stock-carousel";
 import { StoreImage } from "@/components/store-image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock, Mail, MapPin, Phone, Star, Store as StoreIcon, CalendarClock, FileText, ClipboardCheck, CheckCircle2 } from "lucide-react";
+import { Clock, Mail, MapPin, Phone, Star, Store as StoreIcon, CalendarClock, FileText, ClipboardCheck, CheckCircle2, Home } from "lucide-react";
 import { resolveStore, getStoreProducts, getStoreReviews, storeOpenState } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
 import { storeBase } from "@/lib/storefront-base";
+import { appUrl } from "@/lib/domains";
 import { formatMoney, formatDate, truncate, normalisePhone } from "@/lib/utils";
 import { Badge, ButtonLink, Card } from "@/components/ui";
 import { ContactForm } from "@/components/contact-form";
+import { AdUnit } from "@/components/ad-unit";
 import { getCategoryBookingProfile } from "@/lib/artisan-bookings";
+import { getCurrentUser } from "@/lib/auth";
+import { trackStoreView } from "@/lib/visitor-tracking";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -22,6 +26,11 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
   const { slug } = await params;
   const { store, category, live, reason } = await resolveStore(slug);
   if (!store) notFound();
+
+  await trackStoreView(store.id);
+
+  const currentUser = await getCurrentUser();
+  const isOwner = currentUser?.role === "vendor" && currentUser.id === store.owner_id;
 
   const [settings, base, reviews] = await Promise.all([getSettings(), storeBase(slug), getStoreReviews(store.id, 3)]);
   const { products } = await getStoreProducts({ storeId: store.id, limit: 48, includeUnavailable: false });
@@ -91,6 +100,14 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
               {features.prepTime && store.prep_time_minutes ? (
                 <span className="badge-neutral"><Clock className="size-3.5" /> ~{store.prep_time_minutes} min prep</span>
               ) : null}
+              {isOwner ? (
+                <Link href="/vendor" className="btn btn-primary btn-sm">
+                  <Home className="size-3.5" /> Back to dashboard
+                </Link>
+              ) : null}
+              <ButtonLink href={appUrl()} variant="ghost" size="sm">
+                ← Back to Ibom Vendors Hub
+              </ButtonLink>
             </div>
           </div>
         </div>
@@ -183,6 +200,10 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
               {showcase.length === 0 ? <p className="text-sm text-ink-500">This vendor has not published any listings yet.</p> : null}
             </div>
           </section>
+
+          <div className="mt-6 mb-6">
+            <AdUnit adSlot="storefront-banner" style={{ minHeight: "280px" }} />
+          </div>
 
           {categories.map((group) => {
             const groupProducts = products.filter((product) => product.category_id === group.id);

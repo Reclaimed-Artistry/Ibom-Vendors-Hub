@@ -2,7 +2,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireAdmin, getCurrentUser } from "@/lib/auth";
+import { requireAdmin, getCurrentUser, hashPassword } from "@/lib/auth";
 import { systemDb, withSystem } from "@/lib/db";
 import { logActivity } from "@/lib/audit";
 import { notify } from "@/lib/notifications";
@@ -883,5 +883,127 @@ export async function reviewRefundAction(_prev: AdminState, formData: FormData):
   revalidatePath("/admin/payments");
   revalidatePath("/admin");
   return { message: decision === "approve" ? "Refund processed." : "Refund request rejected." };
+}
+
+/**
+ * Server action: create a vendor user account and linked store for an existing
+ * platform administrator, so the admin can log in as a vendor and see exactly
+ * what a vendor sees in their dashboard.
+ */
+export async function createVendorAccountForAdminAction(_prev: unknown, formData: FormData) {
+  const user = await requireAdmin();
+  const storeName = String(formData.get("storeName") ?? "").trim();
+  const storeSlug = String(formData.get("storeSlug") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const categoryId = String(formData.get("categoryId") ?? "") || null;
+
+  if (!storeName || !storeSlug || !email || !password) {
+    return { error: "All fields are required." };
+  }
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters." };
+  }
+
+  try {
+    const result = await createVendorAccountForAdmin({
+      adminId: user.id,
+      storeName,
+      storeSlug,
+      email,
+      password,
+      categoryId,
+    });
+    return {
+      message: `Vendor account "${storeName}" created. Slug: ${result.storeSlug}. Use the email/password above to log in as that vendor.`,
+      vendorUserId: result.vendorUserId,
+      storeId: result.storeId,
+    };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not create vendor account." };
+  }
+}
+
+async function createVendorAccountForAdmin({
+  adminId,
+  storeName,
+  storeSlug,
+  email,
+  password,
+  categoryId,
+}: {
+  adminId: string;
+  storeName: string;
+  storeSlug: string;
+  email: string;
+  password: string;
+  categoryId?: string | null;
+}): Promise<{ vendorUserId: string; storeId: string; storeSlug: string }> {
+  const admin = await systemDb.maybeOne<{ id: string; role: string }>(
+    `select id, role from users where id = $1`,
+    [adminId],
+  );
+  if (!admin || !["admin", "super_admin"].includes(admin.role)) {
+    throw new Error("Only platform administrators can create vendor accounts.");
+  }
+
+  const existing = await systemDb.maybeOne<{ id: string }>(
+    `select id from users where email = $1`,
+    [email],
+  );
+  if (existing) {
+    throw new Error("A user with that email already exists.");
+  }
+
+  const slugExists = await systemDb.maybeOne<{ id: string }>(
+    `select id from stores where slug = $1`,
+    [storeSlug],
+  );
+  if (slugExists) {
+    throw new Error("That store slug is already taken.");
+  }
+
+  const passwordHash = await hashPassword(password);
+
+  return withSystem(async (db) => {
+    const vendorUser = await db.maybeOne<{ id: string }>(
+      `insert into users (email, full_name, role, status, password_hash, email_verified_at)
+       values ($1, $2, 'vendor', 'active', $3, now())
+       returning id`,
+      [email, storeName, passwordHash],
+    );
+
+    const store = await db.maybeOne<{ id: string }>(
+      `insert into stores (owner_id, name, slug, category_id, status, visibility, accepts_orders, accepts_delivery, accepts_pickup, country, created_at, updated_at)
+       values ($1, $2, $3, $4, 'active', 'unlisted', true, true, true, 'Nigeria', now(), now())
+       returning id`,
+      [vendorUser!.id, storeName, storeSlug, categoryId ?? null],
+    );
+
+    await db.execute(
+      `insert into vendor_profiles (user_id, position, kyc_status, kyc_note)
+       values ($1, 'Owner', 'verified', 'Auto-created for admin testing')`,
+      [vendorUser!.id],
+    );
+
+    await logActivity(
+      {
+        actorId: adminId,
+        actorRole: admin.role as "super_admin" | "admin" | "vendor" | "customer",
+        storeId: store!.id,
+        action: "vendor.account_created_for_admin",
+        entityType: "store",
+        entityId: store!.id,
+        description: `Admin created vendor account "${storeName}" (${storeSlug}) for testing`,
+      },
+      db,
+    );
+
+    return {
+      vendorUserId: vendorUser!.id,
+      storeId: store!.id,
+      storeSlug,
+    };
+  });
 }
 

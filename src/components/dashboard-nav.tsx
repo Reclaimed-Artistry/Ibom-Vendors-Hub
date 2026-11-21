@@ -65,8 +65,51 @@ export interface DashboardNavItem {
   locked?: boolean;
 }
 
-export function DashboardNav({ items, compact = false }: { items: DashboardNavItem[]; compact?: boolean }) {
+export function DashboardNav({
+  items,
+  compact = false,
+  variant = "list",
+}: {
+  items: DashboardNavItem[];
+  compact?: boolean;
+  variant?: "list" | "tiles";
+}) {
   const pathname = usePathname();
+
+  if (variant === "tiles") {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-3">
+        {items.map((item) => {
+          const Icon = ICONS[item.icon] ?? LayoutDashboard;
+          const active = !item.locked && (pathname === item.href || (item.href !== "/vendor" && item.href !== "/admin" && pathname.startsWith(`${item.href}/`)));
+          return (
+            <Link
+              key={item.href}
+              href={item.locked ? "/vendor/subscription?suspended=1" : item.href}
+              title={item.locked ? "Suspended — renew your subscription to unlock" : undefined}
+              aria-disabled={item.locked || undefined}
+              className={`card card-pad flex flex-col items-start gap-2 transition-colors hover:border-brand-300 hover:shadow-sm ${active ? "border-brand-500 bg-brand-50" : "border-ink-100"}`}
+            >
+              <div className="flex size-10 items-center justify-center rounded-xl bg-ink-50 text-brand-700">
+                <Icon className="size-5" aria-hidden />
+              </div>
+              <p className="font-semibold text-ink-900 leading-tight min-h-[2.5rem]">{item.label}</p>
+              {item.locked ? (
+                <div className="mt-auto flex items-center gap-1 text-xs text-red-600">
+                  <Lock className="size-3.5" aria-label="Locked until renewal" />
+                  <span>Locked</span>
+                </div>
+              ) : item.badge ? (
+                <span className="mt-auto inline-flex items-center gap-1 rounded-full bg-brand-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+                  {item.badge}
+                </span>
+              ) : null}
+            </Link>
+          );
+        })}
+      </div>
+    );
+  }
 
   return (
     <nav className={compact ? "grid gap-1" : "space-y-1"}>
@@ -120,7 +163,7 @@ export function MobileNav({ items, title }: { items: DashboardNavItem[]; title: 
         <span>{title}</span>
       </summary>
       <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[75dvh] overflow-y-auto rounded-2xl border border-ink-100 bg-white p-2 shadow-xl">
-        <DashboardNav items={items} compact />
+        <DashboardNav items={items} compact variant="tiles" />
         <div className="mt-1 border-t border-ink-100 pt-1">
           <LogoutButton />
         </div>

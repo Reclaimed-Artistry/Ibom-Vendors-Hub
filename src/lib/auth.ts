@@ -271,6 +271,114 @@ export const getVendorContext = cache(async (): Promise<VendorContext> => {
 });
 
 /**
+ * Build vendor dashboard context for a specific store, usable by platform
+ * administrators who want to "view as vendor" for any storefront.
+ * The `actingUser` is the admin; the `store` is what gets exposed to the
+ * vendor layout UI.
+ */
+export async function getVendorContextForStore({
+  storeId,
+  actingUser,
+}: {
+  storeId: string;
+  actingUser: SessionUser;
+}): Promise<VendorContext> {
+  let store = await systemDb.maybeOne<Store>(
+    `select * from stores where id = $1`,
+    [storeId],
+  );
+  if (!store) {
+    throw new Error(`Store ${storeId} not found`);
+  }
+
+  const owner = await systemDb.maybeOne<{ id: string; full_name: string; email: string; email_verified_at: string | null }>(
+    `select id, full_name, email, email_verified_at from users where id = $1`,
+    [store.owner_id],
+  );
+
+  // The vendor layout renders the *store owner's* identity, so surface the
+  // owner's details while keeping the admin as the acting session user.
+  const vendorUser: SessionUser = {
+    id: store.owner_id,
+    email: owner?.email ?? "",
+    fullName: owner?.full_name ?? store.name,
+    role: "vendor",
+    avatarUrl: null,
+    emailVerified: Boolean(owner?.email_verified_at),
+    status: "active",
+  };
+
+  const overdueSub = await systemDb.maybeOne<{ id: string }>(
+    `select id from subscriptions
+      where store_id = $1 and status in ('trialing','active') and expires_at <= now()
+      limit 1`,
+    [store.id],
+  );
+  const overdueGrant =
+    !store.manual_suspension &&
+    (store.status === "active" || store.status === "pending") &&
+    Boolean(store.access_until && new Date(store.access_until).getTime() <= Date.now());
+
+  if (!FREE_STORE_ACCESS && (overdueSub || overdueGrant)) {
+    await withSystem((db) => db.query(`select * from process_subscription_expiry()`));
+    const refreshed = await systemDb.maybeOne<Store>(`select * from stores where id = $1`, [store.id]);
+    if (refreshed) store = refreshed;
+  }
+
+  const [subscription, lastSubscription] = await Promise.all([
+    systemDb.maybeOne<VendorSubscription>(
+      `select s.id, s.status, s.started_at, s.expires_at, s.plan_id, p.name as plan_name, p.price as plan_price,
+              p.features as plan_features
+         from subscriptions s
+         join subscription_plans p on p.id = s.plan_id
+        where s.store_id = $1 and s.status in ('trialing','active') and s.expires_at > now()
+        order by s.expires_at desc limit 1`,
+      [store.id],
+    ),
+    systemDb.maybeOne<VendorSubscription>(
+      `select s.id, s.status, s.started_at, s.expires_at, s.plan_id, p.name as plan_name, p.price as plan_price,
+              p.features as plan_features
+         from subscriptions s
+         join subscription_plans p on p.id = s.plan_id
+        where s.store_id = $1
+        order by s.expires_at desc limit 1`,
+      [store.id],
+    ),
+  ]);
+
+  const hasUnexpiredAccessGrant = Boolean(
+    store.access_until && new Date(store.access_until).getTime() > Date.now(),
+  );
+  const effectiveExpiresAt = FREE_STORE_ACCESS ? null : subscription?.expires_at ?? (hasUnexpiredAccessGrant ? store.access_until : null);
+  const effectiveStartedAt = subscription?.started_at ?? null;
+  const isManuallySuspended = Boolean(store.manual_suspension || store.status === "suspended");
+  const isSubscriptionExpired =
+    !FREE_STORE_ACCESS &&
+    !isManuallySuspended &&
+    store.status !== "rejected" &&
+    (store.status === "expired" || (!subscription && !hasUnexpiredAccessGrant));
+  const isAccountSuspended = isSubscriptionExpired || isManuallySuspended || store.status === "rejected";
+
+  const categories = await getBusinessCategories(systemDb, store.id);
+  const category = categories.find((item) => item.id === store.category_id) ?? null;
+  store.business_categories = categories;
+
+  return {
+    user: vendorUser,
+    store,
+    subscription,
+    lastSubscription,
+    effectiveExpiresAt,
+    effectiveStartedAt,
+    isSubscriptionExpired,
+    isManuallySuspended,
+    isAccountSuspended,
+    category,
+    categories,
+  };
+}
+
+/**
  * Operational vendor page guard: suspends dashboard navigation on subscription
  * expiry and redirects the vendor directly to the subscription renewal screen.
  */
@@ -281,6 +389,8 @@ export async function requireActiveVendorContext(): Promise<VendorContext> {
   }
   return ctx;
 }
+
+
 
 /** Returns a human-readable lock message when a vendor account is suspended, or null when operational. */
 export function vendorSuspensionMessage(ctx: VendorContext): string | null {

@@ -37,18 +37,18 @@ create index if not exists abandoned_carts_recovery_sent_idx on abandoned_carts(
 -- ----------------------------------------------------------------------------
 alter table if exists abandoned_carts enable row level security;
 
-create policy if not exists abandoned_carts_own on abandoned_carts
-  for all to authenticated
-  using (auth.uid() = user_id or user_id is null)
-  with check (auth.uid() = user_id or user_id is null);
+create policy abandoned_carts_own on abandoned_carts
+  for all to app_runtime
+  using (app_current_user_id() = user_id or user_id is null)
+  with check (app_current_user_id() = user_id or user_id is null);
 
-create policy if not exists abandoned_carts_admin on abandoned_carts
-  for all to authenticated
+create policy abandoned_carts_admin on abandoned_carts
+  for all to app_runtime
   using (
-    exists (select 1 from users where id = auth.uid() and role in ('admin','super_admin'))
+    exists (select 1 from users where id = app_current_user_id() and role in ('admin','super_admin'))
   )
   with check (
-    exists (select 1 from users where id = auth.uid() and role in ('admin','super_admin'))
+    exists (select 1 from users where id = app_current_user_id() and role in ('admin','super_admin'))
   );
 
 commit;

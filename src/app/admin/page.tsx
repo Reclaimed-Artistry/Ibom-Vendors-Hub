@@ -1,13 +1,15 @@
 import { BUSINESS_CATEGORY_NAMES_SQL } from "@/lib/business-categories";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Building2, CalendarClock, CreditCard, Flag, ShoppingBag, Users, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRight, Building2, CalendarClock, CreditCard, Flag, Plus, ShoppingBag, Users, Wallet } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
+import { getStoreCategories } from "@/lib/storefront";
 import { formatMoney, formatDate, timeAgo } from "@/lib/utils";
 import { Badge, Card, CardHeader, EmptyState, PageHeader, StatCard } from "@/components/ui";
 import { ReviewCountdown } from "@/components/review-countdown";
+import { CreateVendorAccountForm } from "@/components/create-vendor-account-form";
 
 export const metadata: Metadata = { title: "Admin overview · Ibom Vendors Hub" };
 
@@ -15,7 +17,8 @@ export default async function AdminOverviewPage() {
   await requireAdmin();
   const settings = await getSettings();
 
-  const [stats, pendingStores, recentVendors, payments, activity] = await Promise.all([
+  const [stats, pendingStores, recentVendors, payments, activity] =
+    await Promise.all([
     systemDb.maybeOne<{
       stores: number;
       active: number;
@@ -58,6 +61,8 @@ export default async function AdminOverviewPage() {
       `select id, action, description, actor_role, created_at from activity_logs order by created_at desc limit 8`,
     ),
   ]);
+
+  const categories = (await getStoreCategories()) ?? [];
 
   return (
     <div className="space-y-4">
@@ -163,6 +168,8 @@ export default async function AdminOverviewPage() {
             ))}
           </ul>
         </Card>
+
+        <CreateVendorAccountForm categories={categories} />
       </div>
     </div>
   );

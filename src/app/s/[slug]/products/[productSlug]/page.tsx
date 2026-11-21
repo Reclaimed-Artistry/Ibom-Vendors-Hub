@@ -16,9 +16,11 @@ import { formatMoney, formatDate } from "@/lib/utils";
 import { Badge, ButtonLink, Card } from "@/components/ui";
 import { AddToCart } from "@/components/add-to-cart";
 import { ReviewForm } from "@/components/review-form";
+import { AdUnit } from "@/components/ad-unit";
 import { getCurrentUser } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { getCategoryBookingProfile } from "@/lib/artisan-bookings";
+import { trackProductView } from "@/lib/visitor-tracking";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -44,6 +46,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   if (!store) notFound();
   const product = await getStoreProduct(store.id, productSlug);
   if (!product) notFound();
+  await trackProductView(product.id);
   const category = listingCategory(product, primaryCategory);
 
   const [settings, base, reviews, user] = await Promise.all([
@@ -277,6 +280,10 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               </div>
             ) : null}
           </Card>
+
+          <div className="mt-4 mb-4">
+            <AdUnit adSlot="product-page-banner" style={{ minHeight: "280px" }} />
+          </div>
 
           <Card id="review" className="card-pad space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">

@@ -2,7 +2,7 @@ import { BUSINESS_CATEGORY_NAMES_SQL } from "@/lib/business-categories";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink, FileCheck2, Mail, MapPin, Phone, ShieldCheck, Store } from "lucide-react";
+import { ExternalLink, FileCheck2, Home, Mail, MapPin, Phone, ShieldCheck, Store, User } from "lucide-react";
 import { requireAdmin } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { getPlans, getStoreSubscription } from "@/lib/subscriptions";
@@ -108,6 +108,13 @@ export default async function AdminVendorDetailPage({ params }: { params: Promis
             {store.status === "active" ? (
               <Link href={base} target="_blank" className="btn btn-secondary btn-sm">Storefront <ExternalLink className="size-3.5" /></Link>
             ) : null}
+            <Link
+              href={`/vendor?viewAs=${store.id}`}
+              className="btn btn-primary btn-sm"
+              title="See exactly what this vendor sees in their dashboard"
+            >
+              <User className="size-3.5" /> Vendor&apos;s view
+            </Link>
           </>
         }
       />

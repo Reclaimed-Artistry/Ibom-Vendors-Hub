@@ -24,6 +24,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCategoriesWithCounts, getMarketplaceHighlights, searchMarketplace } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
 import { formatMoney, truncate } from "@/lib/utils";
+import { AdUnit } from "@/components/ad-unit";
 
 export const metadata = publicMetadata({
   title: "Ibom Vendors Hub | Shop Akwa Ibom Businesses Online",
@@ -191,6 +192,11 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Homepage ad unit */}
+      <div className="container-page py-8">
+        <AdUnit adSlot="homepage-banner" style={{ minHeight: "280px" }} />
+      </div>
 
       {/* Categories */}
       <section className="container-page py-14">

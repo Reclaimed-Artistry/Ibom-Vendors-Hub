@@ -1,12 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
-import "./globals-dark.css";
 import "./motion.css";
 import { CartProvider } from "@/components/cart";
 import { SiteMotion } from "@/components/site-motion";
-import { ThemeProvider } from "@/components/theme-provider";
 import { BRAND_ICONS } from "@/lib/brand-assets";
 import { PUBLIC_ROBOTS, SITE_DESCRIPTION, siteUrl, siteVerification } from "@/lib/seo";
+import { trackSiteVisit } from "@/lib/visitor-tracking";
 
 export const metadata: Metadata = {
   title: {
@@ -51,14 +51,19 @@ export const viewport: Viewport = {
   userScalable: true,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const pathname = (await headers()).get("x-ivh-pathname") ?? "/";
+  await trackSiteVisit(pathname);
+
   return (
-    <html lang="en" className="w-full max-w-full overflow-x-clip" data-theme="system">
+    <html lang="en" className="w-full max-w-full overflow-x-clip">
       <body className="w-full max-w-full overflow-x-clip">
-        <ThemeProvider storageKey="ivh-theme">
-          <CartProvider>{children}</CartProvider>
-          <SiteMotion />
-        </ThemeProvider>
+        <CartProvider>{children}</CartProvider>
+        <SiteMotion />
       </body>
     </html>
   );

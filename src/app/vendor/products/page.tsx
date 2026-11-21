@@ -52,8 +52,10 @@ export default async function VendorProductsPage({
       category_name: string | null;
       marketplace_category_name: string | null;
       image_url: string | null;
+      sales_count: number;
+      views_count: number;
     }>(
-      `select p.id, p.name, p.price, p.is_available, p.stock_quantity, p.track_stock, p.kind,
+      `select p.id, p.name, p.price, p.is_available, p.stock_quantity, p.track_stock, p.kind, p.sales_count, p.views_count,
               c.name as category_name, mc.name as marketplace_category_name,
               (select url from product_images where product_id = p.id order by sort_order limit 1) as image_url
          from products p left join product_categories c on c.id = p.category_id
@@ -134,40 +136,28 @@ export default async function VendorProductsPage({
           action={<ButtonLink href="/vendor/products/new">Add product</ButtonLink>}
         />
       ) : (
-        <div className="table-wrap">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th>Category / section</th>
-                <th>Price</th>
-                <th>Stock</th>
-                <th>Status</th>
-                <th className="text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((product) => (
-                <tr key={product.id}>
-                  <td>
-                    <div className="flex items-center gap-3">
-                      <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-ink-100 text-ink-400">
-                        {product.image_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <ListingMedia autoPlayInView={false} src={product.image_url} alt={product.name} className="size-10" />
-                        ) : (
-                          <ImageIcon className="size-4" />
-                        )}
-                      </span>
-                      <div className="min-w-0">
-                        <Link href={`/vendor/products/${product.id}`} className="truncate font-semibold text-ink-900 hover:text-brand-700">{product.name}</Link>
-                        <p className="text-xs text-ink-400">{product.kind === "service" ? "Service" : "Product"}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="text-sm"><p>{product.marketplace_category_name ?? "Uncategorised"}</p>{product.category_name ? <p className="text-xs text-ink-400">Section: {product.category_name}</p> : null}</td>
-                  <td className="font-semibold">{formatMoney(Number(product.price))}</td>
-                  <td>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {rows.map((product) => (
+            <Link key={product.id} href={`/vendor/products/${product.id}`} className="card card-pad flex flex-col gap-3 hover:bg-ink-50 transition-colors group">
+              <div className="aspect-[4/3] rounded-xl bg-ink-100 overflow-hidden flex shrink-0">
+                {product.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <ListingMedia autoPlayInView={false} src={product.image_url} alt={product.name} className="size-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                ) : (
+                  <div className="size-full flex items-center justify-center text-ink-300">
+                    <ImageIcon className="size-6" />
+                  </div>
+                )}
+                {!product.is_available ? (
+                  <span className="absolute left-3 top-3 rounded-full bg-red-900 px-2 py-1 text-[10px] font-bold text-white">Hidden</span>
+                ) : null}
+              </div>
+              <div className="flex-1 flex flex-col gap-1">
+                <h3 className="font-semibold text-ink-900 line-clamp-2 group-hover:text-brand-700">{product.name}</h3>
+                <p className="text-xs text-ink-400">{product.kind === "service" ? "Service" : "Product"}</p>
+                <div className="mt-auto flex items-center justify-between gap-2">
+                  <div>
+                    <p className="font-bold text-ink-900">{formatMoney(Number(product.price))}</p>
                     {product.track_stock ? (
                       <Badge tone={product.stock_quantity === 0 ? "danger" : product.stock_quantity <= 5 ? "warning" : "neutral"}>
                         {product.stock_quantity} in stock
@@ -175,28 +165,30 @@ export default async function VendorProductsPage({
                     ) : (
                       <span className="text-xs text-ink-400">Not tracked</span>
                     )}
-                  </td>
-                  <td>
-                    <Badge tone={product.is_available ? "success" : "neutral"}>{product.is_available ? "Available" : "Hidden"}</Badge>
-                  </td>
-                  <td>
-                    <div className="flex items-center justify-end gap-1">
-                      <Link href={`/vendor/products/${product.id}`} className="btn btn-ghost btn-sm">Edit</Link>
-                      <form action={toggleProductAvailabilityAction}>
-                        <input type="hidden" name="productId" value={product.id} />
-                        <input type="hidden" name="available" value={product.is_available ? "false" : "true"} />
-                        <SubmitButton className="btn-ghost btn-sm" pendingLabel="…">{product.is_available ? "Hide" : "Show"}</SubmitButton>
-                      </form>
-                      <form action={deleteProductAction}>
-                        <input type="hidden" name="productId" value={product.id} />
-                        <ConfirmSubmit message={`Delete “${product.name}”? Existing orders keep their history.`}>Delete</ConfirmSubmit>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Link href={`/vendor/products/${product.id}`} className="btn btn-ghost btn-sm">
+                      Edit
+                    </Link>
+                    <form action={toggleProductAvailabilityAction}>
+                      <input type="hidden" name="productId" value={product.id} />
+                      <input type="hidden" name="available" value={product.is_available ? "false" : "true"} />
+                      <SubmitButton className="btn-ghost btn-sm" pendingLabel="…">{product.is_available ? "Hide" : "Show"}</SubmitButton>
+                    </form>
+                    <form action={deleteProductAction}>
+                      <input type="hidden" name="productId" value={product.id} />
+                      <ConfirmSubmit
+                        message={`Delete “${product.name}”? Existing orders keep their history.`}
+                        className="btn btn-danger btn-sm"
+                      >
+                        Delete
+                      </ConfirmSubmit>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
       )}
 

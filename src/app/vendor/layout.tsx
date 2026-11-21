@@ -5,15 +5,17 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowUpRight, Bell, Clock, ExternalLink, Lock, MailWarning, ShieldAlert } from "lucide-react";
-import { getVendorContext } from "@/lib/auth";
+import { notFound } from "next/navigation";
+import { ArrowUpRight, Bell, Clock, ExternalLink, Home, Lock, MailWarning, Settings, ShieldAlert } from "lucide-react";
+import { getCurrentUser, getVendorContext, getVendorContextForStore } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { storeBase } from "@/lib/storefront-base";
 import { storefrontUrl } from "@/lib/domains";
 import { formatDateTime } from "@/lib/utils";
 import { Badge } from "@/components/ui";
-import { DashboardNav, LogoutButton, MobileNav, type DashboardNavItem } from "@/components/dashboard-nav";
+import { DashboardNav, LogoutButton, type DashboardNavItem } from "@/components/dashboard-nav";
 import { Logo } from "@/components/logo";
+import { MobileVendorSidebar } from "@/components/mobile-vendor-sidebar";
 import { VendorAnnouncements } from "@/components/announcement-strip";
 import { SubscriptionCountdown } from "@/components/subscription-countdown";
 import { ReviewCountdown } from "@/components/review-countdown";
@@ -26,17 +28,40 @@ function daysLeft(expiresAt: string | null): number {
   return Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 86_400_000));
 }
 
-export default async function VendorLayout({ children }: { children: React.ReactNode }) {
-  const {
-    user,
-    store,
-    subscription,
-    lastSubscription,
-    effectiveExpiresAt,
-    effectiveStartedAt,
-    isSubscriptionExpired,
-    category,
-  } = await getVendorContext();
+export default async function VendorLayout({
+  children,
+  searchParams,
+}: {
+  children: React.ReactNode;
+  searchParams?: { viewAs?: string };
+}) {
+  const actingUser = await getCurrentUser();
+  const viewAsStoreId = searchParams?.viewAs;
+
+  let user, store, subscription, lastSubscription, effectiveExpiresAt, effectiveStartedAt, isSubscriptionExpired, category;
+
+  if (viewAsStoreId && actingUser && (actingUser.role === "admin" || actingUser.role === "super_admin")) {
+    // Platform administrator viewing as a specific vendor's storefront
+    const ctx = await getVendorContextForStore({ storeId: viewAsStoreId, actingUser });
+    user = ctx.user;
+    store = ctx.store;
+    subscription = ctx.subscription;
+    lastSubscription = ctx.lastSubscription;
+    effectiveExpiresAt = ctx.effectiveExpiresAt;
+    effectiveStartedAt = ctx.effectiveStartedAt;
+    isSubscriptionExpired = ctx.isSubscriptionExpired;
+    category = ctx.category;
+  } else {
+    const ctx = await getVendorContext();
+    user = ctx.user;
+    store = ctx.store;
+    subscription = ctx.subscription;
+    lastSubscription = ctx.lastSubscription;
+    effectiveExpiresAt = ctx.effectiveExpiresAt;
+    effectiveStartedAt = ctx.effectiveStartedAt;
+    isSubscriptionExpired = ctx.isSubscriptionExpired;
+    category = ctx.category;
+  }
 
   const pathname = (await headers()).get("x-ivh-pathname") ?? "";
   if (
@@ -69,6 +94,7 @@ export default async function VendorLayout({ children }: { children: React.React
   ]);
 
   const nav: DashboardNavItem[] = [
+    { href: "/vendor/settings", label: "Account settings", icon: "settings", locked: isSubscriptionExpired },
     { href: "/vendor", label: "Overview", icon: "overview", locked: isSubscriptionExpired },
     { href: "/vendor/orders", label: "Orders", icon: "orders", badge: counts?.orders || undefined, locked: isSubscriptionExpired },
     { href: "/vendor/payment-approvals", label: "Payment approvals", icon: "payments", locked: isSubscriptionExpired },
@@ -83,7 +109,6 @@ export default async function VendorLayout({ children }: { children: React.React
     { href: "/vendor/messages", label: "Messages", icon: "messages", badge: counts?.messages || undefined, locked: isSubscriptionExpired },
     { href: "/vendor/subscription", label: "Free store", icon: "subscription" },
     { href: "/vendor/store", label: "Store profile", icon: "store", locked: isSubscriptionExpired },
-    { href: "/vendor/settings", label: "Account settings", icon: "settings", locked: isSubscriptionExpired },
   ];
 
   const remaining = daysLeft(effectiveExpiresAt);
@@ -126,7 +151,7 @@ export default async function VendorLayout({ children }: { children: React.React
             </div>
 
             <div className="rounded-2xl border border-ink-100 bg-white p-2 shadow-sm">
-              <DashboardNav items={nav} />
+              <DashboardNav items={nav} variant="list" />
               <div className="mt-1 border-t border-ink-100 pt-1">
                 <LogoutButton />
               </div>
@@ -153,9 +178,41 @@ export default async function VendorLayout({ children }: { children: React.React
         </aside>
 
         <div className="min-w-0 flex-1">
+          <MobileVendorSidebar
+            nav={nav}
+            store={{
+              name: store.name,
+              slug: store.slug,
+              status: store.status,
+              category: store.category ?? null,
+            }}
+            base={base}
+            isSubscriptionExpired={isSubscriptionExpired}
+            user={{ email: user.email }}
+            pathname={pathname}
+          />
           <header className="relative mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink-100 bg-white px-4 py-3 shadow-sm">
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <MobileNav items={nav} title="Menu" />
+              <div className="flex items-center gap-2 shrink-0">
+                {pathname === "/vendor" ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-brand-800 px-3 py-1.5 text-xs font-semibold text-white">
+                    <Home className="size-3.5" /> Dashboard
+                  </span>
+                ) : (
+                  <Link href="/vendor" className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-ink-50 hover:border-brand-300">
+                    <Home className="size-3.5" /> Dashboard
+                  </Link>
+                )}
+                {pathname === "/vendor/settings" ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-brand-800 px-3 py-1.5 text-xs font-semibold text-white">
+                    <Settings className="size-3.5" /> Settings
+                  </span>
+                ) : (
+                  <Link href="/vendor/settings" className="inline-flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink-700 hover:bg-ink-50 hover:border-brand-300">
+                    <Settings className="size-3.5" /> Settings
+                  </Link>
+                )}
+              </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-ink-900">{store.name}</p>
                 <p className="truncate text-xs text-ink-500">
