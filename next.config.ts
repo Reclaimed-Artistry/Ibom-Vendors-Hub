@@ -4,7 +4,6 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [{ protocol: "https", hostname: "**" }],
   },
-  eslint: { ignoreDuringBuilds: true },
   serverExternalPackages: ["pg"],
   experimental: {
     serverActions: { bodySizeLimit: "8mb" },

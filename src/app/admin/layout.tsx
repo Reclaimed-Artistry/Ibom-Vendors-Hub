@@ -3,15 +3,40 @@ import { LiveDashboard } from "@/components/live-dashboard";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Bell, ExternalLink, ShieldCheck } from "lucide-react";
+import { headers } from "next/headers";
 import { requireAdmin } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
+import { getLoanAgentByEmail } from "@/lib/loan-agents";
+import { redirect } from "next/navigation";
 import { DashboardNav, LogoutButton, MobileNav, type DashboardNavItem } from "@/components/dashboard-nav";
 import { Logo } from "@/components/logo";
+import { User } from "lucide-react";
 
 export const metadata: Metadata = { title: "Admin · Ibom Vendors Hub", robots: NO_INDEX };
 
+/** Paths that loan agents are allowed to access within /admin. */
+const LOAN_AGENT_ALLOWED_ADMIN_PATHS = [
+  "/admin/loan-assessments",
+  "/admin/notifications",
+];
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAdmin();
+  const headersList = await headers();
+  const pathname = headersList.get("x-ivh-pathname") ?? "/";
+
+  // Loan agents (admin role, registered loan officer) may only access
+  // loan-related admin routes. Everything else redirects to /agent/loans.
+  const isLoanAgent = user.role !== "super_admin" && Boolean(getLoanAgentByEmail(user.email));
+  if (isLoanAgent) {
+    const isAllowed = LOAN_AGENT_ALLOWED_ADMIN_PATHS.some((p) =>
+      pathname === p || pathname.startsWith(`${p}/`),
+    );
+    if (!isAllowed) {
+      redirect("/agent/loans");
+    }
+  }
+
   const [pending, unread] = await Promise.all([
     systemDb.maybeOne<{ pending: number; requests: number; messages: number }>(
       `select (select count(*)::int from stores where status = 'pending') as pending,
@@ -32,10 +57,29 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin/subdomains", label: "Subdomain requests", icon: "subdomains", badge: pending?.requests || undefined },
     { href: "/admin/messages", label: "Messages", icon: "messages", badge: pending?.messages || undefined },
     { href: "/admin/emails", label: "Emails", icon: "emails" },
+    ...(Boolean(getLoanAgentByEmail(user.email))
+      ? [{ href: "/admin/loan-assessments", label: "Loan assessments", icon: "audit" as const }]
+      : []),
     { href: "/admin/abandoned-carts", label: "Abandoned carts", icon: "recovery" },
+    { href: "/admin/analytics", label: "Visitor analytics", icon: "audit" },
     { href: "/admin/audit", label: "Audit log", icon: "audit" },
     { href: "/admin/notifications", label: "Notifications", icon: "notifications", badge: unread?.count || undefined },
     { href: "/admin/settings", label: "Platform settings", icon: "settings" },
+    ...(user.role === "super_admin"
+      ? [
+          {
+            href: "/admin/loans",
+            label: "Loan Overview",
+            icon: "audit" as const,
+          },
+        ]
+      : [
+          {
+            href: "/agent/loans",
+            label: "My Loans",
+            icon: "audit" as const,
+          },
+        ]),
   ];
 
   return (
@@ -80,6 +124,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 ) : null}
               </Link>
               <Link href="/admin/vendors?status=pending" className="btn btn-secondary btn-sm">Review queue</Link>
+              <Link href="/admin/vendors?status=active" className="btn btn-primary btn-sm" title="See what any vendor sees in their dashboard">
+                <User className="size-3.5" /> Vendor&apos;s view
+              </Link>
             </div>
           </header>
           <main className="pb-12">{children}</main>
