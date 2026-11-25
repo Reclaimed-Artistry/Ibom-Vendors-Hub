@@ -53,9 +53,9 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="w-full max-w-full overflow-x-clip" data-theme="system">
+    <html lang="en" className="w-full max-w-full overflow-x-clip" data-theme="light">
       <body className="w-full max-w-full overflow-x-clip">
-        <ThemeProvider storageKey="ivh-theme">
+        <ThemeProvider>
           <CartProvider>{children}</CartProvider>
           <SiteMotion />
         </ThemeProvider>
