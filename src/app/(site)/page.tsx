@@ -186,7 +186,7 @@ export default async function HomePage() {
             </div>
             <div className="flex items-center gap-2">
               <Lock className="size-5 text-brand-500" />
-              <span className="text-sm font-medium text-ink-600">Secure Paystack payments</span>
+              <span className="text-sm font-medium text-ink-600">Secure payments</span>
             </div>
           </div>
         </div>
