@@ -5,6 +5,7 @@ import "./motion.css";
 import { CartProvider } from "@/components/cart";
 import { SiteMotion } from "@/components/site-motion";
 import { ThemeProvider } from "@/components/theme-provider";
+import { VisitBeacon } from "@/components/visit-beacon";
 import { BRAND_ICONS } from "@/lib/brand-assets";
 import { PUBLIC_ROBOTS, SITE_DESCRIPTION, siteUrl, siteVerification } from "@/lib/seo";
 
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <CartProvider>{children}</CartProvider>
           <SiteMotion />
+          <VisitBeacon />
         </ThemeProvider>
       </body>
     </html>
