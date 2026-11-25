@@ -363,56 +363,58 @@ export default async function VisitorAnalyticsPage() {
               icon={<Store className="size-5" />}
             />
           ) : (
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-ink-100">
-                  <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
-                    Store
-                  </th>
-                  <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
-                    Owner
-                  </th>
-                  <th className="pb-3 px-4 text-right text-xs font-semibold text-ink-400">
-                    Views
-                  </th>
-                  <th className="pb-3 px-4 text-right text-xs font-semibold text-ink-400">
-                    Unique visitors
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100">
-                {topStores.map((store) => (
-                  <tr key={store.id} className="hover:bg-ink-50/50">
-                    <td className="px-4 py-3">
-                      <div className="min-w-0">
-                        <p className="font-medium text-ink-800 truncate max-w-[140px]">
-                          {store.name}
-                        </p>
-                        <p className="text-[11px] text-ink-500 truncate max-w-[140px]">
-                          /s/{store.slug}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="min-w-0">
-                        <p className="font-medium text-ink-800 truncate max-w-[140px]">
-                          {store.owner_name}
-                        </p>
-                        <p className="text-[11px] text-ink-500 truncate max-w-[140px]">
-                          {store.owner_email}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-ink-900">
-                      {store.views}
-                    </td>
-                    <td className="px-4 py-3 text-right text-ink-600">
-                      {store.unique_visitors}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm min-w-[600px]">
+                <thead>
+                  <tr className="border-b border-ink-100">
+                    <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
+                      Store
+                    </th>
+                    <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
+                      Owner
+                    </th>
+                    <th className="pb-3 px-4 text-right text-xs font-semibold text-ink-400">
+                      Views
+                    </th>
+                    <th className="pb-3 px-4 text-right text-xs font-semibold text-ink-400">
+                      Unique visitors
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-ink-100">
+                  {topStores.map((store) => (
+                    <tr key={store.id} className="hover:bg-ink-50/50">
+                      <td className="px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="font-medium text-ink-800 truncate max-w-[140px]">
+                            {store.name}
+                          </p>
+                          <p className="text-[11px] text-ink-500 truncate max-w-[140px]">
+                            /s/{store.slug}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="min-w-0">
+                          <p className="font-medium text-ink-800 truncate max-w-[140px]">
+                            {store.owner_name}
+                          </p>
+                          <p className="text-[11px] text-ink-500 truncate max-w-[140px]">
+                            {store.owner_email}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold text-ink-900">
+                        {store.views}
+                      </td>
+                      <td className="px-4 py-3 text-right text-ink-600">
+                        {store.unique_visitors}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
@@ -423,53 +425,55 @@ export default async function VisitorAnalyticsPage() {
           {recentVisits.length === 0 ? (
             <EmptyState title="No recent visits" icon={<Clock className="size-5" />} />
           ) : (
-            <table className="w-full text-left border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-ink-100">
-                  <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
-                    When
-                  </th>
-                  <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
-                    Page
-                  </th>
-                  <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
-                    Device
-                  </th>
-                  <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
-                    Referrer
-                  </th>
-                  <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
-                    IP
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ink-100">
-                {recentVisits.map((visit) => (
-                  <tr key={visit.id} className="hover:bg-ink-50/50">
-                    <td className="px-4 py-3 text-ink-600">
-                      <time>{formatDateTime(visit.created_at)}</time>
-                      <p className="text-[11px] text-ink-400">
-                        {timeAgo(visit.created_at)} ago
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-ink-800 truncate max-w-[160px]">
-                        {visit.path}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3 text-ink-600">
-                      {deviceName(visit.user_agent)}
-                    </td>
-                    <td className="px-4 py-3 text-ink-600 truncate max-w-[140px]">
-                      {visit.referrer ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-[11px] font-mono text-ink-400">
-                      {visit.ip ?? "—"}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm min-w-[600px]">
+                <thead>
+                  <tr className="border-b border-ink-100">
+                    <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
+                      When
+                    </th>
+                    <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
+                      Page
+                    </th>
+                    <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
+                      Device
+                    </th>
+                    <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
+                      Referrer
+                    </th>
+                    <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
+                      IP
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-ink-100">
+                  {recentVisits.map((visit) => (
+                    <tr key={visit.id} className="hover:bg-ink-50/50">
+                      <td className="px-4 py-3 text-ink-600">
+                        <time>{formatDateTime(visit.created_at)}</time>
+                        <p className="text-[11px] text-ink-400">
+                          {timeAgo(visit.created_at)} ago
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-ink-800 truncate max-w-[160px]">
+                          {visit.path}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 text-ink-600">
+                        {deviceName(visit.user_agent)}
+                      </td>
+                      <td className="px-4 py-3 text-ink-600 truncate max-w-[140px]">
+                        {visit.referrer ?? "—"}
+                      </td>
+                      <td className="px-4 py-3 text-[11px] font-mono text-ink-400">
+                        {visit.ip ?? "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

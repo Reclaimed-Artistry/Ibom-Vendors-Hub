@@ -7,6 +7,7 @@ import {
   Bell,
   CalendarClock,
   CreditCard,
+  ExternalLink,
   FileText,
   Flag,
   LayoutDashboard,
@@ -121,6 +122,14 @@ export function MobileNav({ items, title }: { items: DashboardNavItem[]; title: 
       </summary>
       <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-[75dvh] overflow-y-auto rounded-2xl border border-ink-100 bg-white p-2 shadow-xl">
         <DashboardNav items={items} compact />
+        <div className="mt-3">
+          <Link
+            href="/"
+            className="block text-xs font-semibold text-brand-700 hover:underline flex items-center gap-1 px-2 py-2"
+          >
+            Public site <ExternalLink className="size-3.5" />
+          </Link>
+        </div>
         <div className="mt-1 border-t border-ink-100 pt-1">
           <LogoutButton />
         </div>
