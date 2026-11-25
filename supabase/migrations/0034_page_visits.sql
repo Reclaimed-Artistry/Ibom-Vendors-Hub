@@ -25,7 +25,7 @@ create index if not exists page_visits_session_idx on page_visits(session_id);
 
 alter table if exists page_visits enable row level security;
 
-create policy if not exists page_visits_admin on page_visits
+create policy page_visits_admin on page_visits
   for select to authenticated
   using (
     exists (select 1 from users where id = auth.uid() and role in ('admin','super_admin'))
