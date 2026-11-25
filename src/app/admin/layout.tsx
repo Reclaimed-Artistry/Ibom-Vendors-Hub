@@ -57,7 +57,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin/subdomains", label: "Subdomain requests", icon: "subdomains", badge: pending?.requests || undefined },
     { href: "/admin/messages", label: "Messages", icon: "messages", badge: pending?.messages || undefined },
     { href: "/admin/emails", label: "Emails", icon: "emails" },
-    ...(Boolean(getLoanAgentByEmail(user.email))
+    ...(user.role === "super_admin" || Boolean(getLoanAgentByEmail(user.email))
       ? [{ href: "/admin/loan-assessments", label: "Loan assessments", icon: "audit" as const }]
       : []),
     { href: "/admin/abandoned-carts", label: "Abandoned carts", icon: "recovery" },
