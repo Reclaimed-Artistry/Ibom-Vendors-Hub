@@ -4,7 +4,16 @@ import { requireAdmin } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { formatDateTime, timeAgo } from "@/lib/utils";
 import { PageHeader, StatCard, EmptyState } from "@/components/ui";
-import { Activity, Monitor, Users, Globe, Clock } from "lucide-react";
+import {
+  Activity,
+  Monitor,
+  Users,
+  Globe,
+  Clock,
+  Store,
+  User,
+  TrendingUp,
+} from "lucide-react";
 
 export const metadata: Metadata = { title: "Visitor analytics · Admin" };
 
@@ -23,6 +32,16 @@ interface VisitRow {
   created_at: string;
 }
 
+interface StoreRow {
+  id: string;
+  name: string;
+  slug: string;
+  views: number;
+  unique_visitors: number;
+  owner_name: string;
+  owner_email: string;
+}
+
 function deviceName(userAgent: string | null): string {
   const ua = (userAgent ?? "").toLowerCase();
   if (/ipad|tablet/.test(ua)) return "Tablet";
@@ -36,7 +55,13 @@ export default async function VisitorAnalyticsPage() {
   const [
     totalVisits,
     uniqueVisitors,
-    visitsToday,
+    loggedInVisitors,
+    anonymousVisitors,
+    visitorsLast24h,
+    storeViews,
+    storesWithViews,
+    totalStores,
+    topStores,
     topPages,
     dailyStats,
     recentVisits,
@@ -48,8 +73,43 @@ export default async function VisitorAnalyticsPage() {
       `select count(distinct session_id)::int as count from page_visits`,
     ),
     systemDb.maybeOne<{ count: number }>(
+      `select count(distinct session_id)::int as count from page_visits
+       where user_id is not null`,
+    ),
+    systemDb.maybeOne<{ count: number }>(
+      `select count(distinct session_id)::int as count from page_visits
+       where user_id is null`,
+    ),
+    systemDb.maybeOne<{ count: number }>(
+      `select count(distinct session_id)::int as count from page_visits
+       where created_at >= now() - interval '24 hours'`,
+    ),
+    systemDb.maybeOne<{ count: number }>(
       `select count(*)::int as count from page_visits
-       where created_at >= (now() at time zone 'Africa/Lagos')::date`,
+       where path like '/s/%'`,
+    ),
+    systemDb.maybeOne<{ count: number }>(
+      `select count(distinct s.slug)::int as count
+         from page_visits pv
+         join stores s on s.slug = split_part(pv.path, '/', 3)
+        where pv.path like '/s/%'`,
+    ),
+    systemDb.maybeOne<{ count: number }>(
+      `select count(*)::int as count from stores`,
+    ),
+    systemDb.query<StoreRow>(
+      `select s.id, s.name, s.slug,
+              count(*)::int as views,
+              count(distinct pv.session_id)::int as unique_visitors,
+              u.full_name as owner_name,
+              u.email as owner_email
+         from page_visits pv
+         join stores s on s.slug = split_part(pv.path, '/', 3)
+         join users u on u.id = s.owner_id
+        where pv.path like '/s/%'
+        group by s.id, s.name, s.slug, u.full_name, u.email
+        order by views desc
+        limit 10`,
     ),
     systemDb.query<{ path: string; views: number; visitors: number }>(
       `select path, count(*)::int as views, count(distinct session_id)::int as visitors
@@ -76,7 +136,12 @@ export default async function VisitorAnalyticsPage() {
 
   const total = totalVisits?.count ?? 0;
   const unique = uniqueVisitors?.count ?? 0;
-  const today = visitsToday?.count ?? 0;
+  const loggedIn = loggedInVisitors?.count ?? 0;
+  const anonymous = anonymousVisitors?.count ?? 0;
+  const last24h = visitorsLast24h?.count ?? 0;
+  const totalStoreViews = storeViews?.count ?? 0;
+  const storesViewed = storesWithViews?.count ?? 0;
+  const totalStoreCount = totalStores?.count ?? 0;
 
   // Last 14 days (Lagos time) with zeros filled in for days without visits.
   const nowLagos = new Date(
@@ -101,34 +166,66 @@ export default async function VisitorAnalyticsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Visitor analytics"
-        description={`${total} page views from ${unique} visitors across the platform.`}
+        description={`Track site visitors, store views, and product views across the platform.`}
         actions={null}
       />
 
+      {/* Site-wide visitors stat cards */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Total visits"
+          label="Total site visitors"
           value={total}
           icon={<Monitor className="size-4" />}
           tone="neutral"
         />
         <StatCard
-          label="Unique visitors"
-          value={unique}
-          hint={`${Math.round(((unique || 0) / Math.max(total, 1)) * 100)}% return rate`}
-          icon={<Users className="size-4" />}
+          label="Logged-in visitors"
+          value={loggedIn}
+          hint={`${Math.round(((loggedIn || 0) / Math.max(unique, 1)) * 100)}% of visitors`}
+          icon={<User className="size-4" />}
         />
         <StatCard
-          label="Visits today"
-          value={today}
-          icon={<Activity className="size-4" />}
+          label="Anonymous visitors"
+          value={anonymous}
+          hint={`${Math.round(((anonymous || 0) / Math.max(unique, 1)) * 100)}% of visitors`}
+          icon={<Globe className="size-4" />}
+        />
+        <StatCard
+          label="Visitors (last 24h)"
+          value={last24h}
+          icon={<TrendingUp className="size-4" />}
           tone="info"
         />
+      </div>
+
+      {/* Store views section */}
+      <div className="grid gap-4 xl:grid-cols-4">
         <StatCard
-          label="Busiest page"
-          value={topPath}
-          hint={`${topViews} view${topViews !== 1 ? "s" : ""}`}
-          icon={<Globe className="size-4" />}
+          label="Total store views"
+          value={totalStoreViews}
+          icon={<Store className="size-4" />}
+          tone="neutral"
+        />
+        <StatCard
+          label="Stores with views"
+          value={storesViewed}
+          hint={`of ${totalStoreCount} total`}
+          icon={<Store className="size-4" />}
+        />
+        <StatCard
+          label="Avg views per store"
+          value={
+            totalStoreCount
+              ? Math.round((totalStoreViews / totalStoreCount) * 10) / 10
+              : 0
+          }
+          icon={<Activity className="size-4" />}
+        />
+        <StatCard
+          label="Unique visitors"
+          value={unique}
+          hint={`${total} total page views`}
+          icon={<Users className="size-4" />}
         />
       </div>
 
@@ -183,12 +280,6 @@ export default async function VisitorAnalyticsPage() {
                   (r) => deviceName(r.user_agent) === label,
                 ).length;
                 const pct = total ? Math.round((count / total) * 100) : 0;
-                const tone =
-                  label === "Desktop"
-                    ? "ink"
-                    : label === "Mobile"
-                    ? "brand"
-                    : "amber";
                 return (
                   <div
                     key={label}
@@ -255,6 +346,73 @@ export default async function VisitorAnalyticsPage() {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+
+        <div className="card card-pad xl:col-span-2">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h3 className="text-sm font-semibold text-ink-900">
+              Top stores by views
+            </h3>
+            <p className="text-xs text-ink-400">Most viewed storefronts</p>
+          </div>
+          {topStores.length === 0 ? (
+            <EmptyState
+              title="No store views yet"
+              description="Store views appear here once shoppers visit vendor storefronts."
+              icon={<Store className="size-5" />}
+            />
+          ) : (
+            <table className="w-full text-left border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-ink-100">
+                  <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
+                    Store
+                  </th>
+                  <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
+                    Owner
+                  </th>
+                  <th className="pb-3 px-4 text-right text-xs font-semibold text-ink-400">
+                    Views
+                  </th>
+                  <th className="pb-3 px-4 text-right text-xs font-semibold text-ink-400">
+                    Unique visitors
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-100">
+                {topStores.map((store) => (
+                  <tr key={store.id} className="hover:bg-ink-50/50">
+                    <td className="px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-ink-800 truncate max-w-[140px]">
+                          {store.name}
+                        </p>
+                        <p className="text-[11px] text-ink-500 truncate max-w-[140px]">
+                          /s/{store.slug}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-ink-800 truncate max-w-[140px]">
+                          {store.owner_name}
+                        </p>
+                        <p className="text-[11px] text-ink-500 truncate max-w-[140px]">
+                          {store.owner_email}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-ink-900">
+                      {store.views}
+                    </td>
+                    <td className="px-4 py-3 text-right text-ink-600">
+                      {store.unique_visitors}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
 
