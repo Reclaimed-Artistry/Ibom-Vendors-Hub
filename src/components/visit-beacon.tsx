@@ -11,6 +11,11 @@ const SESSION_KEY = "ivh_visit_session";
  * analytics panel. A session id is persisted in localStorage so repeat visits
  * from the same browser count as one visitor. Failures are swallowed —
  * tracking must never delay or break navigation.
+ *
+ * When on a storefront page (document.documentElement.dataset.storeSlug is
+ * set), the store slug is sent along so subdomain-accessed stores (where
+ * window.location.pathname is '/', not '/s/{slug}') are attributed to the
+ * correct store.
  */
 export function VisitBeacon() {
   const pathname = usePathname();
@@ -29,10 +34,17 @@ export function VisitBeacon() {
         }
       }
 
+      const storeSlug =
+        typeof document !== "undefined" &&
+        document.documentElement.dataset.storeSlug
+          ? document.documentElement.dataset.storeSlug
+          : undefined;
+
       const payload = JSON.stringify({
         session_id: sessionId,
         path: window.location.pathname + window.location.search,
         referrer: document.referrer || undefined,
+        store_slug: storeSlug,
       });
 
       const send = async () => {

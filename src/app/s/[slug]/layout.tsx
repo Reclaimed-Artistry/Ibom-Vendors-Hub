@@ -9,6 +9,7 @@ import { resolveStore } from "@/lib/storefront";
 import { storeBase } from "@/lib/storefront-base";
 import { Logo } from "@/components/logo";
 import { CustomerAnnouncements } from "@/components/announcement-strip";
+import { StoreSlugSetter } from "@/components/store-slug-setter";
 import { NO_INDEX, publicMetadata, seoDescription, storeUrl } from "@/lib/seo";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -39,6 +40,7 @@ export default async function StorefrontLayout({
 
   return (
     <div className="flex min-h-screen w-full max-w-full flex-col overflow-x-clip bg-ink-50">
+      <StoreSlugSetter slug={slug} />
       <header className="sticky top-0 z-40 border-b border-ink-100 bg-white/95 backdrop-blur">
         <div className="container-page flex h-16 items-center justify-between gap-3">
           <Link href={base || "/"} className="flex min-w-0 items-center gap-2.5">

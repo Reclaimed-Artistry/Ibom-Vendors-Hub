@@ -86,13 +86,12 @@ export default async function VisitorAnalyticsPage() {
     ),
     systemDb.maybeOne<{ count: number }>(
       `select count(*)::int as count from page_visits
-       where path like '/s/%'`,
+       where store_slug is not null`,
     ),
     systemDb.maybeOne<{ count: number }>(
-      `select count(distinct s.slug)::int as count
-         from page_visits pv
-         join stores s on s.slug = split_part(pv.path, '/', 3)
-        where pv.path like '/s/%'`,
+      `select count(distinct store_slug)::int as count
+         from page_visits
+        where store_slug is not null`,
     ),
     systemDb.maybeOne<{ count: number }>(
       `select count(*)::int as count from stores`,
@@ -104,9 +103,9 @@ export default async function VisitorAnalyticsPage() {
               u.full_name as owner_name,
               u.email as owner_email
          from page_visits pv
-         join stores s on s.slug = split_part(pv.path, '/', 3)
+         join stores s on s.slug = pv.store_slug
          join users u on u.id = s.owner_id
-        where pv.path like '/s/%'
+        where pv.store_slug is not null
         group by s.id, s.name, s.slug, u.full_name, u.email
         order by views desc
         limit 10`,

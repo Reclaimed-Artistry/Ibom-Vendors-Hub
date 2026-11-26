@@ -14,6 +14,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       session_id?: string;
       path?: string;
       referrer?: string;
+      store_slug?: string;
     };
     if (!body.session_id || typeof body.session_id !== "string") {
       return NextResponse.json({ error: "bad request" }, { status: 400 });
@@ -33,9 +34,16 @@ export async function POST(req: Request): Promise<NextResponse> {
       null;
 
     await systemDb.execute(
-      `insert into page_visits (session_id, path, referrer, user_agent, ip)
-         values ($1, $2, $3, $4, $5)`,
-      [body.session_id, body.path, body.referrer ?? null, ua || null, ip],
+      `insert into page_visits (session_id, path, referrer, user_agent, ip, store_slug)
+         values ($1, $2, $3, $4, $5, $6)`,
+      [
+        body.session_id,
+        body.path,
+        body.referrer ?? null,
+        ua || null,
+        ip,
+        body.store_slug ?? null,
+      ],
     );
   } catch {
     // Intentionally unobserved: analytics must never affect the user journey.
