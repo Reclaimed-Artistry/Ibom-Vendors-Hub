@@ -37,7 +37,7 @@ export function middleware(request: NextRequest) {
   // Marketplace navigation on a store host must reach the actual marketplace,
   // not a /s/vendor/browse 404 or another indexable copy of a platform page.
   if (subdomain && !isReservedSubdomain(subdomain) && PUBLIC_PLATFORM_ROUTES.test(pathname) && safeMethod) {
-    return applyNoStoreHeaders(NextResponse.redirect(new URL(`${pathname}${search}`, `${appUrl()}/`), 308), request);
+    return applyNoStoreHeaders(NextResponse.redirect(new URL(`${pathname}${search}`, `${appUrl()}/`), 301), request);
   }
 
   // Only canonical website hosts redirect. Local development and preview hosts
@@ -51,7 +51,7 @@ export function middleware(request: NextRequest) {
     const destination = new URL(storefrontUrl(legacyStorePath[1]));
     destination.pathname = legacyStorePath[2] || "/";
     destination.search = search;
-    return applyNoStoreHeaders(NextResponse.redirect(destination, 308), request);
+    return applyNoStoreHeaders(NextResponse.redirect(destination, 301), request);
   }
 
   // Public, fixed brand artwork is independent of tenant/preview routing and
