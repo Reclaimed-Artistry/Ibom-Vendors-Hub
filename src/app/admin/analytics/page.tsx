@@ -98,17 +98,15 @@ export default async function VisitorAnalyticsPage() {
     ),
     systemDb.query<StoreRow>(
       `select s.id, s.name, s.slug,
-              count(*)::int as views,
-              count(distinct pv.session_id)::int as unique_visitors,
+              coalesce(count(pv.id), 0)::int as views,
+              coalesce(count(distinct pv.session_id), 0)::int as unique_visitors,
               u.full_name as owner_name,
               u.email as owner_email
-         from page_visits pv
-         join stores s on s.slug = pv.store_slug
+         from stores s
          join users u on u.id = s.owner_id
-        where pv.store_slug is not null
+         left join page_visits pv on pv.store_slug = s.slug
         group by s.id, s.name, s.slug, u.full_name, u.email
-        order by views desc
-        limit 10`,
+        order by views desc, s.name asc`,
     ),
     systemDb.query<{ path: string; views: number; visitors: number }>(
       `select path, count(*)::int as views, count(distinct session_id)::int as visitors
@@ -351,14 +349,16 @@ export default async function VisitorAnalyticsPage() {
         <div className="card card-pad xl:col-span-2">
           <div className="flex items-center justify-between gap-2 mb-3">
             <h3 className="text-sm font-semibold text-ink-900">
-              Top stores by views
+              Store views
             </h3>
-            <p className="text-xs text-ink-400">Most viewed storefronts</p>
+            <p className="text-xs text-ink-400">
+              Total views per storefront across all stores
+            </p>
           </div>
-          {topStores.length === 0 ? (
+          {totalStoreCount === 0 ? (
             <EmptyState
-              title="No store views yet"
-              description="Store views appear here once shoppers visit vendor storefronts."
+              title="No stores yet"
+              description="Stores appear here once vendors open storefronts."
               icon={<Store className="size-5" />}
             />
           ) : (
@@ -366,6 +366,9 @@ export default async function VisitorAnalyticsPage() {
               <table className="w-full text-left border-collapse text-sm min-w-[600px]">
                 <thead>
                   <tr className="border-b border-ink-100">
+                    <th className="pb-3 px-4 text-right text-xs font-semibold text-ink-400">
+                      #
+                    </th>
                     <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">
                       Store
                     </th>
@@ -381,8 +384,11 @@ export default async function VisitorAnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ink-100">
-                  {topStores.map((store) => (
+                  {topStores.map((store, index) => (
                     <tr key={store.id} className="hover:bg-ink-50/50">
+                      <td className="px-4 py-3 text-right text-[11px] font-medium text-ink-400">
+                        {index + 1}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="min-w-0">
                           <p className="font-medium text-ink-800 truncate max-w-[140px]">
@@ -403,7 +409,7 @@ export default async function VisitorAnalyticsPage() {
                           </p>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold text-ink-900">
+                      <td className={`px-4 py-3 text-right tabular-nums font-semibold ${store.views === 0 ? "text-ink-400" : "text-ink-900"}`}>
                         {store.views}
                       </td>
                       <td className="px-4 py-3 text-right text-ink-600">
