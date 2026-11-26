@@ -11,6 +11,7 @@ import {
   ArrowRight,
   BadgeCheck,
   Clock,
+  FileText,
   Lock,
   MapPin,
   Package,
@@ -109,6 +110,9 @@ export default async function HomePage() {
               <span className="inline-flex items-center gap-1.5"><ShieldCheck className="size-4 text-brand-400" /> Verified vendors</span>
               <span className="inline-flex items-center gap-1.5"><Truck className="size-4 text-brand-400" /> Delivery & pickup</span>
               <span className="inline-flex items-center gap-1.5"><Clock className="size-4 text-brand-400" /> Live order tracking</span>
+              <Link href="/loan" className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:underline">
+                <FileText className="size-4" /> Take a loan
+              </Link>
             </div>
           </div>
 
