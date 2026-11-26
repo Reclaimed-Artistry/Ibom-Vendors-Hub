@@ -64,7 +64,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-3">
               From
             </h2>
-            <p className="font-semibold text-ink-900">{settings.platform_name}</p>
+            <p className="font-semibold text-ink-900 whitespace-nowrap">{settings.platform_name}</p>
             <p className="text-sm text-ink-600">{settings.support_email}</p>
             <p className="text-sm text-ink-600">{settings.support_phone}</p>
             <p className="text-sm text-ink-600">Akwa Ibom, Nigeria</p>

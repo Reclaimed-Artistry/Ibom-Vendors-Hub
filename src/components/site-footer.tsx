@@ -65,8 +65,12 @@ export async function SiteFooter() {
       </div>
       <div className="border-t border-ink-100 py-5">
         <div className="container-page flex flex-col items-center justify-between gap-2 text-xs text-ink-400 sm:flex-row">
-          <p>© {new Date().getFullYear()} {settings.platform_name}. All rights reserved.</p>
-          <p>Built for Akwa Ibom businesses · Powered by {settings.platform_name}</p>
+          <div className="flex items-center gap-2 whitespace-nowrap text-xs text-ink-400">
+            <span className="text-ink-500">Loan partners:</span>
+            <span className="font-semibold text-ink-300">MONEY STEWARD</span>
+          </div>
+          <p className="whitespace-nowrap">© {new Date().getFullYear()} <span className="whitespace-nowrap">{settings.platform_name}</span>. All rights reserved.</p>
+          <p className="whitespace-nowrap">Built for Akwa Ibom businesses · Powered by <span className="whitespace-nowrap">{settings.platform_name}</span></p>
         </div>
       </div>
     </footer>

@@ -29,7 +29,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
             ))}
           </ul>
         </div>
-        <p className="relative text-xs text-ink-500">© {new Date().getFullYear()} {settings.platform_name}</p>
+        <p className="relative text-xs text-ink-500 whitespace-nowrap">© {new Date().getFullYear()} <span className="whitespace-nowrap">{settings.platform_name}</span></p>
       </div>
       <div className="flex flex-col justify-center px-5 py-10 sm:px-10">
         <div className="mx-auto w-full max-w-md">
