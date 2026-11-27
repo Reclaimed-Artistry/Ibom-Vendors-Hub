@@ -3,7 +3,7 @@ import { formatNigeriaTime } from "@/lib/order-timing";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, Download, Mail, MapPin, Phone, Star, Store, Truck } from "lucide-react";
+import { CheckCircle2, Download, Mail, MapPin, Package, Phone, Star, Store, Truck } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { getOrderForActor } from "@/lib/orders";
@@ -111,11 +111,28 @@ export default async function AccountOrderDetailPage({ params }: { params: Promi
             <CardHeader title="Items" />
             <ul className="divide-y divide-ink-100">
               {items.map((item) => (
-                <li key={item.id} className="flex items-start justify-between gap-3 px-5 py-3">
-                  <div>
-                    <p className="font-medium text-ink-900">{item.name}</p>
-                    {item.variant_name ? <p className="text-xs text-ink-500">{item.variant_name}</p> : null}
-                    <p className="text-xs text-ink-400">{item.quantity} × {formatMoney(Number(item.unit_price))}</p>
+                <li key={item.id} className="flex items-start justify-between gap-4 px-5 py-4">
+                  <div className="flex items-start gap-3">
+                    {item.product_images?.[0] ? (
+                      <img
+                        src={item.product_images[0].url}
+                        alt={item.product_images[0].alt ?? item.name}
+                        className="size-12 rounded-lg object-cover bg-ink-100"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="size-12 rounded-lg bg-ink-100 flex items-center justify-center">
+                        <Package className="size-5 text-ink-400" />
+                      </div>
+                    )}
+                    <div className="flex flex-col justify-center min-w-0">
+                      <p className="font-medium text-ink-900 truncate">{item.name}</p>
+                      {item.variant_name ? <p className="text-xs text-ink-500 truncate">{item.variant_name}</p> : null}
+                      {item.product_description ? (
+                        <p className="mt-1 text-xs text-ink-600 line-clamp-2">{item.product_description}</p>
+                      ) : null}
+                      <p className="text-xs text-ink-400 mt-1">{item.quantity} × {formatMoney(Number(item.unit_price))}</p>
+                    </div>
                   </div>
                   <span className="text-sm font-semibold">{formatMoney(Number(item.line_total))}</span>
                 </li>

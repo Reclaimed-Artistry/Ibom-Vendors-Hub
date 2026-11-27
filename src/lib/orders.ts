@@ -10,7 +10,7 @@ import { notify, notifyAdmins } from "@/lib/notifications";
 import { logActivity } from "@/lib/audit";
 import { getVendorContext, vendorSuspensionMessage } from "@/lib/auth";
 import type { CheckoutInput } from "@/lib/validation";
-import type { Order, OrderItem, Store, StoreCategory } from "@/lib/types";
+import type { Order, OrderItem, ProductImage, Store, StoreCategory } from "@/lib/types";
 import { workflowFor, workflowLabel } from "@/lib/storefront";
 
 /* -------------------------------------------------------------------------- */
@@ -692,7 +692,18 @@ export async function getOrderForActor(orderId: string, actor: { id: string; rol
     delete order.delivery_pin;
   }
 
-  const items = await systemDb.query<OrderItem>(`select * from order_items where order_id = $1`, [orderId]);
+  const items = await systemDb.query<OrderItem & { product_description: string | null; product_images: ProductImage[] }>(`
+    select i.*,
+           p.description as product_description,
+           coalesce((
+             select jsonb_agg(jsonb_build_object('id', img.id, 'url', img.url, 'alt', img.alt, 'sort_order', img.sort_order)
+                              order by img.sort_order)
+             from product_images img where img.product_id = p.id
+           ), '[]'::jsonb) as product_images
+      from order_items i
+      left join products p on p.id = i.product_id
+     where i.order_id = $1
+  `, [orderId]);
   const history = await systemDb.query<Order["history"] extends Array<infer T> ? T : never>(
     `select id, from_status, to_status, note, actor_role, created_at, customer_visible
        from order_status_history where order_id = $1 order by created_at`,
