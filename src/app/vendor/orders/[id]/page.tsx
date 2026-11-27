@@ -107,14 +107,35 @@ export default async function VendorOrderDetailPage({ params }: { params: Promis
                 <tbody>
                   {items.map((item) => (
                     <tr key={item.id}>
-                      <td>
-                        <p className="font-medium text-ink-900">{item.name}</p>
-                        {item.variant_name ? <p className="text-xs text-ink-400">{item.variant_name}</p> : null}
-                        {item.attributes && Object.keys(item.attributes).length > 0 ? (
-                          <p className="text-xs text-ink-400">
-                            {Object.entries(item.attributes).map(([key, value]) => `${key}: ${value}`).join(" · ")}
-                          </p>
-                        ) : null}
+                      <td className="max-w-[300px]">
+                        <div className="flex items-start gap-3">
+                          {item.product_images?.[0] ? (
+                            <img
+                              src={item.product_images[0].url}
+                              alt={item.product_images[0].alt ?? item.name}
+                              className="size-12 rounded-lg object-cover bg-ink-100"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="size-12 rounded-lg bg-ink-100 flex items-center justify-center shrink-0">
+                              <Package className="size-5 text-ink-400" />
+                            </div>
+                          )}
+                          <div className="flex flex-col justify-center min-w-0">
+                            <p className="font-medium text-ink-900 truncate">{item.name}</p>
+                            {item.variant_name ? (
+                              <p className="text-xs text-ink-400 truncate">{item.variant_name}</p>
+                            ) : null}
+                            {item.product_description ? (
+                              <p className="mt-1 text-xs text-ink-600 line-clamp-2">{item.product_description}</p>
+                            ) : null}
+                            {item.attributes && Object.keys(item.attributes).length > 0 ? (
+                              <p className="mt-1 text-[10px] text-ink-500">
+                                {Object.entries(item.attributes).map(([key, value]) => `${key}: ${value}`).join(" · ")}
+                              </p>
+                            ) : null}
+                          </div>
+                        </div>
                       </td>
                       <td className="text-center">{item.quantity}</td>
                       <td className="text-right">{formatMoney(Number(item.unit_price))}</td>
