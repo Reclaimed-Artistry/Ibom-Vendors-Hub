@@ -52,7 +52,7 @@ export default async function StorefrontLayout({
               </span>
             </span>
           </Link>
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className="flex items-center gap-1">
             <Link href={base || "/"} className="rounded-lg px-3 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100">Home</Link>
             <Link href={`${base}/products`} className="rounded-lg px-3 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100">
               {features.serviceBooking && !features.cart ? "Services" : "Shop"}
@@ -61,7 +61,7 @@ export default async function StorefrontLayout({
               <Link href="/track" className="rounded-lg px-3 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100">Track order</Link>
             ) : null}
             <Link href="/browse" className="rounded-lg px-3 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100">Marketplace</Link>
-            <Link href="/" className="rounded-lg px-3 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100">Main website</Link>
+            <Link href="/" className="rounded-lg px-3 py-2 text-sm font-medium text-ink-600 hover:bg-ink-100">Home</Link>
           </nav>
           <div className="flex items-center gap-2">
             {features.cart ? <CartButton /> : null}
