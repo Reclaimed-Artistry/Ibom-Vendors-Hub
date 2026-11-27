@@ -53,80 +53,81 @@ export default async function LoanAssessmentsPage() {
       />
 
       <div className="rounded-xl border border-ink-100 bg-white shadow-sm overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="bg-ink-50 border-b border-ink-100">
-              <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                Applicant
-              </th>
-              <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                Loan
-              </th>
-              <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                Repayable
-              </th>
-              <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                Assessment
-              </th>
-              <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                Assigned agent
-              </th>
-              <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-ink-100">
-            {applications.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-5 py-10 text-center text-ink-500">
-                  No loan applications yet.
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm min-w-[600px]">
+            <thead>
+              <tr className="bg-ink-50 border-b border-ink-100">
+                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                  Applicant
+                </th>
+                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                  Loan
+                </th>
+                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                  Repayable
+                </th>
+                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                  Assessment
+                </th>
+                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                  Assigned agent
+                </th>
+                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                  Action
+                </th>
               </tr>
-            ) : (
-              applications.map((app) => {
-                const isPending = app.assessment_status === "pending";
-                return (
-                  <tr
-                    key={app.id}
-                    className="hover:bg-ink-50 transition-colors"
-                  >
-                    <td className="px-5 py-3">
-                      <div className="font-medium text-ink-900">
-                        {app.full_name}
-                      </div>
-                      <p className="text-xs text-ink-500">
-                        {app.email ?? "—"}
-                      </p>
-                    </td>
-                    <td className="px-5 py-3">
-                      <p className="font-medium text-ink-900">
-                        {formatMoney(app.loan_amount_figures)}
-                      </p>
-                      <p className="text-xs text-ink-500">
-                        {app.loan_type.replace("_", " ")}
-                      </p>
-                    </td>
-                    <td className="px-5 py-3">
-                      <p className="font-medium text-ink-900">
-                        {formatMoney(app.total_repayable)}
-                      </p>
-                    </td>
-                    <td className="px-5 py-3">
-                      <Badge
-                        tone={
-                          app.status === "repaid"
-                            ? "success"
-                            : app.status === "disbursed"
-                              ? "info"
-                              : app.status === "approved"
-                                ? "warning"
-                                : app.status === "rejected"
-                                  ? "danger"
-                                  : "neutral"
+            </thead>
+            <tbody className="divide-y divide-ink-100">
+              {applications.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-5 py-10 text-center text-ink-500">
+                    No loan applications yet.
+                  </td>
+                </tr>
+              ) : (
+                applications.map((app) => {
+                  const isPending = app.assessment_status === "pending";
+                  return (
+                    <tr
+                      key={app.id}
+                      className="hover:bg-ink-50 transition-colors"
+                    >
+                      <td className="px-5 py-3">
+                        <div className="font-medium text-ink-900">
+                          {app.full_name}
+                        </div>
+                        <p className="text-xs text-ink-500">
+                          {app.email ?? "—"}
+                        </p>
+                      </td>
+                      <td className="px-5 py-3">
+                        <p className="font-medium text-ink-900">
+                          {formatMoney(app.loan_amount_figures)}
+                        </p>
+                        <p className="text-xs text-ink-500">
+                          {app.loan_type.replace("_", " ")}
+                        </p>
+                      </td>
+                      <td className="px-5 py-3">
+                        <p className="font-medium text-ink-900">
+                          {formatMoney(app.total_repayable)}
+                        </p>
+                      </td>
+                      <td className="px-5 py-3">
+                        <Badge
+                          tone={
+                            app.status === "repaid"
+                              ? "success"
+                              : app.status === "disbursed"
+                                ? "info"
+                                : app.status === "approved"
+                                  ? "warning"
+                                  : app.status === "rejected"
+                                    ? "danger"
+                                    : "neutral"
                       }
                       >
                         {app.status.replace(/_/g, " ")}
@@ -162,11 +163,12 @@ export default async function LoanAssessmentsPage() {
                       )}
                     </td>
                   </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

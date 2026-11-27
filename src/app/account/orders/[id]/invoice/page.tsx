@@ -124,35 +124,37 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         {/* Items table */}
         <Card className="card-pad mb-8">
           <h2 className="text-base font-semibold text-ink-900 mb-4">Order items</h2>
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-ink-200">
-                <th className="pb-3 text-left text-xs font-semibold text-ink-400">Item</th>
-                <th className="pb-3 text-left text-xs font-semibold text-ink-400">Qty</th>
-                <th className="pb-3 text-right text-xs font-semibold text-ink-400">Unit price</th>
-                <th className="pb-3 text-right text-xs font-semibold text-ink-400">Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-100">
-              {items.map((item) => (
-                <tr key={item.id} className="text-ink-700">
-                  <td className="py-4">
-                    <p className="font-medium">{item.name}</p>
-                    {item.variant_name ? (
-                      <p className="text-xs text-ink-500">{item.variant_name}</p>
-                    ) : null}
-                  </td>
-                  <td className="py-4 text-center">{item.quantity}</td>
-                  <td className="py-4 text-right tabular-nums">
-                    {formatMoney(Number(item.unit_price), currency, "₦")}
-                  </td>
-                  <td className="py-4 text-right tabular-nums font-semibold">
-                    {formatMoney(Number(item.line_total), currency, "₦")}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-sm min-w-[600px]">
+              <thead>
+                <tr className="border-b border-ink-200">
+                  <th className="pb-3 text-left text-xs font-semibold text-ink-400">Item</th>
+                  <th className="pb-3 text-left text-xs font-semibold text-ink-400">Qty</th>
+                  <th className="pb-3 text-right text-xs font-semibold text-ink-400">Unit price</th>
+                  <th className="pb-3 text-right text-xs font-semibold text-ink-400">Total</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-ink-100">
+                {items.map((item) => (
+                  <tr key={item.id} className="text-ink-700">
+                    <td className="py-4">
+                      <p className="font-medium">{item.name}</p>
+                      {item.variant_name ? (
+                        <p className="text-xs text-ink-500">{item.variant_name}</p>
+                      ) : null}
+                    </td>
+                    <td className="py-4 text-center">{item.quantity}</td>
+                    <td className="py-4 text-right tabular-nums">
+                      {formatMoney(Number(item.unit_price), currency, "₦")}
+                    </td>
+                    <td className="py-4 text-right tabular-nums font-semibold">
+                      {formatMoney(Number(item.line_total), currency, "₦")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
 
         {/* Totals */}

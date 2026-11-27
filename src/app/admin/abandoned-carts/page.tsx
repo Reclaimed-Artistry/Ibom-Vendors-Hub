@@ -46,61 +46,63 @@ export default async function AbandonedCartsPage() {
         </div>
       ) : (
         <div className="rounded-xl border border-ink-100 bg-white">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="border-b border-ink-100">
-                <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">Customer</th>
-                <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">Items</th>
-                <th className="pb-3 px-4 text-right text-xs font-semibold text-ink-400">Cart value</th>
-                <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">Left at</th>
-                <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">Recovery</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-100">
-              {rows.map((cart) => {
-                const items = Array.isArray(cart.items_json) ? cart.items_json : [];
-                const itemNames = items.map((i: any) => i.name).join(", ");
-                const itemCount = items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0);
-                const recovered = Boolean(cart.recovered_at);
-                const sent = Boolean(cart.recovery_sent);
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-sm min-w-[600px]">
+              <thead>
+                <tr className="border-b border-ink-100">
+                  <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">Customer</th>
+                  <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">Items</th>
+                  <th className="pb-3 px-4 text-right text-xs font-semibold text-ink-400">Cart value</th>
+                  <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">Left at</th>
+                  <th className="pb-3 px-4 text-left text-xs font-semibold text-ink-400">Recovery</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-ink-100">
+                {rows.map((cart) => {
+                  const items = Array.isArray(cart.items_json) ? cart.items_json : [];
+                  const itemNames = items.map((i: any) => i.name).join(", ");
+                  const itemCount = items.reduce((sum: number, i: any) => sum + (i.quantity || 1), 0);
+                  const recovered = Boolean(cart.recovered_at);
+                  const sent = Boolean(cart.recovery_sent);
 
-                return (
-                  <tr key={cart.id} className="hover:bg-ink-50/50">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-ink-900">{cart.customer_name}</p>
-                      <p className="text-xs text-ink-500">{cart.customer_email}</p>
-                    </td>
-                    <td className="px-4 py-3 text-ink-700">
-                      <p>{itemCount} item{itemCount !== 1 ? "s" : ""}</p>
-                      {itemNames ? <p className="mt-0.5 text-[11px] text-ink-400 truncate max-w-[200px]">{itemNames}</p> : null}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-ink-900">
-                      {formatMoney(Number(cart.subtotal), cart.currency, "₦")}
-                    </td>
-                    <td className="px-4 py-3 text-ink-600">
-                      <time>{new Date(cart.created_at).toLocaleDateString("en-NG", {
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}</time>
-                    </td>
-                    <td className="px-4 py-3">
-                      {recovered ? (
-                        <StatusBadge status="resolved" />
-                      ) : sent ? (
-                        <StatusBadge status="warning" />
-                      ) : (
-                        <div className="flex items-center gap-2 text-xs text-ink-500">
-                          <Truck className="size-3.5" /> Pending
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  return (
+                    <tr key={cart.id} className="hover:bg-ink-50/50">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-ink-900">{cart.customer_name}</p>
+                        <p className="text-xs text-ink-500">{cart.customer_email}</p>
+                      </td>
+                      <td className="px-4 py-3 text-ink-700">
+                        <p>{itemCount} item{itemCount !== 1 ? "s" : ""}</p>
+                        {itemNames ? <p className="mt-0.5 text-[11px] text-ink-400 truncate max-w-[200px]">{itemNames}</p> : null}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums font-semibold text-ink-900">
+                        {formatMoney(Number(cart.subtotal), cart.currency, "₦")}
+                      </td>
+                      <td className="px-4 py-3 text-ink-600">
+                        <time>{new Date(cart.created_at).toLocaleDateString("en-NG", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}</time>
+                      </td>
+                      <td className="px-4 py-3">
+                        {recovered ? (
+                          <StatusBadge status="resolved" />
+                        ) : sent ? (
+                          <StatusBadge status="warning" />
+                        ) : (
+                          <div className="flex items-center gap-2 text-xs text-ink-500">
+                            <Truck className="size-3.5" /> Pending
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

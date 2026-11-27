@@ -132,8 +132,8 @@
   .badge-danger { @apply inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold bg-red-50 text-red-700; }
   .badge-info { @apply inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold bg-sky-50 text-sky-800; }
   .badge-neutral { @apply inline-flex max-w-full items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold bg-ink-100 text-ink-700; }
-  .table-wrap { @apply w-full max-w-full overflow-x-clip sm:overflow-x-auto rounded-2xl border border-ink-100 bg-white; }
-  .table { @apply w-full border-collapse text-sm sm:min-w-[640px]; }
+  .table-wrap { @apply w-full max-w-full overflow-x-auto rounded-2xl border border-ink-100 bg-white; }
+  .table { @apply w-full border-collapse text-sm min-w-[600px]; }
   .table thead th {
     @apply border-b border-ink-100 bg-ink-50/70 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ink-500;
   }

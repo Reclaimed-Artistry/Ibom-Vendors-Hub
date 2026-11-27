@@ -244,140 +244,142 @@ export default async function AgentLoansPage() {
           </h2>
         </div>
         <div className="rounded-xl border border-ink-100 bg-white shadow-sm overflow-hidden">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="bg-ink-50 border-b border-ink-100">
-                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                  Applicant
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                  Loan
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                  Repayable
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                  Paid
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                  Assessment
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                  Next due
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
-                  Applied
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ink-100">
-              {myLoans.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-ink-500">
-                    No loans assigned to you yet.
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm min-w-[600px]">
+              <thead>
+                <tr className="bg-ink-50 border-b border-ink-100">
+                  <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                    Applicant
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                    Loan
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                    Repayable
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                    Paid
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                    Assessment
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                    Next due
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
+                    Applied
+                  </th>
                 </tr>
-              ) : (
-                myLoans.map((loan) => {
-                  const isOverdue =
-                    loan.next_payment_due &&
-                    new Date(loan.next_payment_due) < new Date() &&
-                    !loan.loan_paid_off;
-                  return (
-                    <tr
-                      key={loan.id}
-                      className="hover:bg-ink-50 transition-colors"
-                    >
-                      <td className="px-5 py-3">
-                        <div className="font-medium text-ink-900">
-                          {loan.full_name}
-                        </div>
-                        <p className="text-xs text-ink-500">
-                          {loan.email ?? "—"}
-                        </p>
-                      </td>
-                      <td className="px-5 py-3">
-                        <p className="font-medium text-ink-900">
-                          {formatMoney(loan.loan_amount_figures)}
-                        </p>
-                        <p className="text-xs text-ink-500">
-                          {loan.loan_type.replace("_", " ")} ·
-                          {loan.duration_months} month{loan.duration_months === 1 ? "" : "s"}
-                        </p>
-                      </td>
-                      <td className="px-5 py-3">
-                        <p className="font-medium text-ink-900">
-                          {formatMoney(loan.total_repayable)}
-                        </p>
-                      </td>
-                      <td className="px-5 py-3">
-                        <p className="font-medium text-brand-700">
-                          {formatMoney(loan.amount_paid)}
-                        </p>
-                        <p className="text-xs text-ink-400">
-                          {Math.round(
-                            (Number(loan.amount_paid) /
-                              Number(loan.total_repayable)) *
-                              100,
-                          )}%
-                        </p>
-                      </td>
-                      <td className="px-5 py-3">
-                        <Badge
-                          tone={
-                            loan.status === "repaid"
-                              ? "success"
-                              : loan.status === "disbursed"
-                                ? isOverdue
-                                  ? "danger"
-                                  : "info"
-                                : loan.status === "approved"
-                                  ? "warning"
-                                  : loan.status === "rejected"
-                                    ? "danger"
-                                    : "neutral"
-                          }
-                        >
-                          {loan.status.replace(/_/g, " ")}
-                        </Badge>
-                      </td>
-                      <td className="px-5 py-3">
-                        <Badge
-                          tone={
-                            loan.assessment_status === "completed"
-                              ? "success"
-                              : "warning"
-                          }
-                        >
-                          {loan.assessment_status.replace(/_/g, " ")}
-                        </Badge>
-                      </td>
-                      <td className="px-5 py-3">
-                        {loan.next_payment_due ? (
-                          <p className={`text-xs font-medium ${isOverdue ? "text-red-600" : "text-ink-900"}`}>
-                            {new Date(loan.next_payment_due).toLocaleDateString(
-                              undefined,
-                              { month: "short", day: "numeric" },
-                            )}
+              </thead>
+              <tbody className="divide-y divide-ink-100">
+                {myLoans.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-5 py-10 text-center text-ink-500">
+                      No loans assigned to you yet.
+                    </td>
+                  </tr>
+                ) : (
+                  myLoans.map((loan) => {
+                    const isOverdue =
+                      loan.next_payment_due &&
+                      new Date(loan.next_payment_due) < new Date() &&
+                      !loan.loan_paid_off;
+                    return (
+                      <tr
+                        key={loan.id}
+                        className="hover:bg-ink-50 transition-colors"
+                      >
+                        <td className="px-5 py-3">
+                          <div className="font-medium text-ink-900">
+                            {loan.full_name}
+                          </div>
+                          <p className="text-xs text-ink-500">
+                            {loan.email ?? "—"}
                           </p>
-                        ) : (
-                          <p className="text-xs text-ink-400">—</p>
-                        )}
-                      </td>
-                      <td className="px-5 py-3">
-                        <p className="text-xs text-ink-500">
-                          {timeAgo(loan.created_at)}
-                        </p>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                        </td>
+                        <td className="px-5 py-3">
+                          <p className="font-medium text-ink-900">
+                            {formatMoney(loan.loan_amount_figures)}
+                          </p>
+                          <p className="text-xs text-ink-500">
+                            {loan.loan_type.replace("_", " ")} ·
+                            {loan.duration_months} month{loan.duration_months === 1 ? "" : "s"}
+                          </p>
+                        </td>
+                        <td className="px-5 py-3">
+                          <p className="font-medium text-ink-900">
+                            {formatMoney(loan.total_repayable)}
+                          </p>
+                        </td>
+                        <td className="px-5 py-3">
+                          <p className="font-medium text-brand-700">
+                            {formatMoney(loan.amount_paid)}
+                          </p>
+                          <p className="text-xs text-ink-400">
+                            {Math.round(
+                              (Number(loan.amount_paid) /
+                                Number(loan.total_repayable)) *
+                                100,
+                            )}%
+                          </p>
+                        </td>
+                        <td className="px-5 py-3">
+                          <Badge
+                            tone={
+                              loan.status === "repaid"
+                                ? "success"
+                                : loan.status === "disbursed"
+                                  ? isOverdue
+                                    ? "danger"
+                                    : "info"
+                                  : loan.status === "approved"
+                                    ? "warning"
+                                    : loan.status === "rejected"
+                                      ? "danger"
+                                      : "neutral"
+                            }
+                          >
+                            {loan.status.replace(/_/g, " ")}
+                          </Badge>
+                        </td>
+                        <td className="px-5 py-3">
+                          <Badge
+                            tone={
+                              loan.assessment_status === "completed"
+                                ? "success"
+                                : "warning"
+                            }
+                          >
+                            {loan.assessment_status.replace(/_/g, " ")}
+                          </Badge>
+                        </td>
+                        <td className="px-5 py-3">
+                          {loan.next_payment_due ? (
+                            <p className={`text-xs font-medium ${isOverdue ? "text-red-600" : "text-ink-900"}`}>
+                              {new Date(loan.next_payment_due).toLocaleDateString(
+                                undefined,
+                                { month: "short", day: "numeric" },
+                              )}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-ink-400">—</p>
+                          )}
+                        </td>
+                        <td className="px-5 py-3">
+                          <p className="text-xs text-ink-500">
+                            {timeAgo(loan.created_at)}
+                          </p>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
