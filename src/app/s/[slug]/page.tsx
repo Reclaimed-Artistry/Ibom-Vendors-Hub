@@ -6,7 +6,7 @@ import { StoreStockCarousel } from "@/components/store-stock-carousel";
 import { StoreImage } from "@/components/store-image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Clock, Mail, MapPin, Phone, Star, Store as StoreIcon, CalendarClock, FileText, ClipboardCheck, CheckCircle2 } from "lucide-react";
+import { Clock, ExternalLink, Mail, MapPin, Phone, Star, Store as StoreIcon, CalendarClock, FileText, ClipboardCheck, CheckCircle2 } from "lucide-react";
 import { resolveStore, getStoreProducts, getStoreReviews, storeOpenState } from "@/lib/storefront";
 import { getSettings } from "@/lib/settings";
 import { storeBase } from "@/lib/storefront-base";
@@ -251,6 +251,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
             <div className="mt-4 grid gap-2">
               <ButtonLink href={`${base}/products`} variant="secondary">Browse catalogue</ButtonLink>
               {features.quotations ? <ButtonLink href={`${base}/quote`} variant="ghost"><FileText className="size-4" /> Request a quotation</ButtonLink> : null}
+              <Link href="/" className="btn btn-ghost btn-sm"><ExternalLink className="size-3.5" /> View Ibom Vendors Hub</Link>
             </div>
           </Card>
 
