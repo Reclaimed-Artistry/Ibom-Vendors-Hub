@@ -1071,8 +1071,27 @@ export async function getVendorOrderList(storeId: string, opts: { status?: strin
       limit ${pageSize} offset ${(page - 1) * pageSize}`,
     params,
   );
+
+  const orderIds = rows.map((row) => row.id);
+  let itemsByOrder = new Map<string, OrderItem[]>();
+  if (orderIds.length > 0) {
+    const items = await systemDb.query<OrderItem>(
+      `select * from order_items where order_id = any($1::uuid[]) order by created_at`,
+      [orderIds],
+    );
+    for (const item of items) {
+      const list = itemsByOrder.get(item.order_id) ?? [];
+      list.push(item);
+      itemsByOrder.set(item.order_id, list);
+    }
+  }
+
   return {
-    orders: rows.map(row => ({ ...row, workflow_category: orderCategory(row.order_categories) })),
+    orders: rows.map((row) => ({
+      ...row,
+      items: itemsByOrder.get(row.id) ?? [],
+      workflow_category: orderCategory(row.order_categories),
+    })),
     total: total.count,
     page,
     pageSize,

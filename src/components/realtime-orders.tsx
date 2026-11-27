@@ -7,6 +7,19 @@ import { Badge, EmptyState, StatusBadge } from "@/components/ui";
 import { ShoppingBag } from "lucide-react";
 import { formatMoney, formatDateTime } from "@/lib/utils";
 
+interface PollOrderItem {
+  id: string;
+  product_id: string | null;
+  variant_id: string | null;
+  kind: string;
+  name: string;
+  variant_name: string | null;
+  unit_price: number;
+  quantity: number;
+  line_total: number;
+  attributes: Record<string, string>;
+}
+
 interface PollOrder {
   id: string;
   reference: string;
@@ -14,6 +27,7 @@ interface PollOrder {
   customer_phone: string;
   customer_email: string;
   item_count: number;
+  items: PollOrderItem[];
   fulfilment_type: string;
   status: string;
   payment_status: string;
@@ -93,7 +107,7 @@ export function RealtimeOrders({
           <tr>
             <th>Order</th>
             <th>Customer</th>
-            <th>Items</th>
+            <th>Items ordered</th>
             <th>Fulfilment</th>
             <th>Status</th>
             <th>Payment</th>
@@ -118,7 +132,15 @@ export function RealtimeOrders({
                 <p className="text-sm text-ink-800">{order.customer_name}</p>
                 <p className="text-xs text-ink-400">{order.customer_phone}</p>
               </td>
-              <td className="text-sm">{order.item_count}</td>
+              <td className="text-sm">
+                <div className="min-w-[150px]">
+                  {order.items.map((item) => (
+                    <div key={item.id} className="text-[11px] text-ink-600">
+                      {item.name}{item.variant_name ? ` (${item.variant_name})` : ""} × {item.quantity}
+                    </div>
+                  ))}
+                </div>
+              </td>
               <td className="text-sm capitalize">{order.fulfilment_type}</td>
               <td>
                 <StatusBadge status={order.status} />
