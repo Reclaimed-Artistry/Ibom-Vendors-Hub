@@ -39,14 +39,14 @@
     scroll-behavior: smooth;
     width: 100%;
     max-width: 100%;
-    overflow-x: clip;
+    overflow-x: auto;
   }
   body {
     @apply bg-ink-50 text-ink-800 antialiased;
     font-family: var(--font-sans);
     width: 100%;
     max-width: 100%;
-    overflow-x: clip;
+    overflow-x: auto;
     overflow-wrap: break-word;
   }
   main, section, header, footer {
