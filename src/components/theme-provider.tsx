@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, createContext } from "react";
+import { useContext, createContext, useEffect } from "react";
 import type { ReactNode } from "react";
 
 type Theme = "light";
@@ -18,10 +18,15 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
  *
  * The site is locked to light mode. Dark mode, the theme toggle, localStorage
  * persistence, and system preference detection have all been removed.
+ *
+ * DOM access is deferred to useEffect to avoid `document is not defined`
+ * during server-side rendering.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const root = document.documentElement;
-  root.setAttribute("data-theme", "light");
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute("data-theme", "light");
+  }, []);
 
   const value: ThemeContextValue = {
     theme: "light",
