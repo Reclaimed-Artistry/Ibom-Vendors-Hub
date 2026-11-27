@@ -31,7 +31,7 @@ export default async function AgentLayout({ children }: { children: React.ReactN
   ];
 
   return (
-    <div className="min-h-screen w-full max-w-full overflow-x-clip bg-ink-50">
+    <div className="min-h-screen w-full max-w-full overflow-x-auto bg-ink-50">
       <div className="mx-auto flex max-w-[1500px] gap-6 px-4 py-5 lg:px-8">
         <aside className="hidden w-64 shrink-0 lg:block">
           <div className="sticky top-5 space-y-4">

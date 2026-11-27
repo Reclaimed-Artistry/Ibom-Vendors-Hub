@@ -93,7 +93,7 @@ export default async function VendorLayout({ children }: { children: React.React
     (effectiveExpiresAt && !subscription ? "Admin access grant" : lastSubscription?.plan_name ?? "No active plan");
 
   return (
-    <div className="min-h-screen w-full max-w-full overflow-x-clip bg-ink-50">
+    <div className="min-h-screen w-full max-w-full overflow-x-auto bg-ink-50">
       <LiveDashboard />
       <VendorAnnouncements />
       <div className="mx-auto max-w-[1440px] px-4 py-3 text-sm font-semibold text-brand-700">{FREE_STORE_MESSAGE}</div>
