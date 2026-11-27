@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePoll } from "@/lib/use-poll";
 import { PageHeader, StatCard } from "@/components/ui";
 import { Monitor, Users, Globe, Store, Clock, TrendingUp } from "lucide-react";
@@ -54,9 +54,13 @@ export function RealtimeAnalytics({ initialData }: RealtimeAnalyticsProps) {
     initialData
   );
 
-  if (polledData) {
-    setData(polledData);
-  }
+  // Sync polled data into local state (kept in useEffect to avoid
+  // setState-during-render which can cause React warnings in StrictMode)
+  useEffect(() => {
+    if (polledData) {
+      setData(polledData);
+    }
+  }, [polledData]);
 
   const {
     totalVisits,
