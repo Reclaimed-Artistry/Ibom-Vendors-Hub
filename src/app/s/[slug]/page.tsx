@@ -84,6 +84,7 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
                   <span className={`inline-flex items-center gap-1 font-medium ${openState.open ? "text-brand-700" : "text-red-600"}`}>
                     <Clock className="size-3.5" /> {openState.label}
                   </span>
+                  <Link href="/" className="inline-flex items-center gap-1 text-xs text-brand-700 underline hover:text-brand-800"><ExternalLink className="size-3" /> View Ibom Vendors Hub</Link>
                 </div>
               </div>
             </div>
@@ -251,7 +252,6 @@ export default async function StorefrontHome({ params }: { params: Promise<{ slu
             <div className="mt-4 grid gap-2">
               <ButtonLink href={`${base}/products`} variant="secondary">Browse catalogue</ButtonLink>
               {features.quotations ? <ButtonLink href={`${base}/quote`} variant="ghost"><FileText className="size-4" /> Request a quotation</ButtonLink> : null}
-              <Link href="/" className="btn btn-ghost btn-sm"><ExternalLink className="size-3.5" /> View Ibom Vendors Hub</Link>
             </div>
           </Card>
 
