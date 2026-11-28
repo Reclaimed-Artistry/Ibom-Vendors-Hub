@@ -1,25 +1,16 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { getLoanAgentByEmail } from "@/lib/loan-agents";
 import { redirect } from "next/navigation";
-import { cn, formatMoney, timeAgo } from "@/lib/utils";
+import { formatMoney, timeAgo } from "@/lib/utils";
 import { Badge, Alert, PageHeader, StatCard } from "@/components/ui";
-import {
-  AlertCircle,
-  ArrowRight,
-  Clock,
-  CreditCard,
-  RefreshCw,
-  Users,
-  Wallet,
-} from "lucide-react";
+import { AlertCircle, Clock, CreditCard, RefreshCw, Users, Wallet } from "lucide-react";
 
-export const metadata: Metadata = { title: "My Loans · Agent" };
+export const metadata: Metadata = { title: "My Loans · Loan Officer" };
 
 interface LoanStats {
-  total_assigned: number;
+  total_applications: number;
   pending_assessment: number;
   approved: number;
   disbursed: number;
@@ -61,27 +52,26 @@ export default async function AgentLoansPage() {
   }
   const agentEmail = user.email;
 
-  const [stats, myLoans, overdueLoans, recentActivity] =
-    await Promise.all([
-      systemDb.maybeOne<LoanStats>(
-        `select
-           count(*)::int as total_assigned,
-           count(*) filter (where assessment_status = 'pending')::int as pending_assessment,
-           count(*) filter (where status = 'approved')::int as approved,
-           count(*) filter (where status = 'disbursed')::int as disbursed,
-           count(*) filter (where status = 'repaid')::int as repaid,
-           count(*) filter (where status = 'rejected')::int as rejected,
-           count(*) filter (where status = 'defaulted')::int as defaulted,
-           count(*) filter (where status = 'disbursed' and loan_paid_off = false and next_payment_due < now())::int as overdue,
-           coalesce(sum(loan_amount_figures),0)::numeric as total_amount_lent,
-           coalesce(sum(amount_paid),0)::numeric as total_amount_repaid,
-           (coalesce(sum(total_repayable),0) - coalesce(sum(amount_paid),0))::numeric as outstanding_balance
-         from loan_applications
-        where agent_assigned = $1`,
-        [agentEmail],
-      ),
-      systemDb.query<LoanRow>(
-        `select l.id, l.full_name, u.email, l.phone_1, l.loan_amount_figures,
+  const [stats, myLoans, overdueLoans] = await Promise.all([
+    systemDb.maybeOne<LoanStats>(
+      `select
+         count(*)::int as total_applications,
+         count(*) filter (where assessment_status = 'pending')::int as pending_assessment,
+         count(*) filter (where status = 'approved')::int as approved,
+         count(*) filter (where status = 'disbursed')::int as disbursed,
+         count(*) filter (where status = 'repaid')::int as repaid,
+         count(*) filter (where status = 'rejected')::int as rejected,
+         count(*) filter (where status = 'defaulted')::int as defaulted,
+         count(*) filter (where status = 'disbursed' and loan_paid_off = false and next_payment_due < now())::int as overdue,
+         coalesce(sum(loan_amount_figures),0)::numeric as total_amount_lent,
+         coalesce(sum(amount_paid),0)::numeric as total_amount_repaid,
+         (coalesce(sum(total_repayable),0) - coalesce(sum(amount_paid),0))::numeric as outstanding_balance
+       from loan_applications
+      where agent_assigned = $1`,
+      [agentEmail],
+    ),
+    systemDb.query<LoanRow>(
+      `select l.id, l.full_name, u.email, l.phone_1, l.loan_amount_figures,
                 l.loan_type, l.total_repayable, l.amount_paid, l.status,
                 l.assessment_status, l.agent_decision, l.agent_name,
                 l.money_sent, l.loan_paid_off, l.next_payment_due,
@@ -91,10 +81,10 @@ export default async function AgentLoansPage() {
            left join users u on u.id = l.user_id
           where l.agent_assigned = $1
           order by l.created_at desc`,
-        [agentEmail],
-      ),
-      systemDb.query<LoanRow>(
-        `select l.id, l.full_name, u.email, l.phone_1, l.loan_amount_figures,
+      [agentEmail],
+    ),
+    systemDb.query<LoanRow>(
+      `select l.id, l.full_name, u.email, l.phone_1, l.loan_amount_figures,
                 l.loan_type, l.total_repayable, l.amount_paid, l.status,
                 l.next_payment_due, l.repayment_frequency, l.agent_name
            from loan_applications l
@@ -104,33 +94,9 @@ export default async function AgentLoansPage() {
             and l.loan_paid_off = false
             and l.next_payment_due < now()
           order by l.next_payment_due asc`,
-        [agentEmail],
-      ),
-      systemDb.query<{
-        id: string;
-        full_name: string;
-        action: string;
-        detail: string | null;
-        created_at: string;
-      }>(
-        `select l.id, l.full_name,
-             case
-               when l.money_sent = true and l.loan_paid_off = false then 'Funds disbursed'
-               when l.agent_decision = 'approve' then 'Application approved'
-               when l.agent_decision = 'reject' then 'Application rejected'
-               when l.assessment_status = 'completed' then 'Assessment completed'
-               else 'Application submitted'
-             end as action,
-             l.agent_decision_notes as detail,
-             l.updated_at as created_at
-           from loan_applications l
-          where l.agent_assigned = $1
-            and l.updated_at > now() - interval '30 days'
-          order by l.updated_at desc
-          limit 20`,
-        [agentEmail],
-      ),
-    ]);
+      [agentEmail],
+    ),
+  ]);
 
   const overdueAmount = overdueLoans.reduce(
     (sum, l) => sum + Number(l.total_repayable) - Number(l.amount_paid),
@@ -142,29 +108,25 @@ export default async function AgentLoansPage() {
       <div className="ivh-animate-in ivh-stagger-1">
         <PageHeader
           title="My Loans"
-          description={`Loan applications assigned to you (${agentEmail}). Review, approve and disburse loans from your dashboard.`}
-          actions={
-            <Link href="/admin/loan-assessments" className="btn-secondary">
-              <ArrowRight className="ml-1 size-4" /> Review assessments
-            </Link>
-          }
+          description={`Loan applications assigned to you ({agentEmail}). Review and assess loans from your dashboard.`}
         />
         <p className="mt-1 text-xs text-ink-500">
           Signed in as <strong>{user.fullName}</strong> · {agentEmail}
         </p>
       </div>
 
-      {/* Overview stats */}
+      {/* Overview stats — loan only */}
       <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6 ivh-animate-in ivh-stagger-2">
         <StatCard
-          label="Total assigned"
-          value={stats?.total_assigned ?? 0}
+          label="Total applications"
+          value={stats?.total_applications ?? 0}
+          hint="Loans assigned to you"
           icon={<Users className="size-4" />}
         />
         <StatCard
-          label="Awaiting assessment"
+          label="Pending assessment"
           value={stats?.pending_assessment ?? 0}
-          hint="Not yet physically assessed"
+          hint="Awaiting your review"
           icon={<Clock className="size-4" />}
           tone="warning"
         />
@@ -177,8 +139,9 @@ export default async function AgentLoansPage() {
         <StatCard
           label="Disbursed"
           value={stats?.disbursed ?? 0}
-          hint="Funds sent to applicants"
+          hint="Funds sent"
           icon={<Wallet className="size-4" />}
+
         />
         <StatCard
           label="Repaid"
@@ -226,26 +189,15 @@ export default async function AgentLoansPage() {
             <p className="text-xs text-ink-600 mt-1">
               Total outstanding: {formatMoney(overdueAmount)}
             </p>
-            <Link
-              href="#overdue"
-              className="mt-2 inline-block text-sm font-semibold text-brand-700 hover:underline"
-            >
-              View overdue loans
-            </Link>
           </Alert>
         </div>
       )}
 
       {/* My loans table */}
       <div className="ivh-animate-in ivh-stagger-5">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-400">
-            Loans assigned to me
-          </h2>
-        </div>
         <div className="rounded-xl border border-ink-100 bg-white shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm min-w-[600px]">
+            <table className="w-full text-left text-sm min-w-[700px]">
               <thead>
                 <tr className="bg-ink-50 border-b border-ink-100">
                   <th className="px-5 py-3 text-xs font-semibold text-ink-400 uppercase tracking-wider">
@@ -380,36 +332,6 @@ export default async function AgentLoansPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      </div>
-
-      {/* Recent activity */}
-      <div className="ivh-animate-in ivh-stagger-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-400 mb-3">
-          Recent activity on my loans
-        </h2>
-        <div className="rounded-xl border border-ink-100 bg-white shadow-sm">
-          <ul className="divide-y divide-ink-100">
-            {recentActivity.length === 0 ? (
-              <p className="text-sm text-ink-500 p-5">No recent activity.</p>
-            ) : (
-              recentActivity.map((item) => (
-                <li key={item.id} className="flex items-start justify-between gap-3 px-5 py-3">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-ink-900">
-                      {item.action}
-                    </p>
-                    <p className="text-xs text-ink-500">
-                      {item.full_name} · {item.detail ?? ""}
-                    </p>
-                  </div>
-                  <p className="text-xs text-ink-400">
-                    {timeAgo(item.created_at)}
-                  </p>
-                </li>
-              ))
-            )}
-          </ul>
         </div>
       </div>
     </div>
