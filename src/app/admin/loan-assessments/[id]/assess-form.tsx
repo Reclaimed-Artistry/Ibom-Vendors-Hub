@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { submitLoanAssessmentAction } from "@/app/actions/loan-assessments";
 import { Alert } from "@/components/ui";
@@ -94,6 +94,57 @@ export function LoanAssessmentForm({ app }: { app: LoanApplicationRow }) {
     {} as { error?: string; message?: string },
   );
   const [decision, setDecision] = useState<"approve" | "reject">("approve");
+  const [approvedAmountInput, setApprovedAmountInput] = useState("");
+  const [approvedAmountPreview, setApprovedAmountPreview] = useState<{
+    monthlyInterest: number;
+    totalInterest: number;
+    totalRepayable: number;
+    monthlyPayment: number;
+    planType: string;
+  } | null>(null);
+
+  const MONTHLY_INTEREST_RATE = 10;
+
+  function buildPreview(
+    loanType: string,
+    amount: number,
+    duration: number,
+  ): {
+    monthlyInterest: number;
+    totalInterest: number;
+    totalRepayable: number;
+    monthlyPayment: number;
+    planType: string;
+  } {
+    const monthlyInterest = Math.round((amount * (MONTHLY_INTEREST_RATE / 100)) * 100) / 100;
+    const totalInterest = Math.round((monthlyInterest * duration) * 100) / 100;
+    const totalRepayable = Math.round(((amount + totalInterest) * 100)) / 100;
+
+    let monthlyPayment: number;
+    let planType: string;
+
+    if (loanType === "financial_lease") {
+      planType = "financial_lease";
+      monthlyPayment = monthlyInterest; // interest-only during term
+    } else {
+      planType = "pure_loan";
+      monthlyPayment = Math.round((totalRepayable / duration) * 100) / 100;
+    }
+
+    return { monthlyInterest, totalInterest, totalRepayable, monthlyPayment, planType };
+  }
+
+  // Recalculate preview when decision or approved amount changes
+  const prevDecisionRef = useRef(decision);
+  useEffect(() => {
+    if (decision !== "approve") {
+      setApprovedAmountPreview(null);
+      return;
+    }
+    const amount = Number(approvedAmountInput) || app.loan_amount_figures;
+    setApprovedAmountPreview(buildPreview(app.loan_type, amount, app.duration_months));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [decision, approvedAmountInput]);
 
   return (
     <div className="container-page py-10 max-w-5xl mx-auto">
@@ -877,6 +928,102 @@ export function LoanAssessmentForm({ app }: { app: LoanApplicationRow }) {
               </div>
             </label>
           </div>
+
+          {/* Approved amount — required when approving */}
+          {decision === "approve" && (
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <label className="label mb-1">
+                  Approved amount (₦)
+                </label>
+                <input
+                  name="approved_amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className="input"
+                  placeholder={new Intl.NumberFormat("en-NG", {
+                    style: "currency",
+                    currency: "NGN",
+                  }).format(app.loan_amount_figures)}
+                  defaultValue={String(app.loan_amount_figures)}
+                  onChange={(e) => setApprovedAmountInput(e.target.value)}
+                  value={approvedAmountInput || String(app.loan_amount_figures)}
+                />
+                <p className="text-xs text-ink-500 mt-1">
+                  Cannot exceed applied amount of{" "}
+                  <span className="font-medium text-ink-900">
+                    {new Intl.NumberFormat("en-NG", {
+                      style: "currency",
+                      currency: "NGN",
+                    }).format(app.loan_amount_figures)}
+                  </span>
+                </p>
+              </div>
+              {decision === "approve" && approvedAmountPreview && (
+                <div className="col-span-2 bg-brand-50/50 p-3 rounded-lg">
+                  <p className="text-xs text-ink-400 uppercase tracking-wider mb-2">
+                    Recalculated terms (10% / month on approved amount)
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-4 text-sm">
+                    <div>
+                      <p className="text-xs text-ink-400 uppercase tracking-wider">
+                        Monthly interest
+                      </p>
+                      <p className="font-medium text-ink-900">
+                        {new Intl.NumberFormat("en-NG", {
+                          style: "currency",
+                          currency: "NGN",
+                        }).format(approvedAmountPreview.monthlyInterest)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-ink-400 uppercase tracking-wider">
+                        Total interest
+                      </p>
+                      <p className="font-medium text-ink-900">
+                        {new Intl.NumberFormat("en-NG", {
+                          style: "currency",
+                          currency: "NGN",
+                        }).format(approvedAmountPreview.totalInterest)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-ink-400 uppercase tracking-wider">
+                        Total repayable
+                      </p>
+                      <p className="font-medium text-brand-700">
+                        {new Intl.NumberFormat("en-NG", {
+                          style: "currency",
+                          currency: "NGN",
+                        }).format(approvedAmountPreview.totalRepayable)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-ink-400 uppercase tracking-wider">
+                        Monthly payment
+                      </p>
+                      <p className="font-medium text-ink-900">
+                        {new Intl.NumberFormat("en-NG", {
+                          style: "currency",
+                          currency: "NGN",
+                        }).format(approvedAmountPreview.monthlyPayment)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-ink-500 mt-2">
+                    Plan:{" "}
+                    <span className="font-medium text-ink-900">
+                      {approvedAmountPreview.planType.replace("_", " ")}
+                    </span>{" "}
+                    over {app.duration_months} month{
+                      app.duration_months === 1 ? "" : "s"
+                    }
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Notes and visit date */}
