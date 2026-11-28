@@ -7,7 +7,8 @@ import { getLoanAgentByEmail } from "@/lib/loan-agents";
 import { redirect } from "next/navigation";
 import { DashboardNav, LogoutButton, type DashboardNavItem } from "@/components/dashboard-nav";
 import { Logo } from "@/components/logo";
-import { ShieldCheck } from "lucide-react";
+import { ShieldCheck, ExternalLink } from "lucide-react";
+import { appUrl } from "@/lib/domains";
 
 export const metadata: Metadata = { title: "Loan Officer · Ibom Vendors Hub", robots: NO_INDEX };
 
@@ -34,6 +35,9 @@ export default async function AgentLayout({ children }: { children: React.ReactN
                 <ShieldCheck className="size-3.5" /> Loan Officer
               </p>
               <p className="mt-1 truncate text-xs text-ink-500">{user.email}</p>
+              <Link href={appUrl()} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline">
+                Public site <ExternalLink className="size-3" />
+              </Link>
             </div>
             <div className="rounded-2xl border border-ink-100 bg-white p-2 shadow-sm">
               <DashboardNav items={nav} />
