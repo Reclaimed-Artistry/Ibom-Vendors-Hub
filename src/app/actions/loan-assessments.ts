@@ -3,6 +3,9 @@
 import { getCurrentUser } from "@/lib/auth";
 import { systemDb } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { sendEmail } from "@/lib/email";
+import { url } from "@/lib/settings";
+import { formatMoney } from "@/lib/utils";
 
 export interface AssessmentState {
   error?: string;
@@ -210,6 +213,68 @@ export async function submitLoanAssessmentAction(
   revalidatePath(`/admin/loan-assessments/${applicationId}`);
   revalidatePath("/admin/loan-assessments");
   revalidatePath("/agent/loans");
+
+  // Notify the applicant when the loan is approved — include the approved
+  // amount and a plain-language repayment plan based on their loan type.
+  if (decision === "approve") {
+    const applicant = await systemDb.maybeOne<{
+      email: string | null;
+      full_name: string;
+    }>(
+      `select u.email, l.full_name
+         from loan_applications l
+         left join users u on u.id = l.user_id
+        where l.id = $1`,
+      [applicationId],
+    );
+    if (applicant?.email) {
+      const schedule = (JSON.parse(repaymentSchedule ?? "[]") as Array<{
+        installment: number;
+        due_offset_months: number;
+        amount: number;
+        description: string;
+      }>).slice(0, 5); // show first 5 installments in the email
+
+      const rows = [
+        ["Application reference", applicationId],
+        ["Loan type", existing.loan_type.replace("_", " ")],
+        ["Duration", `${existing.duration_months} month${existing.duration_months === 1 ? "" : "s"}`],
+        ["Approved amount", formatMoney(approvedAmount ?? 0, "NGN")],
+        ["Monthly interest (10%)", formatMoney(approvedMonthlyInterest ?? 0, "NGN")],
+        ["Total interest", formatMoney(approvedTotalInterest ?? 0, "NGN")],
+        ["Total repayable", formatMoney(approvedTotalRepayable ?? 0, "NGN")],
+        ["Monthly payment", formatMoney(approvedMonthlyPayment ?? 0, "NGN")],
+        ["Repayment plan", (repaymentPlanType ?? "pure_loan").replace("_", " ")],
+        ...schedule.map((item) => [
+          `Month ${item.due_offset_months}`,
+          `${item.description} — ${formatMoney(item.amount, "NGN")}`,
+        ]),
+      ];
+
+      await sendEmail({
+        to: applicant.email,
+        template: "loan_approved",
+        dedupeKey: `loan-approved-${applicationId}`,
+        data: {
+          name: applicant.full_name,
+          email: applicant.email,
+          subject: "Your loan has been approved",
+          message: `Great news — your loan application has been approved.`,
+          applicationReference: applicationId,
+          loanType: existing.loan_type.replace("_", " "),
+          durationMonths: String(existing.duration_months),
+          approvedAmount: formatMoney(approvedAmount ?? 0, "NGN"),
+          monthlyInterest: formatMoney(approvedMonthlyInterest ?? 0, "NGN"),
+          totalInterest: formatMoney(approvedTotalInterest ?? 0, "NGN"),
+          totalRepayable: formatMoney(approvedTotalRepayable ?? 0, "NGN"),
+          monthlyPayment: formatMoney(approvedMonthlyPayment ?? 0, "NGN"),
+          repaymentPlanType: (repaymentPlanType ?? "pure_loan").replace("_", " "),
+          rows,
+          link: url("/account/loans"),
+        },
+      }).catch((err) => console.error("loan approval email failed", err));
+    }
+  }
 
   return {
     message: `Application ${decision}d successfully.${decision === "approve" ? ` Approved amount: ₦${approvedAmount?.toLocaleString()}. Repayment plan: ${(repaymentPlanType ?? "pure_loan").replace("_", " ")}.` : ""} The applicant will be notified.`,

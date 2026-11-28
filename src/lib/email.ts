@@ -491,6 +491,19 @@ function template(name: string, data: EmailData): RenderedEmail {
         ],
         cta: { label: "Respond to review", href: url("/vendor/reviews") },
       };
+    case "loan_approved":
+      return {
+        subject: `Your loan has been approved · Ibom Vendors Hub`,
+        heading: "Your loan has been approved 🎉",
+        intro: `Hi ${data.name ?? "there"}, great news — your loan application has been reviewed and approved by a loan officer.`,
+        rows: (data.rows as Array<[string, string]>) ?? undefined,
+        cta: {
+          label: "View my loan",
+          href: data.link ?? url("/account/loans"),
+        },
+        footnote: `Repayments begin on your next scheduled due date. Keep this email for your records — it shows your approved amount, monthly payment, and repayment plan (${String(data.repaymentPlanType ?? "pure loan")}). If you have questions, reply to this email or contact support.`,
+      };
+
     default:
       return {
         subject: data.subject ?? "Ibom Vendors Hub",
