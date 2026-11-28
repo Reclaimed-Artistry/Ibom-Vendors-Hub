@@ -2,6 +2,7 @@ import { BUSINESS_CATEGORIES_SQL, BUSINESS_CATEGORY_NAMES_SQL } from "@/lib/busi
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { withPublic, systemDb } from "@/lib/db";
+import { revalidatePath } from "next/cache";
 import type { Product, Store, StoreCategory } from "@/lib/types";
 
 export interface StoreResolution {
@@ -105,10 +106,55 @@ const PRODUCT_SELECT = `
   from products p
 `;
 
+const getStoreProductsInner = unstable_cache(
+  async (
+    storeId: string,
+    limit: number,
+    offset: number,
+    sort: string,
+    includeUnavailable: boolean,
+    search: string | undefined,
+    categoryId: string | undefined,
+    kind: string | undefined,
+  ) => {
+    const params: unknown[] = [storeId];
+    let where = "where p.store_id = $1";
+    if (!includeUnavailable) where += " and p.is_available = true";
+    if (search) {
+      params.push(`%${search}%`);
+      where += ` and (p.name ilike $${params.length} or p.description ilike $${params.length} or p.brand ilike $${params.length})`;
+    }
+    if (categoryId) {
+      params.push(categoryId);
+      where += ` and p.category_id = $${params.length}`;
+    }
+    if (kind) {
+      params.push(kind);
+      where += ` and p.kind = $${params.length}`;
+    }
+
+    const count = await withPublic(async (db) =>
+      db.one<{ count: number }>(
+        `select count(*)::int as count from products p ${where}`,
+        params,
+      ),
+    );
+    const rows = await withPublic(async (db) =>
+      db.query<Product>(
+        `${PRODUCT_SELECT} ${where} order by ${sort} limit ${limit} offset ${offset}`,
+        params,
+      ),
+    );
+    return { products: rows, total: count.count };
+  },
+  ["store-products"],
+  { tags: ["store-products"], revalidate: 60 },
+);
+
 export async function getStoreProducts(query: ProductQuery): Promise<{ products: Product[]; total: number }> {
   const limit = Math.min(query.limit ?? 24, 60);
   const offset = query.offset ?? 0;
-  const order =
+  const sort =
     query.sort === "price_asc"
       ? "p.price asc"
       : query.sort === "price_desc"
@@ -117,33 +163,18 @@ export async function getStoreProducts(query: ProductQuery): Promise<{ products:
           ? "p.sales_count desc, p.rating_avg desc"
           : "p.is_featured desc, p.created_at desc";
 
-  return withPublic(async (db) => {
-    const params: unknown[] = [query.storeId];
-    let where = "where p.store_id = $1";
-    if (!query.includeUnavailable) where += " and p.is_available = true";
-    if (query.search) {
-      params.push(`%${query.search}%`);
-      where += ` and (p.name ilike $${params.length} or p.description ilike $${params.length} or p.brand ilike $${params.length})`;
-    }
-    if (query.categoryId) {
-      params.push(query.categoryId);
-      where += ` and p.category_id = $${params.length}`;
-    }
-    if (query.kind) {
-      params.push(query.kind);
-      where += ` and p.kind = $${params.length}`;
-    }
-
-    const count = await db.one<{ count: number }>(
-      `select count(*)::int as count from products p ${where}`,
-      params,
-    );
-    const rows = await db.query<Product>(
-      `${PRODUCT_SELECT} ${where} order by ${order} limit ${limit} offset ${offset}`,
-      params,
-    );
-    return { products: rows, total: count.count };
-  });
+  return cache(() =>
+    getStoreProductsInner(
+      query.storeId,
+      limit,
+      offset,
+      sort,
+      query.includeUnavailable ?? false,
+      query.search,
+      query.categoryId,
+      query.kind,
+    ),
+  )();
 }
 
 export const getStoreProduct = cache(async (storeId: string, productSlug: string): Promise<Product | null> => {
@@ -305,29 +336,41 @@ export const getStoreCategories = cache(
   ),
 );
 
+const getStoreReviewsInner = unstable_cache(
+  async (
+    storeId: string,
+    limit: number,
+    productId: string | undefined,
+  ) => {
+    return withPublic(async (db) =>
+      db.query<{
+        id: string;
+        rating: number;
+        title: string | null;
+        comment: string | null;
+        customer_name: string;
+        created_at: string;
+        vendor_response: string | null;
+        verified_purchase: boolean;
+        product_id: string | null;
+        product_name?: string | null;
+      }>(
+        `select r.id, r.rating, r.title, r.comment, r.customer_name, r.created_at,
+                r.vendor_response, r.verified_purchase, r.product_id, p.name as product_name
+           from reviews r left join products p on p.id = r.product_id
+          where r.store_id = $1 and r.status = 'published'
+            and ($3::uuid is null or r.product_id = $3::uuid)
+          order by r.created_at desc limit $2`,
+        [storeId, Math.min(limit, 30), productId ?? null],
+      ),
+    );
+  },
+  ["store-reviews"],
+  { tags: ["store-reviews"], revalidate: 60 },
+);
+
 export async function getStoreReviews(storeId: string, limit = 6, productId?: string) {
-  return withPublic(async (db) =>
-    db.query<{
-      id: string;
-      rating: number;
-      title: string | null;
-      comment: string | null;
-      customer_name: string;
-      created_at: string;
-      vendor_response: string | null;
-      verified_purchase: boolean;
-      product_id: string | null;
-      product_name?: string | null;
-    }>(
-      `select r.id, r.rating, r.title, r.comment, r.customer_name, r.created_at,
-              r.vendor_response, r.verified_purchase, r.product_id, p.name as product_name
-         from reviews r left join products p on p.id = r.product_id
-        where r.store_id = $1 and r.status = 'published'
-          and ($3::uuid is null or r.product_id = $3::uuid)
-        order by r.created_at desc limit $2`,
-      [storeId, Math.min(limit, 30), productId ?? null],
-    ),
-  );
+  return cache(() => getStoreReviewsInner(storeId, Math.min(limit, 30), productId))();
 }
 
 export async function getMarketplaceHighlights() {

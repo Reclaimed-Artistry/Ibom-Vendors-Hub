@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { ImageIcon, Music2, Play } from "lucide-react";
 import { mediaKind } from "@/lib/product-media";
@@ -28,7 +29,7 @@ export function ListingMedia({ src, mimeType, alt, className, player = false, au
     <div className={cn("relative size-full", player && kind !== "image" && "min-h-0 flex-1")}>
     {kind === "image" ? failed
       ? <span role="img" aria-label={alt} className="flex size-full items-center justify-center text-ink-300"><ImageIcon className="size-10" /></span>
-      : <img src={src} alt={alt} loading="lazy" className="size-full object-cover" onError={() => setFailed(true)} />
+      : <Image src={src} alt={alt} loading="lazy" className="size-full object-cover" fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" onError={() => setFailed(true)} />
       : kind === "video" ? <>
         {!failed ? <video key={src} ref={videoRef} src={src} controls={player} muted={autoPlayInView || !player} playsInline loop={!player && autoPlayInView}
           preload={autoPlayInView ? "none" : "metadata"} tabIndex={player ? undefined : -1}
