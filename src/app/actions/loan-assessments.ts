@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/email";
 import { url } from "@/lib/settings";
 import { formatMoney } from "@/lib/utils";
+import { getLoanAgentByEmail } from "@/lib/loan-agents";
 
 export interface AssessmentState {
   error?: string;
@@ -94,7 +95,12 @@ export async function submitLoanAssessmentAction(
   if (!user) {
     return { error: "Please sign in before assessing a loan." };
   }
-  if (user.role !== "super_admin" && user.role !== "admin") {
+  const isLoanAgent = Boolean(getLoanAgentByEmail(user.email));
+  if (
+    user.role !== "super_admin" &&
+    user.role !== "admin" &&
+    !isLoanAgent
+  ) {
     return { error: "Not authorised to assess loans." };
   }
 

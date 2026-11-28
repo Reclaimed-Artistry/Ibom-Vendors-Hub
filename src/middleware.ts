@@ -41,6 +41,8 @@ async function getSessionUser(request: NextRequest): Promise<{ email: string; ro
  */
 const LOAN_AGENT_ALLOWED_PATHS = [
   "/agent/loans",
+  "/agent/loan-assessments",
+  "/agent/agents",
   "/admin/loan-assessments",
   "/admin/loans",
   "/login",
