@@ -2,6 +2,60 @@ import { NextRequest, NextResponse } from "next/server";
 import { appUrl, isReservedSubdomain, rootDomain, storefrontUrl, subdomainFromHost } from "@/lib/domains";
 import { crawlerContext, isNonIndexablePath } from "@/lib/seo";
 import { PUBLIC_BRAND_ASSET_PATHS } from "@/lib/brand-assets";
+import { getLoanAgents } from "@/lib/loan-agents";
+
+function base64UrlDecode(input: string): string {
+  let base64 = input.replace(/-/g, "+").replace(/_/g, "/");
+  while (base64.length % 4) base64 += "=";
+  try {
+    return decodeURIComponent(
+      atob(base64).split("").map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join(""),
+    );
+  } catch {
+    return "";
+  }
+}
+
+async function getSessionUser(request: NextRequest): Promise<{ email: string; role: string } | null> {
+  const token =
+    request.cookies.get("ivh_session_shared")?.value ||
+    request.cookies.get("ivh_session")?.value;
+  if (!token) return null;
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payload = JSON.parse(base64UrlDecode(parts[1]));
+    return {
+      email: String(payload.email ?? ""),
+      role: String(payload.role ?? ""),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Loan agents (registered loan officers who are not super_admins) must only
+ * access loan-related routes. Block them from all non-loan pages and
+ * redirect to /agent/loans.
+ */
+const LOAN_AGENT_ALLOWED_PATHS = [
+  "/agent/loans",
+  "/admin/loan-assessments",
+  "/admin/loans",
+  "/login",
+  "/logout",
+  "/forbidden",
+];
+
+function isLoanAgentAllowedPath(pathname: string): boolean {
+  if (LOAN_AGENT_ALLOWED_PATHS.includes(pathname)) return true;
+  if (pathname.startsWith("/admin/loan-assessments/")) return true;
+  if (pathname.startsWith("/_next")) return true;
+  if (pathname.startsWith("/api")) return true;
+  if (pathname === "/" || pathname.startsWith("/auth")) return true;
+  return false;
+}
 
 // Platform routes must never be rewritten into non-existent tenant pages.
 const PUBLIC_PLATFORM_ROUTES = /^\/(browse|stores|about|contact|terms|privacy|sell)(?:\/|$)/;
@@ -25,7 +79,7 @@ function applyNoStoreHeaders(response: NextResponse, request: NextRequest) {
 /**
  * Wildcard subdomain routing + strict no-store cache headers on HTML/RSC routes.
  */
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   const host = request.headers.get("host");
   const subdomain = subdomainFromHost(host);
@@ -73,6 +127,18 @@ export function middleware(request: NextRequest) {
       loginUrl.search = `?next=${encodeURIComponent(pathname + search)}`;
       return applyNoStoreHeaders(NextResponse.redirect(loginUrl), request);
     }
+
+    // Restrict loan agents (non-super-admin) to loan-related routes only.
+    const sessionUser = await getSessionUser(request);
+    if (
+      sessionUser &&
+      sessionUser.role !== "super_admin" &&
+      getLoanAgents().some((agent) => agent.email === sessionUser.email) &&
+      !isLoanAgentAllowedPath(pathname)
+    ) {
+      return applyNoStoreHeaders(NextResponse.redirect(new URL("/agent/loans", request.nextUrl.origin)), request);
+    }
+
     const headers = new Headers(request.headers);
     headers.set("x-ivh-pathname", pathname);
     const response = NextResponse.next({ request: { headers } });

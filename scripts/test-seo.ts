@@ -31,23 +31,23 @@ async function main() {
 
   for (const path of ["/admin", "/vendor/products", "/account/orders/123", "/api/health", "/auth/google", "/login", "/register/customer", "/verify-email", "/reset-password", "/pay/ref", "/cart", "/checkout", "/track", "/book/service", "/s/royalfashionboutique/quote/ankara"]) {
     assert(isNonIndexablePath(path), path);
-    const response = middleware(new NextRequest(`https://www.ibomvendorshub.com${path}`, { headers: { host: "www.ibomvendorshub.com" } }));
+    const response = await middleware(new NextRequest(`https://www.ibomvendorshub.com${path}`, { headers: { host: "www.ibomvendorshub.com" } }));
     assert(response.headers.get("x-robots-tag")?.includes("noindex"), path);
   }
   for (const path of ["/", "/browse", "/stores", "/about", "/sell", "/products/ankara"]) assert(!isNonIndexablePath(path), path);
   for (const host of ["www.ibomvendorshub.com", "royalfashionboutique.ibomvendorshub.com"]) {
     for (const path of ["/robots.txt", "/sitemap.xml"]) {
-      const response = middleware(new NextRequest(`https://${host}${path}`, { headers: { host } }));
+      const response = await middleware(new NextRequest(`https://${host}${path}`, { headers: { host } }));
       assert.equal(response.headers.get("x-middleware-rewrite"), null, `${host}${path}`);
       assert.equal(response.headers.get("x-robots-tag"), null, `${host}${path}`);
     }
   }
-  const marketplace = middleware(new NextRequest("https://royalfashionboutique.ibomvendorshub.com/browse?category=fashion-clothing", { headers: { host: "royalfashionboutique.ibomvendorshub.com" } }));
+  const marketplace = await middleware(new NextRequest("https://royalfashionboutique.ibomvendorshub.com/browse?category=fashion-clothing", { headers: { host: "royalfashionboutique.ibomvendorshub.com" } }));
   assert.equal(marketplace.status, 308);
   assert.equal(marketplace.headers.get("location"), "https://www.ibomvendorshub.com/browse?category=fashion-clothing");
-  const preview = middleware(new NextRequest("https://project.vercel.app/", { headers: { host: "project.vercel.app" } }));
+  const preview = await middleware(new NextRequest("https://project.vercel.app/", { headers: { host: "project.vercel.app" } }));
   assert(preview.headers.get("x-robots-tag")?.includes("noindex"));
-  const search = middleware(new NextRequest("https://www.ibomvendorshub.com/browse?q=shirt", { headers: { host: "www.ibomvendorshub.com" } }));
+  const search = await middleware(new NextRequest("https://www.ibomvendorshub.com/browse?q=shirt", { headers: { host: "www.ibomvendorshub.com" } }));
   assert.equal(search.headers.get("x-robots-tag"), "noindex, follow");
 
   const input = { name: "Vendor </script><script>alert(1)</script>\u2028" };

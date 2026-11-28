@@ -12,20 +12,20 @@ try {
   assert.equal(storefrontUrl("glow-beauty"), "https://glow-beauty.ibomvendorshub.com");
   assert.equal(subdomainFromHost("glow-beauty.ibomvendorshub.com"), "glow-beauty");
   for (const host of ["ibomvendorshub.com", "www.ibomvendorshub.com"]) {
-    const response = middleware(new NextRequest(`https://${host}/s/glow-beauty/book/makeup?date=tomorrow`, { headers: { host } }));
+    const response = await middleware(new NextRequest(`https://${host}/s/glow-beauty/book/makeup?date=tomorrow`, { headers: { host } }));
     assert.equal(response.status, 308);
     assert.equal(response.headers.get("location"), "https://glow-beauty.ibomvendorshub.com/book/makeup?date=tomorrow");
   }
   const host = "glow-beauty.ibomvendorshub.com";
-  const rewrite = middleware(new NextRequest(`https://${host}/products`, { headers: { host } }));
+  const rewrite = await middleware(new NextRequest(`https://${host}/products`, { headers: { host } }));
   assert(rewrite.headers.get("x-middleware-rewrite")?.endsWith("/s/glow-beauty/products"));
-  const avatar = middleware(new NextRequest(`https://${host}/brand/store-avatar-placeholder.svg`, { headers: { host } }));
+  const avatar = await middleware(new NextRequest(`https://${host}/brand/store-avatar-placeholder.svg`, { headers: { host } }));
   assert.equal(avatar.headers.get("x-middleware-rewrite"), null, "branding assets must load directly on store subdomains");
   for (const preview of ["localhost:3000", "project.vercel.app", "3000-sandbox.e2b.app"]) {
-    const result = middleware(new NextRequest(`http://${preview}/s/glow-beauty`, { headers: { host: preview } }));
+    const result = await middleware(new NextRequest(`http://${preview}/s/glow-beauty`, { headers: { host: preview } }));
     assert.equal(result.headers.get("location"), null);
   }
-  const post = middleware(new NextRequest("https://www.ibomvendorshub.com/s/glow-beauty/book/makeup", { method: "POST", headers: { host: "www.ibomvendorshub.com" } }));
+  const post = await middleware(new NextRequest("https://www.ibomvendorshub.com/s/glow-beauty/book/makeup", { method: "POST", headers: { host: "www.ibomvendorshub.com" } }));
   assert.equal(post.headers.get("location"), null, "do not redirect booking submissions");
   process.env.NEXT_PUBLIC_ROOT_DOMAIN = "https://www.ibomvendorshub.com/";
   assert.equal(storefrontUrl("glow-beauty"), "https://glow-beauty.ibomvendorshub.com");

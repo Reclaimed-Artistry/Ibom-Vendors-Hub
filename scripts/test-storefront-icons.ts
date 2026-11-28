@@ -40,7 +40,7 @@ async function main() {
   ]) {
     for (const path of PUBLIC_BRAND_ASSET_PATHS) {
       for (const query of ["", "?v=legacy", "?q=logo"]) {
-        const response = middleware(new NextRequest(`https://${host}${path}${query}`, { headers: { host } }));
+        const response = await middleware(new NextRequest(`https://${host}${path}${query}`, { headers: { host } }));
         assert.equal(response.headers.get("x-middleware-rewrite"), null, `${host}${path} must not rewrite to a tenant page`);
         assert.equal(response.headers.get("location"), null, `${host}${path} needs no login or redirect`);
         assert.equal(response.headers.get("x-robots-tag"), null, `${host}${path} must not inherit page noindex`);
@@ -48,11 +48,11 @@ async function main() {
     }
   }
   // Only exact public assets bypass the usual privacy and preview safeguards.
-  const preview = middleware(new NextRequest("https://project.vercel.app/", { headers: { host: "project.vercel.app" } }));
+  const preview = await middleware(new NextRequest("https://project.vercel.app/", { headers: { host: "project.vercel.app" } }));
   assert(preview.headers.get("x-robots-tag")?.includes("noindex"));
-  const nested = middleware(new NextRequest("https://project.vercel.app/brand/organization-logo.png/private", { headers: { host: "project.vercel.app" } }));
+  const nested = await middleware(new NextRequest("https://project.vercel.app/brand/organization-logo.png/private", { headers: { host: "project.vercel.app" } }));
   assert(nested.headers.get("x-robots-tag")?.includes("noindex"));
-  const storefront = middleware(new NextRequest("https://kemcycollections.ibomvendorshub.com/products", { headers: { host: "kemcycollections.ibomvendorshub.com" } }));
+  const storefront = await middleware(new NextRequest("https://kemcycollections.ibomvendorshub.com/products", { headers: { host: "kemcycollections.ibomvendorshub.com" } }));
   assert(new URL(storefront.headers.get("x-middleware-rewrite")!).pathname.includes("/s/kemcycollections/products"), "normal storefront rewrite retained");
 
   for (const icon of BRAND_ICONS.icon) {
